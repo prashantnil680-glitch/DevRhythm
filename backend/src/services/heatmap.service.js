@@ -349,7 +349,7 @@ const regenerateHeatmapData = async (userId, year, forceFullRefresh = false, tim
   try {
     await HeatmapData.deleteOne({ userId, year });
     const heatmap = await generateHeatmapData(userId, year, timeZone);
-    await invalidateDashboardCache(userId);  // NEW: invalidate dashboard cache after heatmap regeneration
+    await invalidateDashboardCache(userId);
     return heatmap;
   } catch (error) {
     console.error('Error regenerating heatmap data:', error);
@@ -671,6 +671,60 @@ const flushDailyActivitiesToMongoDB = async () => {
   }
 };
 
+/**
+ * Retrieve a single day's aggregated activity for a user.
+ * Ensures the heatmap exists for the given year, then returns the daily entry.
+ *
+ * @param {string} userId - User ObjectId
+ * @param {Date|string} date - Target date (will be converted to start of day in user's timezone)
+ * @param {string} timeZone - IANA timezone (e.g., 'Asia/Kolkata')
+ * @returns {Promise<Object|null>} - Day data object or null if date is outside the year range
+ */
+const getDayData = async (userId, date, timeZone = 'UTC') => {
+  const targetDate = getStartOfDay(new Date(date), timeZone);
+  const year = targetDate.getUTCFullYear();
+
+  // Ensure heatmap exists for the year
+  let heatmap = await HeatmapData.findOne({ userId, year }).lean();
+  if (!heatmap) {
+    heatmap = await generateHeatmapData(userId, year, timeZone);
+  }
+
+  // Find the daily entry
+  const dayEntry = heatmap.dailyData.find((day) => isSameDay(day.date, targetDate, timeZone));
+  if (!dayEntry) {
+    // Day is out of range for the year (e.g., Dec 31 2025 but year is 2024) – return null
+    return null;
+  }
+
+  // Compute date string and day of week
+  const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][targetDate.getUTCDay()];
+
+  return {
+    date: formatDate(targetDate),
+    dayOfWeek,
+    problemsSolved: dayEntry.newProblemsSolved,
+    revisionsCompleted: dayEntry.revisionProblems,
+    studyTimeMinutes: dayEntry.totalTimeSpent,
+    goalAchieved: dayEntry.dailyGoalAchieved,
+    goalTarget: dayEntry.goalTarget,
+    goalCompletion: dayEntry.goalCompletion,
+    submissions: dayEntry.totalSubmissions,
+    testCaseExecutions: dayEntry.testCaseExecutions || 0,
+    passedCount: dayEntry.passedCount || 0,
+    failedCount: dayEntry.failedCount || 0,
+    activityBreakdown: {
+      easy: dayEntry.difficultyBreakdown.easy,
+      medium: dayEntry.difficultyBreakdown.medium,
+      hard: dayEntry.difficultyBreakdown.hard,
+      leetcode: dayEntry.platformBreakdown.leetcode,
+      hackerrank: dayEntry.platformBreakdown.hackerrank,
+      codeforces: dayEntry.platformBreakdown.codeforces,
+      other: dayEntry.platformBreakdown.other,
+    },
+  };
+};
+
 module.exports = {
   calculateIntensityLevel,
   generateHeatmapData,
@@ -682,4 +736,5 @@ module.exports = {
   extractMinimalHeatmap,
   incrementDailyActivity,
   flushDailyActivitiesToMongoDB,
+  getDayData, // newly exported
 };

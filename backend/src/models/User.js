@@ -71,7 +71,7 @@ const UserSchema = new mongoose.Schema({
   preferences: {
     timezone: {
       type: String,
-      default: 'UTC'
+      // default: 'UTC'
     },
     notifications: {
       revisionReminders: {

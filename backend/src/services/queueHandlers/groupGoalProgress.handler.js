@@ -39,22 +39,25 @@ const handleGroupGoalProgress = async (job) => {
       await invalidateCache(`heatmap:${userId}:${year}:*`);
     }
 
-    // --- Create activity log ---
-    await ActivityLog.create({
-      userId,
-      action: 'group_goal_progress',
-      targetId: groupId,
-      targetModel: 'StudyGroup',
-      metadata: {
-        goalId,
-        delta,
-        newProgress,
-        target
-      },
-      timestamp: activityDate,
-    });
+    // --- Create activity log ONLY if progress > 50% or ==100% ---
+    const percentage = (newProgress / target) * 100;
+    if (percentage > 50 || percentage === 100) {
+      await ActivityLog.create({
+        userId,
+        action: 'group_goal_progress',
+        targetId: groupId,
+        targetModel: 'StudyGroup',
+        metadata: {
+          goalId,
+          delta,
+          newProgress,
+          target
+        },
+        timestamp: activityDate,
+      });
+    }
 
-    console.log(`Group goal progress processed for user ${userId}`);
+    console.log(`Group goal progress processed for user ${userId} (progress: ${newProgress}/${target}, percentage: ${percentage}%)`);
   } catch (error) {
     console.error('Error in groupGoalProgress handler:', error);
     throw error;

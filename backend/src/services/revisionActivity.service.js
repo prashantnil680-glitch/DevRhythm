@@ -1,8 +1,9 @@
-// src/services/revisionActivity.service.js
 const { client: redisClient } = require('../config/redis');
 const RevisionSchedule = require('../models/RevisionSchedule');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const User = require('../models/User');
+const Question = require('../models/Question');
+const ActivityLog = require('../models/ActivityLog');
 const { getStartOfDay, getEndOfDay, formatDate, isToday } = require('../utils/helpers/date');
 const { invalidateCache } = require('../middleware/cache');
 const heatmapService = require('./heatmap.service');
@@ -261,6 +262,10 @@ const markTestPassedForQuestion = async (userId, questionId) => {
   }
 };
 
+/**
+ * Complete a past overdue revision (the one whose scheduled date is before today).
+ * Now creates an ActivityLog entry.
+ */
 const completePastRevision = async (userId, questionId, targetDate, confidence = null, auto = false) => {
   const timeZone = await getUserTimeZone(userId);
   const todayStart = getStartOfDay(new Date(), timeZone);
@@ -344,11 +349,76 @@ const completePastRevision = async (userId, questionId, targetDate, confidence =
   await deleteRevisionSession(userId, questionId, targetDate);
   await invalidateCache(`revisions:*:user:${userId}:*`);
 
+  await ActivityLog.create({
+    userId,
+    action: 'revision_completed',
+    targetId: questionId,
+    targetModel: 'Question',
+    metadata: {
+      revisionIndex: targetIndex,
+      scheduledDate: revision.schedule[targetIndex],
+      overdueCompleted: true,
+      outOfOrder: false,
+      timeSpent: activity.timeSpent,
+      confidenceAfter: confidence && confidence >= 1 && confidence <= 5 ? confidence : null,
+    },
+    timestamp: completionDate,
+  });
+
   return {
     completed: true,
     message: `Past revision for ${formatDate(targetDate)} marked as completed.`,
     revision,
   };
+};
+
+/**
+ * Retrieve all revisions completed on a specific day, with full question details.
+ */
+const getDayRevisions = async (userId, date, timeZone) => {
+  const targetDateStart = getStartOfDay(date, timeZone);
+  const targetDateEnd = getEndOfDay(date, timeZone);
+
+  const schedules = await RevisionSchedule.aggregate([
+    { $match: { userId } },
+    { $unwind: '$completedRevisions' },
+    {
+      $match: {
+        'completedRevisions.completedAt': {
+          $gte: targetDateStart,
+          $lte: targetDateEnd,
+        },
+        'completedRevisions.status': 'completed',
+      },
+    },
+    {
+      $lookup: {
+        from: 'questions',
+        localField: 'questionId',
+        foreignField: '_id',
+        as: 'question',
+      },
+    },
+    { $unwind: '$question' },
+    {
+      $project: {
+        questionId: '$question._id',
+        platformQuestionId: '$question.platformQuestionId',
+        title: '$question.title',
+        platform: '$question.platform',
+        difficulty: '$question.difficulty',
+        completedAt: '$completedRevisions.completedAt',
+        timeSpent: '$completedRevisions.timeSpent',
+        confidenceAfter: '$completedRevisions.confidenceAfter',
+        status: '$completedRevisions.status',
+        overdueCompleted: '$completedRevisions.overdueCompleted',
+        outOfOrder: '$completedRevisions.outOfOrder',
+      },
+    },
+    { $sort: { completedAt: -1 } },
+  ]);
+
+  return schedules;
 };
 
 module.exports = {
@@ -362,4 +432,5 @@ module.exports = {
   markTestPassedForQuestion,
   addActiveSecondsToSession,
   deleteRevisionSession,
+  getDayRevisions,
 };

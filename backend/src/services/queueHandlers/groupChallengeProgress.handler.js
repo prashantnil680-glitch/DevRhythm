@@ -39,22 +39,25 @@ const handleGroupChallengeProgress = async (job) => {
       await invalidateCache(`heatmap:${userId}:${year}:*`);
     }
 
-    // --- Create activity log ---
-    await ActivityLog.create({
-      userId,
-      action: 'group_challenge_progress',
-      targetId: groupId,
-      targetModel: 'StudyGroup',
-      metadata: {
-        challengeId,
-        delta,
-        newProgress,
-        target
-      },
-      timestamp: activityDate,
-    });
+    // --- Create activity log ONLY if progress > 50% or ==100% ---
+    // Note: newProgress is already a percentage (0‑100)
+    if (newProgress > 50 || newProgress === 100) {
+      await ActivityLog.create({
+        userId,
+        action: 'group_challenge_progress',
+        targetId: groupId,
+        targetModel: 'StudyGroup',
+        metadata: {
+          challengeId,
+          delta,
+          newProgress,
+          target
+        },
+        timestamp: activityDate,
+      });
+    }
 
-    console.log(`Group challenge progress processed for user ${userId}`);
+    console.log(`Group challenge progress processed for user ${userId} (progress: ${newProgress}%, target: ${target})`);
   } catch (error) {
     console.error('Error in groupChallengeProgress handler:', error);
     throw error;

@@ -1,6 +1,6 @@
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const Question = require('../models/Question');
-const { getStartOfDay } = require('../utils/helpers/date');
+const { getStartOfDay, getEndOfDay, formatDate, getDaysBetween } = require('../utils/helpers/date');
 
 const calculateProgressStats = async (userId) => {
   const progressRecords = await UserQuestionProgress.find({ userId })
@@ -174,6 +174,56 @@ const getUserRecentProgress = async (userId, limit = 10) => {
     .lean();
 };
 
+/**
+ * Retrieve all questions solved on a specific day (status 'Solved' or 'Mastered' with solvedAt timestamp within the day).
+ * Includes full question details and progress metadata.
+ *
+ * @param {string} userId - User ObjectId
+ * @param {Date|string} date - Target date (will be converted to start/end of day in user's timezone)
+ * @param {string} timeZone - IANA timezone
+ * @returns {Promise<Array>} - Array of solved question objects, each containing:
+ *   - questionId, platformQuestionId, title, platform, difficulty
+ *   - solvedAt (timestamp)
+ *   - totalTimeSpent, revisionCount, attemptsCount, confidenceLevel, status
+ *   - lastPracticed (lastRevisedAt or updatedAt or lastAttemptAt)
+ */
+const getDaySolvedQuestions = async (userId, date, timeZone) => {
+  const dayStart = getStartOfDay(date, timeZone);
+  const dayEnd = getEndOfDay(date, timeZone);
+
+  const solvedRecords = await UserQuestionProgress.find({
+    userId,
+    status: { $in: ['Solved', 'Mastered'] },
+    'attempts.solvedAt': { $gte: dayStart, $lte: dayEnd },
+  })
+    .populate('questionId', '_id platformQuestionId title platform difficulty tags pattern')
+    .lean();
+
+  // Map to desired output structure
+  const result = solvedRecords.map(record => {
+    const question = record.questionId;
+    if (!question) return null;
+    return {
+      questionId: question._id,
+      platformQuestionId: question.platformQuestionId,
+      title: question.title,
+      platform: question.platform,
+      difficulty: question.difficulty,
+      tags: question.tags,
+      pattern: question.pattern,
+      solvedAt: record.attempts?.solvedAt,
+      totalTimeSpent: record.totalTimeSpent || 0,
+      revisionCount: record.revisionCount || 0,
+      attemptsCount: record.attempts?.count || 0,
+      confidenceLevel: record.confidenceLevel || 0,
+      status: record.status,
+      lastPracticed: record.lastRevisedAt || record.updatedAt || record.attempts?.lastAttemptAt || null,
+    };
+  }).filter(Boolean);
+
+  return result;
+};
+
 module.exports = {
   calculateProgressStats,
   updateProgressStatus,
@@ -182,5 +232,6 @@ module.exports = {
   updateQuestionCode,
   updateQuestionNotes,
   updateQuestionConfidence,
-  getUserRecentProgress
+  getUserRecentProgress,
+  getDaySolvedQuestions, // newly exported
 };

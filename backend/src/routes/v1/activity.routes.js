@@ -28,12 +28,11 @@ router.get('/',
   activityController.getActivityLogs
 );
 
-router.get('/feed',
+// NEW: Today's solved questions grouped by followed user
+router.get('/feed/today-grouped',
   auth,
-  rateLimiters.userLimiter,
-  cache(30, 'activity:feed'),
-  validate(Joi.object({ page: Joi.number().integer().min(1).default(1), limit: Joi.number().integer().min(1).max(50).default(20) }), 'query'),
-  activityController.getActivityFeed
+  rateLimiters.followGetLimiter,
+  activityController.getTodayGroupedFeed
 );
 
 module.exports = router;

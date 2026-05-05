@@ -18,6 +18,8 @@ const progressSnapshotRoutes = require('./progressSnapshot.routes');
 const userStatsRoutes = require('./userStats.routes');
 const codeExecutionRoutes = require('./codeExecution.routes');
 const dashboardRoutes = require('./dashboard.routes');
+const trendsRoutes = require('./trends.routes');
+const activityDayRoutes = require('./activityDay.routes');
 
 router.get('/health', (req, res) => {
   res.json({
@@ -57,6 +59,8 @@ router.use('/notifications', notificationRoutes);
 router.use('/progress-snapshots', progressSnapshotRoutes);
 router.use('/user-stats', userStatsRoutes);
 router.use('/code', codeExecutionRoutes);
-router.use('/dashboard', dashboardRoutes);   // NEW LINE
+router.use('/dashboard', dashboardRoutes);
+router.use('/trends', trendsRoutes);
+router.use('/activity', activityDayRoutes);  // Note: activity/day routes, separate from activity/ (activityRoutes)
 
 module.exports = router;

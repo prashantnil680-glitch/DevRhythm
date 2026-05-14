@@ -23,7 +23,7 @@ const RevisionScheduleSchema = new mongoose.Schema({
       enum: ['completed', 'skipped', 'auto_skipped'],
     },
     timeSpent: { type: Number, default: 0 },
-    confidenceAfter: { type: Number, min: 1, max: 5 },
+    confidenceAfter: { type: Number, min: 0, max: 5 },
     overdueCompleted: { type: Boolean, default: false },
     skipped: { type: Boolean, default: false },
     outOfOrder: { type: Boolean, default: false }

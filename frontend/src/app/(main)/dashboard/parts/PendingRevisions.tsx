@@ -33,11 +33,10 @@ export default function PendingRevisions({
   };
 
   const title = type === 'pending' ? 'Pending Revisions Today' : 'Upcoming Revisions';
-  // const viewAllLink = type === 'pending' ? ROUTES.REVISIONS.ROOT : ROUTES.REVISIONS.ROOT;
   const viewAllLink = ROUTES.REVISIONS.ROOT;
   const displayLimit = limit ?? (type === 'pending' ? 2 : 5);
 
-  // Helper: get time remaining for pending revision (hours left today)
+  // Helper: get hours left today for pending revision
   const getHoursLeftToday = (scheduledDate: string): string | null => {
     const now = new Date();
     const endOfToday = endOfDay(now);
@@ -49,15 +48,18 @@ export default function PendingRevisions({
     return `${hoursLeft}h left`;
   };
 
-  // Helper: get days until upcoming revision
+  // Helper: get days until upcoming revision using local calendar dates
   const getDaysRemaining = (scheduledDate: string): string => {
-    const now = new Date();
     const scheduled = new Date(scheduledDate);
-    const days = differenceInDays(scheduled, now);
-    if (days < 0) return 'Overdue';
-    if (days === 0) return 'Today';
-    if (days === 1) return 'Tomorrow';
-    return `in ${days} days`;
+    const now = new Date();
+    // Use local midnight for comparison (ignore time-of-day)
+    const localScheduled = new Date(scheduled.getFullYear(), scheduled.getMonth(), scheduled.getDate());
+    const localNow = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffDays = Math.floor((localScheduled.getTime() - localNow.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return 'Overdue';
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    return `in ${diffDays} days`;
   };
 
   if (isLoading) {

@@ -93,8 +93,7 @@ const followUser = async (req, res, next) => {
     // So we skip public cache invalidation to avoid unnecessary purges.
 
     // Emit event for new follower
-    await jobQueue.add({
-      type: 'follower.new',
+    await jobQueue.add('follower.new', {
       followerId: req.user._id,
       followedId,
       createdAt: follow.createdAt

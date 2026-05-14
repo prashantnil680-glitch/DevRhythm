@@ -321,12 +321,12 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
         {progress?.personalDifficulty && (
           <span className={styles.personalBadge}>Personal: {progress.personalDifficulty}</span>
         )}
-        {initialQuestion.tags.map(tag => (
-          <span key={tag} className={styles.tag}>#{tag}</span>
-        ))}
+          {/* {initialQuestion.tags.map(tag => (
+            <span key={tag} className={styles.tag}>#{tag}</span>
+          ))} */}
         {initialQuestion.pattern?.map(p => (
           <Link key={p} href={`/patterns/${slugify(p)}`} className={styles.patternLink}>
-            {p}
+            #{p}
           </Link>
         ))}
 

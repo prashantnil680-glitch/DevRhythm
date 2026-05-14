@@ -1,3 +1,4 @@
+const { DateTime } = require('luxon');
 const Goal = require('../models/Goal');
 const RevisionSchedule = require('../models/RevisionSchedule');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
@@ -11,6 +12,13 @@ const revisionService = require('./revision.service');
 const { calculateIntensityLevel } = require('./heatmap.service');
 const { getStartOfDay, getEndOfDay, getStartOfWeek, getEndOfWeek, getStartOfMonth, getEndOfMonth, formatDate } = require('../utils/helpers/date');
 const { slugify } = require('../utils/helpers/string');
+
+// Helper to convert UTC to localised ISO string
+const toLocalISOString = (utcDate, timeZone) => {
+  if (!utcDate) return null;
+  const dt = DateTime.fromJSDate(new Date(utcDate), { zone: 'UTC' });
+  return dt.setZone(timeZone).toISO({ includeOffset: true });
+};
 
 const getUserStats = (user) => ({
   totalSolved: user.stats?.totalSolved || 0,
@@ -110,6 +118,7 @@ const getRevisionsData = async (userId, timeZone) => {
     },
     { $unwind: { path: '$progress', preserveNullAndEmptyArrays: true } },
     { $project: {
+        _id: '$_id',
         questionId: '$question._id',
         platformQuestionId: '$question.platformQuestionId',
         title: '$question.title',
@@ -131,6 +140,12 @@ const getRevisionsData = async (userId, timeZone) => {
     }
   ]);
 
+  // Convert scheduledDate to local timezone
+  const convertedPendingList = pendingList.map(item => ({
+    ...item,
+    scheduledDate: toLocalISOString(item.scheduledDate, timeZone)
+  }));
+
   const upcomingCountResult = await RevisionSchedule.aggregate([
     { $match: { userId, status: 'active' } },
     { $project: { nextDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] } } },
@@ -139,7 +154,7 @@ const getRevisionsData = async (userId, timeZone) => {
   ]);
   const upcomingCount = upcomingCountResult[0]?.count || 0;
 
-  return { pendingTodayCount, pendingToday: pendingList, upcomingCount };
+  return { pendingTodayCount, pendingToday: convertedPendingList, upcomingCount };
 };
 
 const getRecentActivity = async (userId, timeZone) => {
@@ -400,7 +415,12 @@ const getRecentRevisions = async (userId, timeZone) => {
       result.push({ ...rev, isPending: false });
     }
   }
-  return result.slice(0, 5);
+
+  // Convert date to local timezone for all items
+  return result.slice(0, 5).map(item => ({
+    ...item,
+    date: toLocalISOString(item.date, timeZone)
+  }));
 };
 
 const getRecentlySolved = async (userId) => {
@@ -569,6 +589,7 @@ const getUpcomingRevisionsList = async (userId, timeZone, limit = 5) => {
     },
     { $unwind: { path: '$progress', preserveNullAndEmptyArrays: true } },
     { $project: {
+        _id: '$_id',
         questionId: '$question._id',
         platformQuestionId: '$question.platformQuestionId',
         title: '$question.title',
@@ -588,7 +609,12 @@ const getUpcomingRevisionsList = async (userId, timeZone, limit = 5) => {
       }
     }
   ]);
-  return upcoming;
+
+  // Convert scheduledDate to local timezone
+  return upcoming.map(item => ({
+    ...item,
+    scheduledDate: toLocalISOString(item.scheduledDate, timeZone)
+  }));
 };
 
 const getActivePlannedGoals = async (userId, limit = 2) => {

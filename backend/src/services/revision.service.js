@@ -1,5 +1,7 @@
+const { DateTime } = require('luxon');
 const RevisionSchedule = require('../models/RevisionSchedule');
 const { getStartOfDay, getEndOfDay, isToday, getStartOfMonth, getEndOfMonth } = require('../utils/helpers/date');
+const constants = require('../config/constants');
 
 /**
  * Calculate revision stats using aggregation with pendingDue (actual due date)
@@ -11,11 +13,9 @@ const calculateRevisionStats = async (userId) => {
   nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
   nextWeekEnd.setHours(23, 59, 59, 999);
 
-  // Total active
   const totalActive = await RevisionSchedule.countDocuments({ userId, status: 'active' });
   const totalCompleted = await RevisionSchedule.countDocuments({ userId, status: 'completed' });
 
-  // Overdue and pending counts based on pendingDue
   const stats = await RevisionSchedule.aggregate([
     { $match: { userId, status: 'active' } },
     {
@@ -132,19 +132,36 @@ const calculateUpcomingStats = async (userId, startDate, endDate) => {
   return { totalUpcoming, byDay };
 };
 
-const createRevisionSchedule = async (userId, questionId, baseDate, customSchedule = null) => {
-  const schedule = customSchedule || [1, 3, 7, 14, 30].map(days => {
-    const date = new Date(baseDate);
-    date.setDate(date.getDate() + days);
-    date.setHours(0, 0, 0, 0);
-    return date;
-  });
+/**
+ * Create a revision schedule for a user+question.
+ * @param {string} userId - User ObjectId
+ * @param {string} questionId - Question ObjectId
+ * @param {Date|string} baseDate - Base date (usually the solve date, UTC)
+ * @param {Array<Date>} customSchedule - Optional custom schedule of dates (UTC)
+ * @param {string} timeZone - IANA timezone (e.g., 'Asia/Kolkata', 'UTC')
+ * @returns {Promise<Document>} Created RevisionSchedule document
+ */
+const createRevisionSchedule = async (userId, questionId, baseDate, customSchedule = null, timeZone = 'UTC') => {
+  let scheduleUTC;
+  const baseUTC = new Date(baseDate);
+
+  if (customSchedule && Array.isArray(customSchedule) && customSchedule.length === 5) {
+    scheduleUTC = customSchedule;
+  } else {
+    const daysOffsets = constants.REVISION_SCHEDULE; // [1, 3, 7, 14, 30]
+    const baseLocal = DateTime.fromJSDate(baseUTC, { zone: timeZone });
+    scheduleUTC = daysOffsets.map(offset => {
+      // For all offsets, use start of the target day (midnight)
+      const localDate = baseLocal.startOf('day').plus({ days: offset });
+      return localDate.toUTC().toJSDate();
+    });
+  }
 
   const revision = await RevisionSchedule.create({
     userId,
     questionId,
-    schedule,
-    baseDate,
+    schedule: scheduleUTC,
+    baseDate: baseUTC,
     status: 'active',
   });
 
@@ -237,7 +254,6 @@ const getRevisionStatusLabel = (revision, index = null, mode = 'actionable', tim
 const getDetailedRevisionStats = async (userId, timeZone = 'UTC') => {
   const baseStats = await calculateRevisionStats(userId);
 
-  // Trends (daily, weekly, monthly)
   const trends = await RevisionSchedule.aggregate([
     { $match: { userId, status: { $in: ['active', 'completed'] } } },
     { $unwind: '$completedRevisions' },
@@ -432,22 +448,8 @@ const getDetailedRevisionStats = async (userId, timeZone = 'UTC') => {
   return detailedStats;
 };
 
-/**
- * Compute monthly revision completion rate for the last N months.
- * For each month, counts:
- *   - Scheduled: number of revision entries whose due date falls in that month.
- *   - Completed on time: number of those that were completed on or before their due date.
- * Returns an array of percentages (0-100) aligned with the last N months (most recent first or last?).
- * The function returns from oldest to newest (ascending) for consistency with monthly trend charts.
- *
- * @param {string} userId - User ObjectId
- * @param {number} months - Number of months to look back (default 12)
- * @param {string} timeZone - IANA timezone
- * @returns {Promise<Array<number>>} - Array of completion percentages (0-100) for each month, oldest to newest.
- */
 const getMonthlyRevisionCompletionRate = async (userId, months = 12, timeZone = 'UTC') => {
   const now = new Date();
-  // Generate month boundaries: from earliest month to latest month
   const monthBoundaries = [];
   for (let i = months - 1; i >= 0; i--) {
     const monthDate = new Date(now);
@@ -462,7 +464,6 @@ const getMonthlyRevisionCompletionRate = async (userId, months = 12, timeZone = 
   const completionRates = [];
 
   for (const boundary of monthBoundaries) {
-    // Find all revision schedules that have at least one scheduled revision date in this month
     const schedules = await RevisionSchedule.aggregate([
       { $match: { userId } },
       { $unwind: { path: '$schedule', includeArrayIndex: 'schedIndex' } },
@@ -491,7 +492,6 @@ const getMonthlyRevisionCompletionRate = async (userId, months = 12, timeZone = 
 
     for (const s of schedules) {
       scheduledCount++;
-      // Check if this specific revision entry has been completed on or before its due date
       const completionEntry = s.completedRevisions.find(cr => {
         const crDate = new Date(cr.date);
         return crDate.getTime() === s.scheduleDate.getTime() && cr.status === 'completed';
@@ -521,5 +521,5 @@ module.exports = {
   updateOverdueRevisions,
   getRevisionStatusLabel,
   getDetailedRevisionStats,
-  getMonthlyRevisionCompletionRate, // newly exported
+  getMonthlyRevisionCompletionRate,
 };

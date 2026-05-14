@@ -1,4 +1,4 @@
-// src/services/queueHandlers/questionSolved.handler.js
+const { DateTime } = require('luxon');
 const User = require("../../models/User");
 const Question = require("../../models/Question");
 const PatternMastery = require("../../models/PatternMastery");
@@ -16,8 +16,8 @@ const {
 const { getStartOfDay, parseDate } = require("../../utils/helpers/date");
 const heatmapService = require("../heatmap.service");
 const { updateUserActivity } = require("../user.service");
-const { DateTime } = require("luxon");
 const { client: redisClient } = require("../../config/redis");
+const constants = require("../../config/constants");
 
 const getGoalDailySolveKey = (userId, dateStr) => `goal:solved:daily:${userId}:${dateStr}`;
 
@@ -188,28 +188,37 @@ const handleQuestionSolved = async (job) => {
       }
     }
 
-    if (isFirstSolve) {
-      const existingRevision = await RevisionSchedule.findOne({ userId, questionId });
-      if (!existingRevision) {
-        const baseDate = solvedDate;
-        const schedule = [1, 3, 7, 14, 30].map((days) => {
-          const d = new Date(baseDate);
-          d.setDate(d.getDate() + days);
-          d.setHours(0, 0, 0, 0);
-          return d;
-        });
-        await RevisionSchedule.create({
-          userId,
-          questionId,
-          schedule,
-          baseDate,
-          status: "active",
-          currentRevisionIndex: 1,
-          completedRevisions: [{ date: schedule[0], completedAt: new Date(), status: "completed" }],
-        });
+    // ========== REVISION SCHEDULE HANDLING (TIMEZONE-AWARE, NO AUTO-COMPLETION) ==========
+    const existingRevision = await RevisionSchedule.findOne({ userId, questionId });
+
+    if (!existingRevision) {
+      const scheduleDays = constants.REVISION_SCHEDULE; // [1, 3, 7, 14, 30]
+      const scheduleUTC = scheduleDays.map(days => {
+        // For all offsets, use start of the target day (midnight)
+        const localDate = solvedLocal.startOf('day').plus({ days });
+        return localDate.toUTC().toJSDate();
+      });
+      await RevisionSchedule.create({
+        userId,
+        questionId,
+        schedule: scheduleUTC,
+        baseDate: solvedLocalMidnight.toUTC().toJSDate(),
+        status: "active",
+        currentRevisionIndex: 0,
+        completedRevisions: []
+      });
+    } else {
+      // Ensure no auto‑completion (if the schedule already exists but was created with auto‑completion in the past)
+      if (existingRevision.completedRevisions.length === 0 && existingRevision.currentRevisionIndex !== 0) {
+        existingRevision.currentRevisionIndex = 0;
+        existingRevision.completedRevisions = [];
+        existingRevision.updatedAt = new Date();
+        await existingRevision.save();
       }
-      await invalidateCache(`revisions:*:user:${userId}:*`);
     }
+    await invalidateCache(`revisions:*:user:${userId}:*`);
+    await invalidateCache(`question-details:*:${questionId}:*`);
+    // =========================================================================
 
     if (!wasSolvedToday) {
       let isGoalRelated = false;
@@ -345,7 +354,7 @@ const handleQuestionSolved = async (job) => {
       }
     }
 
-    // Queue confidence increment (fixed: two arguments)
+    // Queue confidence increment
     const { jobQueue } = require("../queue.service");
     await jobQueue.add('confidence.increment', {
       userId,

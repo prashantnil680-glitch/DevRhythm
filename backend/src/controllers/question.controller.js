@@ -1,3 +1,4 @@
+const { DateTime } = require('luxon');
 const Question = require('../models/Question');
 const Goal = require('../models/Goal');  
 const UserQuestionProgress = require('../models/UserQuestionProgress');
@@ -14,6 +15,47 @@ const { invalidateQuestionCache } = require('../middleware/cache');
 const { fetchProblemDetails, searchProblems } = require('../services/leetcode.service');
 const { jobQueue } = require('../services/queue.service');
 const revisionService = require('../services/revision.service');
+const dashboardService = require('../services/dashboard.service');
+const leetcodeService = require('../services/leetcode.service');
+
+/**
+ * Convert a UTC date to user's local ISO string with offset.
+ * Example output: "2026-05-15T00:00:00+05:30"
+ */
+const toLocalISOString = (utcDate, timeZone) => {
+  if (!utcDate) return null;
+  if (!timeZone) timeZone = 'UTC';
+  const dt = DateTime.fromJSDate(new Date(utcDate), { zone: 'UTC' });
+  return dt.setZone(timeZone).toISO({ includeOffset: true });
+};
+
+/**
+ * Convert all date fields in a revision object to local timezone.
+ */
+const convertRevisionDatesToLocal = (revision, timeZone) => {
+  if (!revision) return revision;
+  const converted = { ...revision };
+  if (Array.isArray(converted.schedule)) {
+    converted.schedule = converted.schedule.map(d => toLocalISOString(d, timeZone));
+  }
+  if (converted.baseDate) converted.baseDate = toLocalISOString(converted.baseDate, timeZone);
+  if (converted.createdAt) converted.createdAt = toLocalISOString(converted.createdAt, timeZone);
+  if (converted.updatedAt) converted.updatedAt = toLocalISOString(converted.updatedAt, timeZone);
+  if (Array.isArray(converted.completedRevisions)) {
+    converted.completedRevisions = converted.completedRevisions.map(cr => ({
+      ...cr,
+      date: toLocalISOString(cr.date, timeZone),
+      completedAt: toLocalISOString(cr.completedAt, timeZone)
+    }));
+  }
+  if (Array.isArray(converted.scheduleStatuses)) {
+    converted.scheduleStatuses = converted.scheduleStatuses.map(ss => ({
+      ...ss,
+      date: toLocalISOString(ss.date, timeZone)
+    }));
+  }
+  return converted;
+};
 
 const generatePatternFromTags = (tags) => {
   if (!tags || tags.length === 0) return '';
@@ -118,7 +160,7 @@ const getQuestionById = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-const fetchQuestionDetails = async (userId, questionId) => {
+const fetchQuestionDetails = async (userId, questionId, timeZone) => {
   const [
     question,
     progress,
@@ -149,17 +191,23 @@ const fetchQuestionDetails = async (userId, questionId) => {
 
   if (!question) return null;
 
+  let revisionWithLocalDates = null;
+  if (revision) {
+    const revObj = {
+      ...revision,
+      currentStatus: revisionService.getRevisionStatusLabel(revision, null, 'actionable', timeZone),
+      scheduleStatuses: revision.schedule.map((date, idx) => ({
+        date,
+        status: revisionService.getRevisionStatusLabel(revision, idx, 'display', timeZone)
+      }))
+    };
+    revisionWithLocalDates = convertRevisionDatesToLocal(revObj, timeZone);
+  }
+
   return {
     question,
     progress: progress || null,
-    revision: revision ? {
-      ...revision,
-      currentStatus: revisionService.getRevisionStatusLabel(revision, null, 'actionable'),
-      scheduleStatuses: revision.schedule.map((date, idx) => ({
-        date,
-        status: revisionService.getRevisionStatusLabel(revision, idx, 'display')
-      }))
-    } : null,
+    revision: revisionWithLocalDates,
     codeExecutionHistory: codeHistory || [],
     activityLogs: activityLogs || []
   };
@@ -169,8 +217,9 @@ const getQuestionDetails = async (req, res, next) => {
   try {
     const { id: questionId } = req.params;
     const userId = req.user._id;
+    const timeZone = req.userTimeZone || 'UTC';
 
-    const details = await fetchQuestionDetails(userId, questionId);
+    const details = await fetchQuestionDetails(userId, questionId, timeZone);
     if (!details) throw new AppError('Question not found', 404);
 
     res.json(formatResponse('Question details retrieved successfully', details));
@@ -183,13 +232,14 @@ const getQuestionDetailsByPlatform = async (req, res, next) => {
   try {
     const { platform, platformQuestionId } = req.params;
     const userId = req.user._id;
+    const timeZone = req.userTimeZone || 'UTC';
 
     const question = await Question.findOne({ platform, platformQuestionId, isActive: true })
       .select('_id')
       .lean();
     if (!question) throw new AppError('Question not found', 404);
 
-    const details = await fetchQuestionDetails(userId, question._id);
+    const details = await fetchQuestionDetails(userId, question._id, timeZone);
     res.json(formatResponse('Question details retrieved successfully', details));
   } catch (error) {
     next(error);
@@ -282,18 +332,10 @@ const createQuestion = async (req, res, next) => {
     }
 
     if (question.contentRef && (!question.testCases || question.testCases.length === 0)) {
-      await jobQueue.add({
-        type: 'question.extract_testcases',
+      await jobQueue.add('question.extract_testcases', {
         questionId: question._id
       });
     }
-
-    await jobQueue.add({
-      type: 'revision.schedule',
-      userId: req.user._id,
-      questionId: question._id,
-      baseDate: new Date(),
-    });
 
     await invalidateQuestionCache(question._id, question.platform, question.platformQuestionId);
 
@@ -570,85 +612,80 @@ const getDailyProblemAndGoal = async (req, res, next) => {
       status: dailyGoal.status
     } : null;
 
-    const forceRefresh = req.query.refresh === 'true';
+    const dashboardDaily = await dashboardService.getDailyProblem(userId);
+    
     let dailyProblem = null;
-
-    try {
-      const leetcodeService = require('../services/leetcode.service');
-      const rawDaily = await leetcodeService.getDailyProblem(forceRefresh);
+    if (dashboardDaily && dashboardDaily.title) {
+      const question = await Question.findOne({
+        platform: 'LeetCode',
+        platformQuestionId: dashboardDaily.platformQuestionId,
+        isActive: true
+      }).lean();
       
-      if (rawDaily && rawDaily.titleSlug) {
-        // Compute POD active flag based on the date from LeetCode
-        const todayUTC = new Date().toISOString().split('T')[0];
-        const isPodActive = rawDaily.date === todayUTC;
-
-        // Build the enriched dailyProblem object
-        dailyProblem = {
-          date: rawDaily.date,
-          title: rawDaily.title,
-          titleSlug: rawDaily.titleSlug,
-          difficulty: rawDaily.difficulty,
-          link: rawDaily.link,
-          tags: rawDaily.tags || [],
-          codeSnippets: rawDaily.codeSnippets || {},
-          isPodActive 
-        };
-
-        // Auto-create the question in DB if not exists (existing logic)
-        const existingQuestion = await Question.findOne({
-          platform: 'LeetCode',
-          platformQuestionId: rawDaily.titleSlug,
-          isActive: true
-        });
-
-        if (!existingQuestion) {
-          const fullDetails = await leetcodeService.fetchProblemDetails(rawDaily.link);
-          
-          let extractedTestCases = [];
-          if (fullDetails.description) {
-            const { extractTestCasesFromHtml } = require('../services/queueHandlers/questionExtractTestCases.hanlder');
-            extractedTestCases = extractTestCasesFromHtml(fullDetails.description);
-          }
-
-          const starterCode = {};
-          if (fullDetails.codeSnippets) {
-            Object.entries(fullDetails.codeSnippets).forEach(([lang, code]) => {
-              starterCode[lang.toLowerCase()] = code;
+      dailyProblem = {
+        date: dashboardDaily.date,
+        title: dashboardDaily.title,
+        titleSlug: dashboardDaily.platformQuestionId,
+        difficulty: dashboardDaily.difficulty,
+        link: dashboardDaily.link,
+        tags: question?.tags || [],
+        codeSnippets: question?.starterCode || {},
+        isPodActive: dashboardDaily.isActive,
+        questionId: dashboardDaily.questionId,
+        totalTimeSpent: dashboardDaily.totalTimeSpent,
+        revisionCount: dashboardDaily.revisionCount,
+        attemptsCount: dashboardDaily.attemptsCount,
+        lastPracticed: dashboardDaily.lastPracticed,
+        status: dashboardDaily.status
+      };
+      
+      if (!question) {
+        try {
+          const rawDaily = await leetcodeService.getDailyProblem();
+          if (rawDaily && rawDaily.titleSlug) {
+            const fullDetails = await leetcodeService.fetchProblemDetails(rawDaily.link);
+            let extractedTestCases = [];
+            if (fullDetails.description) {
+              const { extractTestCasesFromHtml } = require('../services/queueHandlers/questionExtractTestCases.handler');
+              extractedTestCases = extractTestCasesFromHtml(fullDetails.description);
+            }
+            const starterCode = {};
+            if (fullDetails.codeSnippets) {
+              Object.entries(fullDetails.codeSnippets).forEach(([lang, code]) => {
+                starterCode[lang.toLowerCase()] = code;
+              });
+            }
+            const newQuestion = new Question({
+              title: rawDaily.title,
+              problemLink: rawDaily.link,
+              platform: 'LeetCode',
+              platformQuestionId: rawDaily.titleSlug,
+              difficulty: rawDaily.difficulty,
+              tags: rawDaily.tags || [],
+              pattern: rawDaily.tags || [],
+              solutionLinks: [],
+              similarQuestions: [],
+              contentRef: fullDetails.description || '',
+              testCases: extractedTestCases,
+              starterCode: starterCode,
+              source: 'leetcode',
+              createdBy: null,
+              isActive: true
             });
+            await newQuestion.save();
+            console.log(`[DailyProblem] Auto-created question: ${rawDaily.title} (${rawDaily.titleSlug})`);
+            if (extractedTestCases.length === 0 && fullDetails.description) {
+              const { jobQueue } = require('../services/queue.service');
+              await jobQueue.add('question.extract_testcases', { questionId: newQuestion._id });
+            }
+            dailyProblem.tags = newQuestion.tags;
+            dailyProblem.codeSnippets = newQuestion.starterCode;
+            dailyProblem.questionId = newQuestion._id;
           }
-
-          const newQuestion = new Question({
-            title: rawDaily.title,
-            problemLink: rawDaily.link,
-            platform: 'LeetCode',
-            platformQuestionId: rawDaily.titleSlug,
-            difficulty: rawDaily.difficulty,
-            tags: rawDaily.tags || [],
-            pattern: rawDaily.tags || [],
-            solutionLinks: [],
-            similarQuestions: [],
-            contentRef: fullDetails.description || '',
-            testCases: extractedTestCases,
-            starterCode: starterCode,
-            source: 'leetcode',
-            createdBy: null,
-            isActive: true
-          });
-
-          await newQuestion.save();
-          console.log(`[DailyProblem] Auto-created question: ${rawDaily.title} (${rawDaily.titleSlug})`);
-          
-          if (extractedTestCases.length === 0 && fullDetails.description) {
-            const { jobQueue } = require('../services/queue.service');
-            await jobQueue.add({
-              type: 'question.extract_testcases',
-              questionId: newQuestion._id
-            });
-          }
+        } catch (error) {
+          console.error('Failed to auto-create daily question:', error.message);
         }
       }
-    } catch (error) {
-      console.error('Failed to fetch or save daily LeetCode problem:', error.message);
     }
 
     const responseData = {

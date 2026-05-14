@@ -47,10 +47,11 @@ interface CodeExecutionAreaProps {
   onTabChange: (tabId: string) => void;
 }
 
+
 const languageMap: Record<string, string> = {
-  python: 'Python3',
-  java: 'Java',
-  cpp: 'C++',
+  python: 'python3',
+  java: 'java',
+  cpp: 'c++',
 };
 
 const createCustomTheme = (isDark: boolean): Extension => {
@@ -148,6 +149,7 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
   const getCurrentStarterCode = useCallback(() => {
     if (!starterCodeByLanguage) return '';
     const backendLang = languageMap[language];
+    // backendLang now is 'python', 'java', or 'cpp' – matches the keys in starterCodeByLanguage
     return starterCodeByLanguage[backendLang] || `# Write your solution here for ${language}\n`;
   }, [starterCodeByLanguage, language]);
 

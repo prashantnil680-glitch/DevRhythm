@@ -82,6 +82,7 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
   const { targetDate = null, allowOverdue = false } = options;
   const timeZone = await getUserTimeZone(userId);
   const todayStart = getStartOfDay(date, timeZone);
+  const todayEnd = getEndOfDay(date, timeZone);
 
   const revision = await RevisionSchedule.findOne({
     userId,
@@ -118,10 +119,20 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
     return { completed: true, message: 'Revision already completed', skippedCount: 0, overdueCompleted: false };
   }
 
-  const isOverdue = revision.schedule[targetIndex] < todayStart;
+  const revisionDate = revision.schedule[targetIndex];
+  const isFuture = revisionDate > todayEnd;
+  const isOverdue = revisionDate < todayStart;
 
-  // For manual completion, enforce activity conditions (today’s activity)
-  if (source === 'manual' && targetIndex === revision.currentRevisionIndex) {
+  if (isFuture) {
+    return {
+      completed: false,
+      message: 'Cannot complete a revision scheduled for a future date.',
+      skippedCount: 0
+    };
+  }
+
+  // For manual completion, enforce activity conditions (only for pending/overdue)
+  if (source === 'manual' && targetIndex === revision.currentRevisionIndex && !isFuture) {
     const activity = await getRevisionActivity(userId, questionId, date);
     const conditionsMet = activity.timeSpent >= 20 || activity.codeSubmitted;
     if (!conditionsMet) {
@@ -406,7 +417,7 @@ const getDayRevisions = async (userId, date, timeZone) => {
         title: '$question.title',
         platform: '$question.platform',
         difficulty: '$question.difficulty',
-        pattern: '$question.pattern',                      // new
+        pattern: '$question.pattern',
         completedAt: '$completedRevisions.completedAt',
         timeSpent: '$completedRevisions.timeSpent',
         confidenceAfter: '$completedRevisions.confidenceAfter',

@@ -139,6 +139,7 @@ export interface UpcomingRevisionsListResponse {
         platform: string;
       };
       revisionIndex: number;
+      status: string;
     }>;
   }>;
   pagination?: {

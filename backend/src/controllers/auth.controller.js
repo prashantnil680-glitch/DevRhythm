@@ -1,13 +1,29 @@
 const jwt = require('jsonwebtoken');
 const passport = require('passport');
 const crypto = require('crypto');
+const geoip = require('geoip-lite');                         
 const { client: redisClient } = require('../config/redis');
 const { generateToken, generateRefreshToken } = require('../middleware/auth');
 const { invalidateUserCache } = require('../middleware/cache');
 const { formatResponse } = require('../utils/helpers/response');
 const config = require('../config');
-const AppError = require('../utils/errors/AppError'); // <-- ADD THIS LINE
+const AppError = require('../utils/errors/AppError');
 const User = require('../models/User');
+
+/**
+ * Helper to detect timezone from IP address
+ * Returns 'Asia/Kolkata' for Indian IPs, otherwise 'UTC'
+ */
+const detectTimezoneFromIp = (ip) => {
+  try {
+    const geo = geoip.lookup(ip);
+    if (geo && geo.country === 'IN') return 'Asia/Kolkata';
+    return 'UTC';
+  } catch (err) {
+    console.warn('GeoIP lookup failed:', err.message);
+    return 'UTC';
+  }
+};
 
 const initiateOAuth = (provider) => (req, res, next) => {
   const state = crypto.randomBytes(32).toString('hex');
@@ -31,8 +47,16 @@ const handleOAuthCallback = (provider) => (req, res, next) => {
     try {
       if (err || !user) {
         console.error('OAuth error:', err || info);
-        // Redirect to frontend with error
         return res.redirect(`${config.frontendUrl}/auth/callback?error=${encodeURIComponent(info?.message || 'Authentication failed')}`);
+      }
+
+      // --- DETECT AND SET TIMEZONE IF NOT ALREADY SET ---
+      if (!user.preferences?.timezone) {
+        const detectedTz = detectTimezoneFromIp(req.ip);
+        user.preferences = user.preferences || {};
+        user.preferences.timezone = detectedTz;
+        await user.save();
+        console.log(`Timezone set to ${detectedTz} for user ${user._id} based on IP ${req.ip}`);
       }
       
       const token = generateToken(user._id);

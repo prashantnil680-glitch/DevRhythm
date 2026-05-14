@@ -1,34 +1,56 @@
 const cron = require('cron');
 const GoalSnapshotService = require('../services/goalSnapshot.service');
+const User = require('../models/User');
 const { getStartOfDay, getStartOfMonth } = require('../utils/helpers/date');
 
 /**
- * Compute yesterday's monthly snapshot for all users and global.
+ * Compute yesterday's monthly snapshot for all users, using each user's timezone.
  * Runs daily at 00:10 UTC.
  */
 const updateDailySnapshot = async () => {
   try {
-    // Use UTC as the reference timezone for cron jobs (consistent, deterministic)
     const yesterday = new Date();
     yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-    const timeZone = 'UTC';
-
     console.log(`[GoalSnapshot] Running daily update for date: ${yesterday.toISOString()}`);
 
-    await GoalSnapshotService.generateForAllUsers(yesterday, 'monthly', timeZone);
-    console.log('[GoalSnapshot] Daily monthly snapshots updated successfully');
+    // Fetch all active users with their timezone preferences
+    let skip = 0;
+    const batchSize = 100;
+    let totalProcessed = 0;
+
+    while (true) {
+      const users = await User.find({ isActive: true })
+        .select('_id preferences.timezone')
+        .skip(skip)
+        .limit(batchSize)
+        .lean();
+
+      if (users.length === 0) break;
+
+      for (const user of users) {
+        const userTz = user.preferences?.timezone || 'UTC';
+        const year = yesterday.getUTCFullYear();
+        const month = yesterday.getUTCMonth() + 1;
+        await GoalSnapshotService.generateUserSnapshot(user._id, year, month, 'monthly', userTz);
+        totalProcessed++;
+      }
+
+      skip += batchSize;
+    }
+
+    console.log(`[GoalSnapshot] Daily monthly snapshots updated for ${totalProcessed} users (user-timezone aware).`);
   } catch (error) {
     console.error('[GoalSnapshot] Daily update failed:', error);
   }
 };
 
 /**
- * Compute previous month's snapshot for all users and global.
+ * Compute previous month's snapshot for all users, using each user's timezone.
+ * Also triggers yearly snapshot for the same year.
  * Runs on the 1st of every month at 00:15 UTC.
  */
 const updateMonthlySnapshot = async () => {
   try {
-    const timeZone = 'UTC';
     // First day of current month, then subtract one day to get last day of previous month
     const firstDayOfCurrentMonth = new Date();
     firstDayOfCurrentMonth.setUTCDate(1);
@@ -42,18 +64,45 @@ const updateMonthlySnapshot = async () => {
 
     console.log(`[GoalSnapshot] Running monthly update for ${previousMonthYear}-${previousMonthNumber}`);
 
-    // Use the first day of the target month for `generateForAllUsers` (monthly snapshot)
-    const targetDate = new Date(previousMonthYear, previousMonthNumber - 1, 1);
-    await GoalSnapshotService.generateForAllUsers(targetDate, 'monthly', timeZone);
+    // Fetch all active users with their timezone preferences
+    let skip = 0;
+    const batchSize = 100;
+    let totalProcessed = 0;
 
-    // Also update yearly snapshots for the same year (if not already updated this month)
-    await GoalSnapshotService.generateForAllUsers(
-      new Date(previousMonthYear, 0, 1),
-      'yearly',
-      timeZone
-    );
+    while (true) {
+      const users = await User.find({ isActive: true })
+        .select('_id preferences.timezone')
+        .skip(skip)
+        .limit(batchSize)
+        .lean();
 
-    console.log('[GoalSnapshot] Monthly and yearly snapshots updated successfully');
+      if (users.length === 0) break;
+
+      for (const user of users) {
+        const userTz = user.preferences?.timezone || 'UTC';
+        // Monthly snapshot for previous month
+        await GoalSnapshotService.generateUserSnapshot(
+          user._id,
+          previousMonthYear,
+          previousMonthNumber,
+          'monthly',
+          userTz
+        );
+        // Yearly snapshot for the same year (if not already updated this month)
+        await GoalSnapshotService.generateUserSnapshot(
+          user._id,
+          previousMonthYear,
+          0,
+          'yearly',
+          userTz
+        );
+        totalProcessed++;
+      }
+
+      skip += batchSize;
+    }
+
+    console.log(`[GoalSnapshot] Monthly and yearly snapshots updated for ${totalProcessed} users (user-timezone aware).`);
   } catch (error) {
     console.error('[GoalSnapshot] Monthly update failed:', error);
   }
@@ -66,7 +115,7 @@ const monthlySnapshotJob = new cron.CronJob('15 0 1 * *', updateMonthlySnapshot)
 const startGoalSnapshotJob = () => {
   dailySnapshotJob.start();
   monthlySnapshotJob.start();
-  console.log('Goal snapshot cron jobs started (daily at 00:10 UTC, monthly on 1st at 00:15 UTC)');
+  console.log('Goal snapshot cron jobs started (user-timezone aware)');
 };
 
 const stopGoalSnapshotJob = () => {
@@ -78,6 +127,6 @@ const stopGoalSnapshotJob = () => {
 module.exports = {
   startGoalSnapshotJob,
   stopGoalSnapshotJob,
-  updateDailySnapshot,   // exported for manual triggering if needed
+  updateDailySnapshot,
   updateMonthlySnapshot,
 };

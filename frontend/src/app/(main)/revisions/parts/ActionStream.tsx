@@ -170,6 +170,7 @@ export default function ActionStream() {
         attemptsCount: 0,
         revisionCount: q.revisionIndex || 0,
         confidenceLevel: 3,
+        status: q.status,
       }))
     );
   }, [upcomingData]);
@@ -419,7 +420,11 @@ export default function ActionStream() {
           <Link href={`/questions/${item.platformQuestionId}`} className={styles.titleLink}>
             {item.title}
           </Link>
-          {type === 'upcoming' && <span className={styles.status}>Upcoming</span>}
+          {type === 'upcoming' && (
+            <span className={`${styles.status} ${item.status === 'Pending' ? styles.statusPending : styles.statusUpcoming}`}>
+              {item.status === 'Pending' ? 'Pending Today' : item.status}
+            </span>
+          )}
         </div>
         <div className={styles.meta}>
           {item.difficulty && (

@@ -12,12 +12,17 @@ const getActivityLogsSchema = Joi.object({
   limit: Joi.number().integer().min(1).max(100).default(20),
   action: Joi.string().valid(
     'question_solved', 'question_mastered', 'revision_completed',
-    'goal_achieved', 'joined_group', 'created_share', 'followed_user'
+    'goal_achieved', 'joined_group', 'created_share', 'followed_user',
+    'group_goal_progress', 'group_goal_completed',
+    'group_challenge_progress', 'group_challenge_completed'
   ),
+  type: Joi.string().valid('on_time', 'overdue'),               
   startDate: Joi.date(),
   endDate: Joi.date(),
-  sortBy: Joi.string().valid('timestamp', 'createdAt').default('timestamp'),
-  sortOrder: Joi.string().valid('asc', 'desc').default('desc')
+  sortBy: Joi.string().valid('timestamp', 'createdAt', 'scheduledDate', 'completedAt').default('timestamp'),
+  sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
+  goalPage: Joi.number().integer().min(1).default(1),
+  goalLimit: Joi.number().integer().min(1).max(100).default(20)
 });
 
 router.get('/',
@@ -28,12 +33,11 @@ router.get('/',
   activityController.getActivityLogs
 );
 
-router.get('/feed',
+// NEW: Today's solved questions grouped by followed user
+router.get('/feed/today-grouped',
   auth,
-  rateLimiters.userLimiter,
-  cache(30, 'activity:feed'),
-  validate(Joi.object({ page: Joi.number().integer().min(1).default(1), limit: Joi.number().integer().min(1).max(50).default(20) }), 'query'),
-  activityController.getActivityFeed
+  rateLimiters.followGetLimiter,
+  activityController.getTodayGroupedFeed
 );
 
 module.exports = router;

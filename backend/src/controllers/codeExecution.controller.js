@@ -1,3 +1,4 @@
+const { DateTime } = require('luxon');
 const { executeBatch } = require("../services/codeExecution.service");
 const { formatResponse } = require("../utils/helpers/response");
 const AppError = require("../utils/errors/AppError");
@@ -8,10 +9,22 @@ const RevisionSchedule = require("../models/RevisionSchedule");
 const { invalidateCache, invalidateProgressCache } = require('../middleware/cache');
 const revisionActivityService = require("../services/revisionActivity.service");
 const { jobQueue } = require('../services/queue.service');
-const { markTestPassedForQuestion, cancelAllAutoCompletionsForQuestion } = require('../services/revisionActivity.service');
+const { markTestPassedForQuestion } = require('../services/revisionActivity.service');
+const constants = require('../config/constants');
 
 const SUPPORTED_LANGUAGES = ["cpp", "python", "java", "javascript"];
 const normalize = (str) => (str || "").replace(/\s/g, "");
+
+// Normalize language aliases: "C++" → "cpp", "Python3" → "python"
+const normalizeLanguage = (lang) => {
+  const lower = lang.toLowerCase();
+  if (lower === 'c++') return 'cpp';
+  if (lower === 'python3') return 'python';
+  if (lower === 'javascript') return 'javascript';
+  if (lower === 'java') return 'java';
+  return lower;
+};
+
 
 const hasSolveFunction = (code, language) => {
   if (language === "python") return /def\s+solve\s*\(/.test(code);
@@ -2995,6 +3008,7 @@ const convertToJsonArgs = (rawInput) => {
 const runCode = async (req, res, next) => {
   try {
     let { language, code, stdin, expected, testCases, questionId } = req.body;
+    language = normalizeLanguage(language);
 
     if (!SUPPORTED_LANGUAGES.includes(language)) {
       throw new AppError(
@@ -3166,8 +3180,7 @@ const runCode = async (req, res, next) => {
       const passedCount = results.filter(r => r.passed).length;
       const failedCount = results.filter(r => !r.passed).length;
       const totalTestCases = results.length;
-      await jobQueue.add({
-        type: 'test_case.executed',
+       await jobQueue.add('test_case.executed', {
         userId: req.user._id,
         questionId,
         passedCount,
@@ -3303,21 +3316,25 @@ const runCode = async (req, res, next) => {
       questionId
     });
     if (!existingRevision) {
-      const baseDate = new Date();
-      const schedule = [1, 3, 7, 14, 30].map(days => {
-        const d = new Date(baseDate);
-        d.setDate(d.getDate() + days);
-        d.setHours(0, 0, 0, 0);
-        return d;
+      const timeZone = req.user.preferences?.timezone || 'UTC';
+      const solvedLocal = DateTime.fromJSDate(new Date(), { zone: timeZone });
+      const scheduleDays = constants.REVISION_SCHEDULE; // [1, 3, 7, 14, 30]
+      const scheduleUTC = scheduleDays.map(days => {
+        // For all offsets, use start of the target day (midnight)
+        const localDate = solvedLocal.startOf('day').plus({ days });
+        return localDate.toUTC().toJSDate();
       });
       await RevisionSchedule.create({
         userId: req.user._id,
         questionId,
-        schedule,
-        baseDate,
-        status: 'active'
+        schedule: scheduleUTC,
+        baseDate: new Date(),
+        status: 'active',
+        currentRevisionIndex: 0,
+        completedRevisions: []
       });
       await invalidateCache(`revisions:*:user:${req.user._id}:*`);
+      await invalidateCache(`question-details:*:${questionId}:*`);
     }
 
     // ----- If all tests passed, mark question as Solved (if not already) -----
@@ -3342,8 +3359,7 @@ const runCode = async (req, res, next) => {
 
       // --- Queue question.solved job for goal and revision sync ---
       if (jobQueue) {
-        await jobQueue.add({
-          type: 'question.solved',
+        await jobQueue.add('question.solved', {
           userId: req.user._id,
           questionId,
           progressId: progress._id,
@@ -3357,7 +3373,6 @@ const runCode = async (req, res, next) => {
       
       // Mark test passed for active revision sessions AND cancel any pending auto-completion jobs
       await markTestPassedForQuestion(req.user._id, questionId);
-      await cancelAllAutoCompletionsForQuestion(req.user._id, questionId); // NEW LINE
 
       // Automatically complete today's revision by skipping any overdue revisions
       const revisionResult = await revisionActivityService.checkAndCompleteRevision(

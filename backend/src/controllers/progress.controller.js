@@ -139,8 +139,7 @@ const createOrUpdateProgress = async (req, res, next) => {
         if (!jobQueue) {
           console.error('jobQueue is not available, cannot add job');
         } else {
-          await jobQueue.add({
-            type: 'question.solved',
+          await jobQueue.add('question.solved', {
             userId,
             questionId,
             progressId: newProgress._id,
@@ -195,8 +194,7 @@ const updateStatus = async (req, res, next) => {
       if (!jobQueue) {
         console.error('jobQueue is not available, cannot add job');
       } else {
-        await jobQueue.add({
-          type: 'question.solved',
+        await jobQueue.add('question.solved', {
           userId,
           questionId,
           progressId: progress._id,
@@ -308,8 +306,7 @@ const recordAttempt = async (req, res, next) => {
 
     if (jobQueue) {
       if (successful) {
-        await jobQueue.add({
-          type: 'question.solved',
+        await jobQueue.add('question.solved', {
           userId,
           questionId,
           progressId: progress._id,
@@ -317,8 +314,7 @@ const recordAttempt = async (req, res, next) => {
           solvedAt: new Date(),
         });
       } else {
-        await jobQueue.add({
-          type: 'question.attempted',
+         await jobQueue.add('question.attempted', {
           userId,
           questionId,
           progressId: progress._id,

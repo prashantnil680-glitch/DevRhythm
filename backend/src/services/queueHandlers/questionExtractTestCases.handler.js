@@ -63,13 +63,12 @@ const handleQuestionExtractTestCases = async (job) => {
     await question.save();
     console.log(`[extract-testcases] Added ${extracted.length} test cases to question ${questionId}`);
 
-    // Lazy load jobQueue to avoid circular dependency
-    const { jobQueue } = require('../queue.service');
-    await jobQueue.add({
-      type: 'question.generate_runner',
-      questionId: question._id,
-    });
-    console.log(`[extract-testcases] Queued runner generation for question ${questionId}`);
+    // // Lazy load jobQueue to avoid circular dependency
+    // const { jobQueue } = require('../queue.service');
+    // await jobQueue.add('question.generate_runner', {
+    //   questionId: question._id,
+    // });
+    // console.log(`[extract-testcases] Queued runner generation for question ${questionId}`);
   } catch (error) {
     console.error(`[extract-testcases] Error for question ${questionId}:`, error);
     throw error;

@@ -3,10 +3,36 @@
   font-weight: 500;
   color: var(--text-secondary);
   text-align: center;
-  padding: 1rem;
+  padding: 1.5rem;
   border: 1px dashed var(--border);
   border-radius: var(--radius);
   background: var(--bg-elevated);
+}
+
+.timelineContainer {
+  position: relative;
+  margin: 1rem 0;
+  background: transparent;
+}
+
+/* Vertical line – perfectly centered behind marker */
+.verticalLine {
+  position: absolute;
+  left: 11px;                 /* (24px marker width / 2) - (2px line width / 2) = 12 - 1 = 11px */
+  top: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, #f59e0b, #cbd5e1);
+  transition: height 0.8s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.2s ease, background 0.3s ease;
+  z-index: 1;
+  border-radius: 2px;
+  opacity: 0.9;
+}
+
+/* On hover over timeline items, the line becomes slightly more vibrant */
+.timelineItem:hover ~ .verticalLine,
+.verticalLine:hover {
+  opacity: 1;
+  background: linear-gradient(to bottom, #f59e0b, #f59e0b);
 }
 
 .timeline {
@@ -14,26 +40,24 @@
   padding: 0;
   margin: 0;
   list-style: none;
+  z-index: 2;
 }
 
 .timelineItem {
   position: relative;
   display: flex;
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
   padding: 0.5rem 0;
   border-radius: var(--radius);
-  transition: background-color 0.3s ease;
+  transition: background-color 0.2s ease;
   opacity: 0;
   transform: translateY(8px);
   animation: slideUp 0.3s ease forwards;
+  cursor: pointer;
 }
 
-.timelineItem:hover {
-  background-color: var(--hover-surface);
-}
-
-/* Marker */
+/* Marker circle – solid background to hide line behind */
 .marker {
   flex-shrink: 0;
   width: 24px;
@@ -42,78 +66,106 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.2s ease;
   position: relative;
-  z-index: 2;
+  z-index: 3;
   background-color: var(--bg-surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .marker:hover {
   transform: scale(1.1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
 }
 
 /* Completed marker */
 .marker.completed {
-  background-color: #2e7d32;
-  border: 2px solid #2e7d32;
+  background: #2e7d32;
+  border: none;
   color: white;
-  box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.4);
-  animation: none;
 }
-
-.marker.completed.pulse {
-  animation: pulseGreen 0.2s ease-out;
-}
-.marker.pending {
-  border: 2px solid var(--accent-moss);
-  background-color: transparent;
-}
-
-.statusPending {
-  color: var(--accent-moss);
-  border-color: var(--accent-moss);
-}
-
-.statusOverdue {
-  color: var(--error);
-  border-color: var(--error);
-}
-.checkIcon {
+.marker.completed .checkIcon {
   width: 14px;
   height: 14px;
   stroke-width: 3;
 }
 
+/* Pending marker */
+.marker.pending {
+  border: 2px solid #f59e0b;
+  background: white;
+}
+.marker.pending .innerDot {
+  width: 8px;
+  height: 8px;
+  background: #f59e0b;
+  border-radius: 50%;
+  animation: pulseDot 1.5s infinite;
+}
+
 /* Upcoming marker */
 .marker.upcoming {
-  border: 2px solid var(--border);
-  background-color: transparent;
+  border: 2px solid #cbd5e1;
+  background: white;
+}
+.marker.upcoming .innerDot {
+  width: 6px;
+  height: 6px;
+  background: #94a3b8;
+  border-radius: 50%;
 }
 
-/* Connector line (pseudo‑element) */
-.timelineItem:not(:last-child)::after {
-  content: '';
-  position: absolute;
-  left: 11px; /* half of marker width + 2px border */
-  top: 32px;
-  bottom: -12px;
-  width: 2px;
-  background: var(--border);
-  z-index: 1;
+/* Overdue marker */
+.marker.upcoming.overdue {
+  border: 2px solid #ef4444;
+}
+.marker.upcoming .alertIcon {
+  width: 14px;
+  height: 14px;
+  color: #ef4444;
 }
 
-/* Content */
+/* Status badges */
+.status {
+  font-size: 0.85rem;
+  padding: 0.25rem 0.9rem;
+  border-radius: 40px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  font-weight: 500;
+}
+
+.statusCompleted {
+  color: #2e7d32;
+  border-color: #2e7d32;
+  background: rgba(46, 125, 50, 0.1);
+}
+.statusPending {
+  color: #f59e0b;
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+}
+.statusOverdue {
+  color: #ef4444;
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+.statusUpcoming {
+  color: #64748b;
+}
+
+/* Content layout */
 .content {
   flex: 1;
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .date {
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-primary);
   font-size: 0.9rem;
 }
@@ -121,32 +173,8 @@
 .statusRow {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
   flex-wrap: wrap;
-}
-
-.status {
-  font-size: 0.85rem;
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  background-color: var(--bg-elevated);
-  border: 1px solid var(--border);
-}
-
-.statusCompleted {
-  color: #2e7d32;
-  border-color: #2e7d32;
-}
-.statusCurrent {
-  color: var(--accent-moss);
-  border-color: var(--accent-moss);
-}
-.statusUpcoming {
-  color: var(--text-secondary);
-}
-.overdue {
-  color: var(--error);
-  border-color: var(--error);
 }
 
 .markButton {
@@ -159,6 +187,21 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes pulseDot {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.8);
+    opacity: 0.6;
   }
 }
 
@@ -177,6 +220,10 @@
   }
 }
 
+.marker.completed.pulse {
+  animation: pulseGreen 0.2s ease-out;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .timelineItem {
@@ -190,6 +237,12 @@
   .marker.completed.pulse {
     animation: none;
   }
+  .verticalLine {
+    transition: none;
+  }
+  .marker.pending .innerDot {
+    animation: none;
+  }
 }
 
 /* Responsive */
@@ -197,7 +250,7 @@
   .content {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.25rem;
+    gap: 0.4rem;
   }
   .statusRow {
     width: 100%;
@@ -207,11 +260,8 @@
     width: 100%;
     justify-content: center;
   }
-  .timelineItem:not(:last-child)::after {
-    width: 1px;
-    border-left: 1px dashed var(--border);
-    background: none;
-    left: 12px;
+  .verticalLine {
+    left: 11px;   /* keep same */
   }
 }
 
@@ -221,9 +271,17 @@
   }
   .status {
     font-size: 0.75rem;
-    padding: 0.2rem 0.5rem;
+    padding: 0.2rem 0.6rem;
   }
   .markButton {
-    padding: 0.5rem;
+    padding: 0.4rem;
+  }
+  .marker {
+    width: 22px;
+    height: 22px;
+  }
+  .verticalLine {
+    left: 10px;  /* adjust for smaller marker */
+    width: 2px;
   }
 }

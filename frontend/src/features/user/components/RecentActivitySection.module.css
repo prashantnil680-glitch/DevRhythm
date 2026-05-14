@@ -23,6 +23,17 @@
   margin: 0;
 }
 
+.dateLink {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.dateLink:hover {
+  color: var(--accent-moss);
+  text-decoration: underline;
+}
+
 .viewall {
   font-size: 1.1rem;
   color: var(--text-secondary);

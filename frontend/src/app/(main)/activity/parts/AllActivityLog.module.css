@@ -1,0 +1,347 @@
+/* AllActivityLog.module.css – Left-aligned vertical timeline */
+
+.container {
+  width: 100%;
+  transition: box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+.container:hover {
+  box-shadow: 0 2px 8px var(--shadow);
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+.title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--divider);
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+.tab {
+  background: none;
+  border: none;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+.tab:hover { color: var(--accent-moss); }
+.tab.active {
+  color: var(--accent-moss);
+  border-bottom-color: var(--accent-moss);
+}
+
+/* ========== Timeline Card (each question/goal/group) ========== */
+.timelineCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1rem 1rem 0;
+  margin-bottom: 1.5rem;
+  transition: box-shadow 0.2s ease;
+}
+.timelineCard:hover {
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+/* Card header (title, meta) */
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding-left: 44px;   /* aligns header text with timeline labels */
+}
+.cardTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.cardTitle:hover {
+  color: var(--accent-moss);
+}
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.patternBadge {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  padding: 0.125rem 0.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+.patternBadge:hover {
+  background: var(--hover-surface);
+  color: var(--accent-moss);
+  border-color: var(--accent-moss);
+}
+
+/* ========== Vertical Timeline (left axis) ========== */
+.timeline {
+  position: relative;
+  padding: 0.25rem 0;
+  margin: 0;
+  --fill-height: 0px;
+}
+
+/* Base vertical line (static) */
+.timelineBase {
+  position: absolute;
+  left: 28px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+  border-radius: 1px;
+  z-index: 0;
+}
+
+/* Fill line (animated on hover) */
+.timelineFill {
+  position: absolute;
+  left: 28px;
+  width: 2px;
+  top: 0;
+  height: var(--fill-height);
+  background: var(--accent-moss);
+  border-radius: 1px;
+  z-index: 1;
+  transition: height 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+  pointer-events: none;
+}
+
+/* Container for timeline items */
+.timelineItems {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Individual timeline item (dot + label) */
+.timelineItem {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  position: relative;
+  cursor: pointer;
+}
+
+/* Dot – centred on the vertical line */
+.timelineDot {
+  position: absolute;
+  left: 28px;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-moss);
+  border: 2px solid var(--bg-surface);
+  box-shadow: 0 0 0 1px var(--accent-moss);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  z-index: 3;
+}
+.timelineItem:hover .timelineDot {
+  transform: translateX(-50%) scale(1.4);
+  box-shadow: 0 0 0 2px var(--accent-moss);
+}
+
+/* Overdue revision dot */
+.timelineDot.warning {
+  background: var(--toast-warning);
+  box-shadow: 0 0 0 1px var(--toast-warning);
+}
+
+/* Failed goal dot (hollow) */
+.timelineDot.failed {
+  background: transparent;
+  border: 2px solid var(--text-muted);
+  box-shadow: none;
+}
+
+/* Group event diamond */
+.timelineDot.diamond {
+  width: 14px;
+  height: 14px;
+  background: var(--accent-sand);
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--accent-sand);
+}
+.timelineItem:hover .timelineDot.diamond {
+  transform: translateX(-50%) rotate(45deg) scale(1.2);
+}
+
+/* Label – placed to the right of the axis */
+.timelineLabel {
+  margin-left: 48px;
+  padding: 0.25rem 0;
+  line-height: 1.4;
+  flex: 1;
+}
+.timelineDate {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.timelineDetail {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.duration {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.firstBadge {
+  font-size: 0.65rem;
+  background: #d4a373;
+  color: white;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+.overdueBadge {
+  font-size: 0.65rem;
+  background: var(--toast-warning);
+  color: white;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+.goalProgressInline {
+  margin-top: 4px;
+  width: 100%;
+  max-width: 200px;
+}
+.goalProgressBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.tooltipContent {
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.dateLink {
+  font-weight: 500;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.dateLink:hover {
+  color: var(--accent-moss);
+  text-decoration: underline;
+}
+
+/* ========== Revisions Tab: Two‑column grid ========== */
+.revisionsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+.revisionsColumn {
+  min-width: 0; /* prevent overflow */
+}
+
+/* ========== Empty & Loading States ========== */
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.skeletonItem {
+  height: 60px;
+  background: var(--bg-elevated);
+  border-radius: 6px;
+  animation: pulse 1.5s infinite;
+}
+.emptyState {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ========== Disclaimer message (revisions tab)  ========== */
+.disclaimerMessage {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+.disclaimerMessage svg {
+  flex-shrink: 0;
+  color: var(--accent-moss);
+}
+
+/* ========== Pagination ========== */
+.paginationWrapper {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+.loadMore {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 768px) {
+  .revisionsGrid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .cardHeader {
+    padding-left: 36px;
+  }
+  .timelineBase,
+  .timelineFill {
+    left: 20px;
+  }
+  .timelineDot {
+    left: 20px;
+  }
+  .timelineLabel {
+    margin-left: 36px;
+  }
+}

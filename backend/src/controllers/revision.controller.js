@@ -1,3 +1,4 @@
+const { DateTime } = require('luxon');
 const RevisionSchedule = require('../models/RevisionSchedule');
 const Question = require('../models/Question');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
@@ -8,18 +9,70 @@ const revisionService = require('../services/revision.service');
 const revisionActivityService = require('../services/revisionActivity.service');
 const { jobQueue } = require('../services/queue.service');
 const { client: redisClient } = require('../config/redis');
+const constants = require('../config/constants');
 
-const calculateSpacedRepetitionSchedule = (baseDate, schedule = [1, 3, 7, 14, 30]) => {
+/**
+ * Helper to get user timezone from request (fallback to DB preference, then UTC)
+ */
+const getUserTimeZone = (req) => {
+  if (req.userTimeZone) return req.userTimeZone;
+  if (req.user && req.user.preferences && req.user.preferences.timezone) {
+    return req.user.preferences.timezone;
+  }
+  return 'UTC';
+};
+
+/**
+ * Convert a UTC date to user's local ISO string with offset.
+ * Example output: "2026-05-15T00:00:00+05:30"
+ */
+const toLocalISOString = (utcDate, timeZone) => {
+  if (!utcDate) return null;
+  if (!timeZone) timeZone = 'UTC';
+  const dt = DateTime.fromJSDate(new Date(utcDate), { zone: 'UTC' });
+  return dt.setZone(timeZone).toISO({ includeOffset: true });
+};
+
+/**
+ * Convert all date fields in a revision object to local timezone.
+ */
+const convertRevisionDatesToLocal = (revision, timeZone) => {
+  if (!revision) return revision;
+  const converted = { ...revision };
+  if (Array.isArray(converted.schedule)) {
+    converted.schedule = converted.schedule.map(d => toLocalISOString(d, timeZone));
+  }
+  if (converted.baseDate) converted.baseDate = toLocalISOString(converted.baseDate, timeZone);
+  if (converted.createdAt) converted.createdAt = toLocalISOString(converted.createdAt, timeZone);
+  if (converted.updatedAt) converted.updatedAt = toLocalISOString(converted.updatedAt, timeZone);
+  if (Array.isArray(converted.completedRevisions)) {
+    converted.completedRevisions = converted.completedRevisions.map(cr => ({
+      ...cr,
+      date: toLocalISOString(cr.date, timeZone),
+      completedAt: toLocalISOString(cr.completedAt, timeZone)
+    }));
+  }
+  if (Array.isArray(converted.scheduleStatuses)) {
+    converted.scheduleStatuses = converted.scheduleStatuses.map(ss => ({
+      ...ss,
+      date: toLocalISOString(ss.date, timeZone)
+    }));
+  }
+  return converted;
+};
+
+const calculateSpacedRepetitionSchedule = (baseDate, schedule = constants.REVISION_SCHEDULE) => {
   return schedule.map(days => {
     const date = new Date(baseDate);
-    date.setDate(date.getDate() + days);
-    date.setHours(0, 0, 0, 0);
+    date.setUTCDate(date.getUTCDate() + days);
+    date.setUTCHours(0, 0, 0, 0);
     return date;
   });
 };
 
 const getRevisions = async (req, res, next) => {
   try {
+    const timeZone = getUserTimeZone(req);
     const { page, limit, skip } = getPaginationParams(req);
     const { status, questionId, sortBy = 'schedule', sortOrder = 'asc' } = req.query;
     
@@ -44,12 +97,12 @@ const getRevisions = async (req, res, next) => {
     
     const enhancedRevisions = revisions.map(rev => {
       const revObj = rev.toObject();
-      revObj.currentStatus = revisionService.getRevisionStatusLabel(rev, null, 'actionable', req.userTimeZone);
+      revObj.currentStatus = revisionService.getRevisionStatusLabel(rev, null, 'actionable', timeZone);
       revObj.scheduleStatuses = rev.schedule.map((date, idx) => ({
         date,
-        status: revisionService.getRevisionStatusLabel(rev, idx, 'display', req.userTimeZone)
+        status: revisionService.getRevisionStatusLabel(rev, idx, 'display', timeZone)
       }));
-      return revObj;
+      return convertRevisionDatesToLocal(revObj, timeZone);
     });
     
     res.json(formatResponse('Revision schedules retrieved successfully', {
@@ -64,7 +117,7 @@ const getRevisions = async (req, res, next) => {
 
 const getTodayRevisions = async (req, res, next) => {
   try {
-    const timeZone = req.userTimeZone;
+    const timeZone = getUserTimeZone(req);
     const todayStart = getStartOfDay(new Date(), timeZone);
     const todayEnd = getEndOfDay(new Date(), timeZone);
     
@@ -106,7 +159,7 @@ const getTodayRevisions = async (req, res, next) => {
     const enhancedRevisions = pendingRevisions.map(rev => ({
       _id: rev._id,
       questionId: rev.questionId,
-      scheduledDate: rev.scheduledDate,
+      scheduledDate: toLocalISOString(rev.scheduledDate, timeZone),
       revisionIndex: rev.revisionIndex,
       overdue: rev.overdue,
       status: rev.overdue ? 'Overdue' : 'Pending'
@@ -123,7 +176,7 @@ const getTodayRevisions = async (req, res, next) => {
 
 const getUpcomingRevisions = async (req, res, next) => {
   try {
-    const timeZone = req.userTimeZone;
+    const timeZone = getUserTimeZone(req);
     let startDate = req.query.startDate ? new Date(req.query.startDate) : getStartOfDay(new Date(), timeZone);
     let endDate = req.query.endDate ? new Date(req.query.endDate) : getEndOfDay(new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000), timeZone);
     
@@ -165,7 +218,8 @@ const getUpcomingRevisions = async (req, res, next) => {
                   }
                 }
               },
-              revisionIndex: '$currentRevisionIndex'
+              revisionIndex: '$currentRevisionIndex',
+              scheduledDate: '$pendingDue'
             }
           }
         }
@@ -173,26 +227,31 @@ const getUpcomingRevisions = async (req, res, next) => {
       { $sort: { date: 1 } },
     ]);
     
-    // POST‑PROCESSING: replace empty objects with null
-    for (const group of upcoming) {
-      for (const q of group.questions) {
-        if (q.questionId && typeof q.questionId === 'object' && Object.keys(q.questionId).length === 0) {
-          q.questionId = null;
-        }
-      }
-    }
+    // Compute today's boundaries in the user's timezone
+    const now = new Date();
+    const todayStart = getStartOfDay(now, timeZone);
+    const todayEnd = getEndOfDay(now, timeZone);
+    
+    const convertedUpcoming = upcoming.map(group => ({
+      ...group,
+      date: toLocalISOString(group.date, timeZone),
+      questions: group.questions.map(q => {
+        // Parse the scheduled date (already converted to local ISO string)
+        const scheduledDateLocal = new Date(toLocalISOString(q.scheduledDate, timeZone));
+        const isToday = scheduledDateLocal >= todayStart && scheduledDateLocal <= todayEnd;
+        const status = isToday ? 'Pending' : 'Upcoming';
+        return {
+          ...q,
+          scheduledDate: toLocalISOString(q.scheduledDate, timeZone),
+          status
+        };
+      })
+    }));
     
     const stats = await revisionService.calculateUpcomingStats(req.user._id, startDate, endDate);
     
-    upcoming.forEach(group => {
-      group.questions = group.questions.map(q => ({
-        ...q,
-        status: 'Upcoming'
-      }));
-    });
-    
     res.json(formatResponse('Upcoming revisions retrieved', {
-      upcomingRevisions: upcoming,
+      upcomingRevisions: convertedUpcoming,
       stats,
     }));
   } catch (error) {
@@ -202,7 +261,7 @@ const getUpcomingRevisions = async (req, res, next) => {
 
 const getQuestionRevision = async (req, res, next) => {
   try {
-    const timeZone = req.userTimeZone;
+    const timeZone = getUserTimeZone(req);
     const revision = await RevisionSchedule.findOne({
       userId: req.user._id,
       questionId: req.params.questionId,
@@ -222,8 +281,10 @@ const getQuestionRevision = async (req, res, next) => {
       status: revisionService.getRevisionStatusLabel(revision, idx, 'display', timeZone)
     }));
     
+    const convertedRev = convertRevisionDatesToLocal(revObj, timeZone);
+    
     res.json(formatResponse('Revision schedule retrieved successfully', {
-      revision: revObj,
+      revision: convertedRev,
     }));
   } catch (error) {
     next(error);
@@ -232,7 +293,7 @@ const getQuestionRevision = async (req, res, next) => {
 
 const getQuestionRevisionByPlatform = async (req, res, next) => {
   try {
-    const timeZone = req.userTimeZone;
+    const timeZone = getUserTimeZone(req);
     const { platform, platformQuestionId } = req.params;
     const question = await Question.findOne({ platform, platformQuestionId, isActive: true });
     if (!question) throw new AppError('Question not found', 404);
@@ -254,7 +315,9 @@ const getQuestionRevisionByPlatform = async (req, res, next) => {
       status: revisionService.getRevisionStatusLabel(revision, idx, 'display', timeZone)
     }));
 
-    res.json(formatResponse('Revision schedule retrieved successfully', { revision: revObj }));
+    const convertedRev = convertRevisionDatesToLocal(revObj, timeZone);
+
+    res.json(formatResponse('Revision schedule retrieved successfully', { revision: convertedRev }));
   } catch (error) {
     next(error);
   }
@@ -263,6 +326,7 @@ const getQuestionRevisionByPlatform = async (req, res, next) => {
 const createRevision = async (req, res, next) => {
   try {
     let { baseDate = new Date(), schedule } = req.body;
+    const timeZone = getUserTimeZone(req);
     
     let baseDateObj;
     if (baseDate instanceof Date) {
@@ -298,30 +362,13 @@ const createRevision = async (req, res, next) => {
       throw new AppError('Cannot create revision schedule for an unsolved question. Please solve it first.', 400);
     }
     
-    let revisionSchedule;
-    if (schedule && Array.isArray(schedule) && schedule.length > 0) {
-      revisionSchedule = schedule.map(dateStr => {
-        const date = new Date(dateStr);
-        if (isNaN(date.getTime())) {
-          throw new AppError(`Invalid date in schedule: ${dateStr}`, 400);
-        }
-        return date;
-      });
-      
-      if (revisionSchedule.length !== 5) {
-        throw new AppError('Schedule must contain exactly 5 dates', 400);
-      }
-    } else {
-      revisionSchedule = calculateSpacedRepetitionSchedule(baseDateObj);
-    }
-    
-    const revision = await RevisionSchedule.create({
-      userId: req.user._id,
-      questionId: req.params.questionId,
-      schedule: revisionSchedule,
-      baseDate: baseDateObj,
-      status: 'active',
-    });
+    const revision = await revisionService.createRevisionSchedule(
+      req.user._id,
+      req.params.questionId,
+      baseDateObj,
+      schedule,
+      timeZone
+    );
     
     await invalidateCache(`revisions:*:user:${req.user._id}:*`);
     
@@ -355,7 +402,6 @@ const completeRevision = async (req, res, next) => {
       throw new AppError(result.message, 400);
     }
 
-    // Confidence increment for completing a revision
     if (jobQueue) {
       await jobQueue.add('confidence.increment', {
         userId: req.user._id,
@@ -434,7 +480,6 @@ const completePastRevision = async (req, res, next) => {
       throw new AppError('Question not found', 404);
     }
 
-    // Acquire persistent lock with stale detection
     const lockValue = JSON.stringify({
       questionId,
       title: question.title,
@@ -466,7 +511,6 @@ const completePastRevision = async (req, res, next) => {
     }
     lockAcquired = true;
 
-    // --- Session creation / completion ---
     let session;
     try {
       session = await revisionActivityService.getRevisionSession(req.user._id, questionId, targetDate);
@@ -475,7 +519,6 @@ const completePastRevision = async (req, res, next) => {
         return res.status(202).json(formatResponse('Revision session started. Open the question page to track active time.', null));
       }
     } catch (err) {
-      // Catch the "already active session" error from the service
       if (err.message === 'You already have an active revision session for another question. Please complete it first.') {
         return res.status(409).json(formatResponse(err.message, null, null, { code: 'ACTIVE_SESSION_EXISTS' }));
       }
@@ -517,10 +560,8 @@ const recordTimeSpent = async (req, res, next) => {
     const { minutes } = req.body;
     const today = new Date();
 
-    // Store the time spent in the daily activity Redis (for heatmap)
     await revisionActivityService.recordTimeSpent(req.user._id, questionId, today, minutes);
 
-    // Update cumulative total in UserQuestionProgress
     let progress = await UserQuestionProgress.findOne({
       userId: req.user._id,
       questionId
@@ -537,7 +578,6 @@ const recordTimeSpent = async (req, res, next) => {
       progress.totalTimeSpent += minutes;
     }
 
-    // Update status if this is the first time reaching 20 minutes (but not yet solved)
     const isTimeThresholdReached = progress.totalTimeSpent >= 20;
     const isNotSolved = progress.status !== 'Solved' && progress.status !== 'Mastered';
     if (isTimeThresholdReached && isNotSolved && progress.status === 'Not Started') {
@@ -546,12 +586,6 @@ const recordTimeSpent = async (req, res, next) => {
 
     await progress.save();
 
-    // ========== NEW: Increment active seconds for any past revision session ==========
-    // We need to find which targetDate the user is working on. Since the frontend
-    // does not send the targetDate, we look for any active session for this (userId, questionId).
-    // For simplicity, we will iterate through all sessions and add the active seconds to each.
-    // In practice, a user may have multiple past revision dates for the same question,
-    // but they are likely working on the earliest one. We'll add active seconds to all.
     const pattern = `revision:session:${req.user._id}:${questionId}:*`;
     let cursor = 0;
     let keys = [];
@@ -571,15 +605,12 @@ const recordTimeSpent = async (req, res, next) => {
           req.user._id,
           questionId,
           targetDate,
-          minutes * 60  // convert minutes to seconds
+          minutes * 60
         );
         if (completed) anyCompleted = true;
       }
     }
 
-    // If any session completed due to active time, we already queued confidence increment
-    // inside addActiveSecondsToSession? Actually addActiveSecondsToSession calls completePastRevision,
-    // which does NOT queue confidence increment. We'll queue it here if any completed.
     if (anyCompleted && jobQueue) {
       await jobQueue.add('confidence.increment', {
         userId: req.user._id,
@@ -588,7 +619,6 @@ const recordTimeSpent = async (req, res, next) => {
       });
     }
 
-    // Also handle the existing auto‑completion for today's revision (standard revision)
     const revisionResult = await revisionActivityService.checkAndCompleteRevision(
       req.user._id,
       questionId,
@@ -607,17 +637,15 @@ const recordTimeSpent = async (req, res, next) => {
       return res.json(formatResponse(revisionResult.message, { revisionCompleted: true }));
     }
 
-    // Fallback response if only time recorded
     res.json(formatResponse('Time recorded successfully', { minutes }));
   } catch (error) {
     next(error);
   }
 };
 
-
 const rescheduleRevision = async (req, res, next) => {
   try {
-    const timeZone = req.userTimeZone;
+    const timeZone = getUserTimeZone(req);
     const { newDate, revisionIndex } = req.body;
     
     if (revisionIndex < 0 || revisionIndex > 4) {
@@ -707,7 +735,6 @@ const fetchOverdueRevisionsForStats = async (userId, timeZone, limit = 50) => {
     {
       $addFields: {
         pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
-        // Check if the pending due date is already in completedRevisions
         alreadyCompleted: {
           $in: [
             { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
@@ -790,7 +817,7 @@ const fetchUpcomingRevisionsForStats = async (userId, timeZone, limit = 20) => {
 const getRevisionStats = async (req, res, next) => {
   try {
     const detailed = req.query.detailed === 'true';
-    const timeZone = req.userTimeZone;
+    const timeZone = getUserTimeZone(req);
     
     let stats;
     if (detailed) {
@@ -800,8 +827,26 @@ const getRevisionStats = async (req, res, next) => {
         fetchOverdueRevisionsForStats(req.user._id, timeZone, 5),
         fetchUpcomingRevisionsForStats(req.user._id, timeZone, 5)
       ]);
-      stats.overdueRevisions = overdueRevisions;
-      stats.upcomingRevisions = upcomingRevisions;
+      if (stats.overdueRevisions) {
+        stats.overdueRevisions = stats.overdueRevisions.map(rev => ({
+          ...rev,
+          nextRevisionDue: toLocalISOString(rev.nextRevisionDue, timeZone)
+        }));
+      }
+      if (stats.upcomingRevisions) {
+        stats.upcomingRevisions = stats.upcomingRevisions.map(rev => ({
+          ...rev,
+          scheduledDate: toLocalISOString(rev.scheduledDate, timeZone)
+        }));
+      }
+      stats.overdueRevisions = overdueRevisions.map(rev => ({
+        ...rev,
+        nextRevisionDue: toLocalISOString(rev.nextRevisionDue, timeZone)
+      }));
+      stats.upcomingRevisions = upcomingRevisions.map(rev => ({
+        ...rev,
+        scheduledDate: toLocalISOString(rev.scheduledDate, timeZone)
+      }));
     } else {
       stats = await revisionService.calculateRevisionStats(req.user._id);
     }
@@ -817,8 +862,8 @@ const getRevisionStats = async (req, res, next) => {
 
 const getOverdueRevisions = async (req, res, next) => {
   try {
+    const timeZone = getUserTimeZone(req);
     const { page, limit, skip } = getPaginationParams(req);
-    const timeZone = req.userTimeZone;
     const today = getStartOfDay(new Date(), timeZone);
     
     const overdue = await RevisionSchedule.aggregate([
@@ -826,7 +871,6 @@ const getOverdueRevisions = async (req, res, next) => {
       {
         $addFields: {
           pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
-          // Check if the pending due date is already in completedRevisions
           alreadyCompleted: {
             $in: [
               { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
@@ -866,6 +910,11 @@ const getOverdueRevisions = async (req, res, next) => {
       }
     ]);
     
+    const convertedOverdue = overdue.map(rev => ({
+      ...rev,
+      scheduledDate: toLocalISOString(rev.scheduledDate, timeZone)
+    }));
+    
     const totalResult = await RevisionSchedule.aggregate([
       { $match: { userId: req.user._id, status: { $in: ['active', 'overdue'] } } },
       {
@@ -885,7 +934,7 @@ const getOverdueRevisions = async (req, res, next) => {
     const totalCount = totalResult[0]?.count || 0;
     
     res.json(formatResponse('Overdue revisions retrieved', {
-      revisions: overdue,
+      revisions: convertedOverdue,
     }, {
       pagination: paginate(totalCount, page, limit),
     }));

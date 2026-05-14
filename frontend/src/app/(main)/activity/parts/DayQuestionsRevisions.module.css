@@ -1,0 +1,197 @@
+/* DayQuestionsRevisions.module.css */
+
+.container {
+  width: 100%;
+  height: 100%;
+  transition: box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.container:hover {
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.viewAllLink {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.viewAllLink:hover {
+  color: var(--accent-moss);
+}
+
+/* Sections */
+.section {
+  margin-bottom: 1rem;
+}
+
+.section:last-child {
+  margin-bottom: 0;
+}
+
+.sectionTitle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px dashed var(--divider);
+}
+
+/* List items */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.listItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.questionLink {
+  text-decoration: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+}
+
+.questionTitle {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  transition: color 0.2s ease;
+}
+
+.questionLink:hover .questionTitle {
+  color: var(--accent-moss);
+  text-decoration: underline;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.timeSpent {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.timestamp {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.overdueBadge {
+  font-size: 0.6rem;
+}
+
+/* Empty state */
+.emptyMessage {
+  text-align: center;
+  padding: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.8rem;
+}
+
+/* Error state */
+.errorState {
+  text-align: center;
+  padding: 1rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.dateLink {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.dateLink:hover {
+  color: var(--accent-moss);
+  text-decoration: underline;
+}
+
+/* Skeleton styles */
+.skeletonViewAll {
+  width: 70px;
+  height: 16px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  animation: pulse 1.5s infinite;
+}
+
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.skeletonItem {
+  height: 48px;
+  background: var(--bg-elevated);
+  border-radius: 6px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .questionTitle {
+    font-size: 0.85rem;
+  }
+  .metaRow {
+    gap: 0.35rem;
+  }
+  .timeSpent, .timestamp {
+    font-size: 0.65rem;
+  }
+}
+
+
+.firstSolveBadge {
+  font-size: 0.65rem;
+  background: #d4a373;
+  color: white;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+.dateLink {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.dateLink:hover {
+  color: var(--accent-moss);
+  text-decoration: underline;
+}

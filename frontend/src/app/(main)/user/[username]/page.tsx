@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import Script from 'next/script';
 import { userServiceServer } from '@/features/user/services/userServiceServer';
 import { heatmapServiceServer } from '@/features/heatmap/services/heatmapServiceServer';
@@ -11,6 +12,8 @@ import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION } from '@/shared/config/seo';
 import NotFoundPage from '@/shared/components/NotFoundPage';
 import type { GroupListResponse } from '@/features/studyGroup/types/studyGroup.types';
 import type { PatternMasteryListResponse } from '@/features/patternMastery/types/patternMastery.types';
+import { getCurrentUser } from '@/features/auth/server/getCurrentUser';
+
 
 // Helper to generate Person schema
 function generatePersonSchema(user: any, canonicalUrl: string) {
@@ -45,7 +48,6 @@ function generateBreadcrumbSchema(items: { name: string; item?: string }[]) {
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
   const { username } = await params;
-
   try {
     const user = await userServiceServer.getUserByUsername(username);
     if (!user?._id || !user.username) {
@@ -76,7 +78,7 @@ export async function generateMetadata({ params }: { params: Promise<{ username:
         siteName: SITE_NAME,
         images: user.avatarUrl ? [{ url: user.avatarUrl, alt: displayName }] : [],
         type: 'profile',
-        username: user.username,        // ✅ correct placement for profile type
+        username: user.username,
       },
       twitter: {
         card: 'summary_large_image',
@@ -105,6 +107,17 @@ export default async function PublicUserPage({ params }: { params: Promise<{ use
     const user = await userServiceServer.getUserByUsername(username);
     if (!user?._id) {
       throw new Error('User not found');
+    }
+
+    // ✅ Redirect logged-in users from their own public profile to their private profile
+    const currentUser = await getCurrentUser();
+    if (currentUser && currentUser.username === user.username) {
+      redirect(`/user/u/${user.username}`);
+    }
+
+    // ✅ Redirect to canonical username if case/format differs
+    if (user.username !== username) {
+      redirect(`/user/u/${user.username}`);
     }
 
     const userId = user._id;
@@ -138,7 +151,6 @@ export default async function PublicUserPage({ params }: { params: Promise<{ use
       { name: user.displayName || user.username },
     ];
     const breadcrumbSchema = generateBreadcrumbSchema(breadcrumbItemsForSchema);
-
     const breadcrumbUiItems = [
       { label: 'Home', href: '/' },
       { label: 'Users', href: '/users' },
@@ -173,14 +185,18 @@ export default async function PublicUserPage({ params }: { params: Promise<{ use
         />
       </>
     );
-  } catch (error) {
+  } catch (error: any) {
+    // ✅ If the error is a redirect, rethrow it so Next.js can handle it
+    if (error?.digest?.startsWith?.('NEXT_REDIRECT')) {
+      throw error;
+    }
     console.error(`Failed to load user ${username}:`, error);
     return (
       <NotFoundPage
         title="User Not Found"
         message="The user you're looking for doesn't exist or their profile is private."
-        actionHref="/"
-        actionText="Go back home"
+        actionHref="/users"
+        actionText="Search User"
       />
     );
   }

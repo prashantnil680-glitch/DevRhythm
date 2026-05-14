@@ -1,9 +1,11 @@
-// src/services/revisionActivity.service.js
 const { client: redisClient } = require('../config/redis');
 const RevisionSchedule = require('../models/RevisionSchedule');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const User = require('../models/User');
+const Question = require('../models/Question');
+const ActivityLog = require('../models/ActivityLog');
 const { getStartOfDay, getEndOfDay, formatDate, isToday } = require('../utils/helpers/date');
+const { slugify } = require('../utils/helpers/string');
 const { invalidateCache } = require('../middleware/cache');
 const heatmapService = require('./heatmap.service');
 
@@ -80,6 +82,7 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
   const { targetDate = null, allowOverdue = false } = options;
   const timeZone = await getUserTimeZone(userId);
   const todayStart = getStartOfDay(date, timeZone);
+  const todayEnd = getEndOfDay(date, timeZone);
 
   const revision = await RevisionSchedule.findOne({
     userId,
@@ -116,10 +119,20 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
     return { completed: true, message: 'Revision already completed', skippedCount: 0, overdueCompleted: false };
   }
 
-  const isOverdue = revision.schedule[targetIndex] < todayStart;
+  const revisionDate = revision.schedule[targetIndex];
+  const isFuture = revisionDate > todayEnd;
+  const isOverdue = revisionDate < todayStart;
 
-  // For manual completion, enforce activity conditions (today’s activity)
-  if (source === 'manual' && targetIndex === revision.currentRevisionIndex) {
+  if (isFuture) {
+    return {
+      completed: false,
+      message: 'Cannot complete a revision scheduled for a future date.',
+      skippedCount: 0
+    };
+  }
+
+  // For manual completion, enforce activity conditions (only for pending/overdue)
+  if (source === 'manual' && targetIndex === revision.currentRevisionIndex && !isFuture) {
     const activity = await getRevisionActivity(userId, questionId, date);
     const conditionsMet = activity.timeSpent >= 20 || activity.codeSubmitted;
     if (!conditionsMet) {
@@ -344,11 +357,89 @@ const completePastRevision = async (userId, questionId, targetDate, confidence =
   await deleteRevisionSession(userId, questionId, targetDate);
   await invalidateCache(`revisions:*:user:${userId}:*`);
 
+  // Create activity log for this overdue revision completion
+  await ActivityLog.create({
+    userId,
+    action: 'revision_completed',
+    targetId: questionId,
+    targetModel: 'Question',
+    metadata: {
+      revisionIndex: targetIndex,
+      scheduledDate: revision.schedule[targetIndex],
+      overdueCompleted: true,
+      outOfOrder: false,
+      timeSpent: activity.timeSpent,
+      confidenceAfter: confidence && confidence >= 1 && confidence <= 5 ? confidence : null,
+    },
+    timestamp: completionDate,
+  });
+
   return {
     completed: true,
     message: `Past revision for ${formatDate(targetDate)} marked as completed.`,
     revision,
   };
+};
+
+/**
+ * Retrieve all revisions completed on a specific day, with full question details.
+ * Includes pattern and patternSlugs for each question.
+ */
+const getDayRevisions = async (userId, date, timeZone) => {
+  const targetDateStart = getStartOfDay(date, timeZone);
+  const targetDateEnd = getEndOfDay(date, timeZone);
+
+  const schedules = await RevisionSchedule.aggregate([
+    { $match: { userId } },
+    { $unwind: '$completedRevisions' },
+    {
+      $match: {
+        'completedRevisions.completedAt': {
+          $gte: targetDateStart,
+          $lte: targetDateEnd,
+        },
+        'completedRevisions.status': 'completed',
+      },
+    },
+    {
+      $lookup: {
+        from: 'questions',
+        localField: 'questionId',
+        foreignField: '_id',
+        as: 'question',
+      },
+    },
+    { $unwind: '$question' },
+    {
+      $project: {
+        questionId: '$question._id',
+        platformQuestionId: '$question.platformQuestionId',
+        title: '$question.title',
+        platform: '$question.platform',
+        difficulty: '$question.difficulty',
+        pattern: '$question.pattern',
+        completedAt: '$completedRevisions.completedAt',
+        timeSpent: '$completedRevisions.timeSpent',
+        confidenceAfter: '$completedRevisions.confidenceAfter',
+        status: '$completedRevisions.status',
+        overdueCompleted: '$completedRevisions.overdueCompleted',
+        outOfOrder: '$completedRevisions.outOfOrder',
+      },
+    },
+    { $sort: { completedAt: -1 } },
+  ]);
+
+  // Add patternSlugs to each schedule item
+  for (const schedule of schedules) {
+    if (schedule.pattern && Array.isArray(schedule.pattern)) {
+      schedule.patternSlugs = schedule.pattern.map(p => slugify(p));
+    } else {
+      schedule.patternSlugs = [];
+      schedule.pattern = [];
+    }
+  }
+
+  return schedules;
 };
 
 module.exports = {
@@ -362,4 +453,5 @@ module.exports = {
   markTestPassedForQuestion,
   addActiveSecondsToSession,
   deleteRevisionSession,
+  getDayRevisions,
 };

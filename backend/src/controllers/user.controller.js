@@ -4,7 +4,7 @@ const Follow = require('../models/Follow');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const AppError = require('../utils/errors/AppError');
 const { generateToken } = require('../middleware/auth');
-const { invalidateUserCache, invalidateDashboardCache } = require('../middleware/cache');
+const { invalidateUserCache, invalidateDashboardCache, invalidateCache } = require('../middleware/cache');
 const { paginate } = require('../utils/helpers/pagination');
 const { formatResponse } = require('../utils/helpers/response');
 const config = require('../config');
@@ -329,8 +329,7 @@ const changeTimezone = async (req, res, next) => {
     }
 
     const { jobQueue } = require('../services/queue.service');
-    await jobQueue.add({
-      type: 'user.timezone_change',
+    await jobQueue.add('user.timezone_change', {
       userId,
       oldTimezone,
       newTimezone,

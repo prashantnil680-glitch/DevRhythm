@@ -3,15 +3,18 @@
 import React from 'react';
 import Link from 'next/link';
 import clsx from 'clsx';
-import { formatDistanceToNow } from 'date-fns';
-import { 
-  FiCheckCircle, FiStar, FiUsers, FiTarget, FiAward, FiActivity 
+import { formatDistanceToNow, format } from 'date-fns';
+import {
+  FiCheckCircle,
+  FiStar,
+  FiUsers,
+  FiTarget,
+  FiAward,
+  FiActivity,
 } from 'react-icons/fi';
-
 import { useRecentActivity } from '../hooks/useRecentActivity';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import NoRecordFound from '@/shared/components/NoRecordFound';
-
 import styles from './RecentActivitySection.module.css';
 
 export interface RecentActivitySectionProps {
@@ -21,20 +24,18 @@ export interface RecentActivitySectionProps {
   className?: string;
 }
 
-// Helper to format action into human-readable message with icon and link
 const formatActivity = (log: any): { icon: React.ReactNode; message: string; link?: string } => {
   const { action, metadata, targetId } = log;
 
   switch (action) {
     case 'question_solved':
     case 'question_mastered': {
-      // Use platform-based slug if targetId is populated and has platform info
       let link: string | undefined;
       if (targetId && typeof targetId !== 'string') {
         if (targetId.platform && targetId.platformQuestionId) {
           link = `/questions/${targetId.platformQuestionId}`;
         } else if (targetId._id) {
-          link = `/questions`; // fallback
+          link = `/questions`;
         }
       }
       return {
@@ -112,7 +113,7 @@ const RecentActivitySection: React.FC<RecentActivitySectionProps> = ({
     );
   }
 
-  const logs = data?.logs ?? [];
+  const logs = data ?? [];
 
   if (logs.length === 0) {
     return (
@@ -139,18 +140,20 @@ const RecentActivitySection: React.FC<RecentActivitySectionProps> = ({
           View All →
         </Link>
       </div>
-
       <div className={styles.list}>
         {logs.slice(0, limit).map((log) => {
           const { icon, message, link } = formatActivity(log);
           const time = formatTime(log.timestamp);
+          const dateUrl = `/activity/${format(new Date(log.timestamp), 'yyyy-MM-dd')}`;
 
           const content = (
             <div className={styles.item}>
               <div className={styles.itemIcon}>{icon}</div>
               <div className={styles.itemContent}>
                 <span className={styles.message}>{message}</span>
-                <span className={styles.time}>{time}</span>
+                <Link href={dateUrl} className={styles.dateLink}>
+                  {time}
+                </Link>
               </div>
             </div>
           );

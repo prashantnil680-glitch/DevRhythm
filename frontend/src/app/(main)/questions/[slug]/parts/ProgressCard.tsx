@@ -22,13 +22,10 @@ interface ProgressCardProps {
   questionId?: string;
 }
 
-function formatUTCDate(dateString: string): string {
+const formatLocalDate = (dateString: string): string => {
   const date = new Date(dateString);
-  const month = date.toLocaleString('default', { month: 'short', timeZone: 'UTC' });
-  const day = date.getUTCDate();
-  const year = date.getUTCFullYear();
-  return `${month} ${day}, ${year}`;
-}
+  return date.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' });
+};
 
 export const ProgressCard: React.FC<ProgressCardProps> = ({
   progress,
@@ -152,14 +149,14 @@ export const ProgressCard: React.FC<ProgressCardProps> = ({
               {hasPendingRevision ? (
                 <>
                   <span className={styles.metricValue}>
-                    {formatUTCDate(pendingEntry!.date)}
+                    {formatLocalDate(pendingEntry!.date)}
                   </span>
                   <span className={styles.metricLabel}>due today</span>
                 </>
               ) : hasUpcomingRevision ? (
                 <>
                   <span className={styles.metricValue}>
-                    {formatUTCDate(upcomingEntry!.date)}
+                    {formatLocalDate(upcomingEntry!.date)}
                   </span>
                   <span className={styles.metricLabel}>next revision</span>
                 </>

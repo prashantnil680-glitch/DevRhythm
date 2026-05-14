@@ -192,8 +192,7 @@ const incrementGoal = async (req, res, next) => {
     
     await goal.save();
     
-    await jobQueue.add({
-      type: 'goal.completed',
+    await jobQueue.add('goal.completed', {
       userId,
       goalId: goal._id,
       completedAt: goal.achievedAt || new Date(),

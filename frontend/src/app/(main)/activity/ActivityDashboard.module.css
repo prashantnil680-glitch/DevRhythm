@@ -1,0 +1,232 @@
+/* ActivityDashboard.module.css – Responsive grid layout */
+/* Based on wireframe specifications: desktop 12-col, tablet 8-col, mobile single column */
+
+.container {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 1rem 0;
+  animation: fadeInUp 0.4s ease-out both;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Stagger child card animations */
+.container > * {
+  animation: fadeInUp 0.4s ease-out both;
+}
+
+.container > *:nth-child(1) { animation-delay: 0s; }
+.container > *:nth-child(2) { animation-delay: 0.05s; }
+.container > *:nth-child(3) { animation-delay: 0.1s; }
+.container > *:nth-child(4) { animation-delay: 0.15s; }
+.container > *:nth-child(5) { animation-delay: 0.2s; }
+
+.fullWidth {
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+/* Two‑column row layout */
+.twoColumnRow {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: stretch;
+}
+
+/* Desktop (≥940px): 12‑column grid inside each column */
+.dailyTrendColumn {
+  flex: 7; /* 70% width */
+  min-width: 0;
+}
+
+.dayQuestionsColumn {
+  flex: 5; /* 30% width */
+  min-width: 0;
+}
+
+.monthlyTrendColumn {
+  flex: 7; /* ~58% width (7/12) */
+  min-width: 0;
+}
+
+.socialFeedColumn {
+  flex: 5; /* ~42% width (5/12) */
+  min-width: 0;
+}
+
+/* Ensure cards fill column height */
+.dailyTrendColumn > *,
+.dayQuestionsColumn > *,
+.monthlyTrendColumn > *,
+.socialFeedColumn > *,
+.fullWidth > * {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.placeholderCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+.placeholderText {
+  font-style: italic;
+}
+
+/* Tablet (768px – 939px): switch to 2‑col layout with different ratios */
+@media (min-width: 768px) and (max-width: 939px) {
+  .container {
+    padding: 0.75rem;
+  }
+  .twoColumnRow {
+    gap: 0.75rem;
+  }
+  /* Daily trend takes ~60%, Day's Q&R ~40% */
+  .dailyTrendColumn {
+    flex: 6;
+  }
+  .dayQuestionsColumn {
+    flex: 4;
+  }
+  /* Monthly trend takes ~60%, Social feed ~40% */
+  .monthlyTrendColumn {
+    flex: 6;
+  }
+  .socialFeedColumn {
+    flex: 4;
+  }
+}
+
+/* Mobile (≤767px): single column layout */
+@media (max-width: 767px) {
+  .container {
+    padding: 0.5rem;
+  }
+  .twoColumnRow {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .dailyTrendColumn,
+  .dayQuestionsColumn,
+  .monthlyTrendColumn,
+  .socialFeedColumn {
+    flex: auto;
+  }
+  .fullWidth {
+    margin-bottom: 0.75rem;
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .container,
+  .container > * {
+    animation: none;
+  }
+}
+
+
+
+.activityLogSection {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: var(--bg-surface);
+  border-radius: 12px;
+}
+.sectionTitle {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+.tabSection {
+  margin-bottom: 2rem;
+}
+.tabSubtitle {
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 2px solid var(--accent-moss);
+  display: inline-block;
+}
+.revisionsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+.revisionsColumn, .goalsColumn {
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+.columnHeader {
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text-secondary);
+}
+.goalsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+.disclaimerMessage {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.emptyState {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 1rem;
+  font-style: italic;
+}
+.placeholderCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+.placeholderText {
+  font-style: italic;
+}
+
+/* ========== Breathing Skeleton Animation (Activity pages only) ========== */
+/* Override default skeleton shimmer with a slow, subtle breath effect */
+.skeletonWrapper :global(.skeleton) {
+  animation: breathe 2.5s ease-in-out infinite !important;
+  background: linear-gradient(90deg, var(--hover-surface) 25%, var(--bg-elevated) 50%, var(--hover-surface) 75%) !important;
+}
+
+@keyframes breathe {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}

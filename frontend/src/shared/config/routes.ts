@@ -16,6 +16,13 @@ export const ROUTES = {
   // Main authenticated area
   DASHBOARD: '/dashboard',
 
+  // Activity Dashboard
+  ACTIVITY: {
+    ROOT: '/activity',
+    /** Activity page for a specific date (YYYY-MM-DD) */
+    BY_DATE: (date: string) => `/activity/${date}`,
+  },
+
   // User profile pages
   USER_PROFILE: {
     /** Public profile (any user) */

@@ -128,8 +128,8 @@ const joinGroup = async (req, res, next) => {
     group.lastActivityAt = new Date();
     await group.save();
 
-    await jobQueue.add({
-      type: 'group.joined',
+    // FIXED: use proper Bull signature (job name, data)
+    await jobQueue.add('group.joined', {
       userId: req.user._id,
       groupId: group._id,
       groupName: group.name,
@@ -192,7 +192,6 @@ const createGoal = async (req, res, next) => {
     const timeZone = req.userTimeZone; 
     const { group } = await checkGroupAccess(groupId, req.user._id, true);
     
-    // Validate deadline is not in the past using user timezone
     const deadlineDate = new Date(deadline);
     const todayStart = getStartOfDay(new Date(), timeZone);
     if (deadlineDate < todayStart) {
@@ -258,8 +257,8 @@ const updateGoalProgress = async (req, res, next) => {
     await group.save();
 
     if (progress > oldProgress) {
-      await jobQueue.add({
-        type: 'group.goal_progress',
+      // FIXED: use proper Bull signature
+      await jobQueue.add('group.goal_progress', {
         userId: req.user._id,
         groupId,
         goalId,
@@ -271,8 +270,8 @@ const updateGoalProgress = async (req, res, next) => {
     }
 
     if (!wasCompleted && participant.completed) {
-      await jobQueue.add({
-        type: 'group.goal_completed',
+      // FIXED: use proper Bull signature
+      await jobQueue.add('group.goal_completed', {
         userId: req.user._id,
         groupId,
         goalId,
@@ -363,8 +362,8 @@ const updateChallengeProgress = async (req, res, next) => {
     await group.save();
 
     if (progress > oldProgress) {
-      await jobQueue.add({
-        type: 'group.challenge_progress',
+      // FIXED: use proper Bull signature
+      await jobQueue.add('group.challenge_progress', {
         userId: req.user._id,
         groupId,
         challengeId,
@@ -376,8 +375,8 @@ const updateChallengeProgress = async (req, res, next) => {
     }
 
     if (!wasCompleted && participant.completed) {
-      await jobQueue.add({
-        type: 'group.challenge_completed',
+      // FIXED: use proper Bull signature
+      await jobQueue.add('group.challenge_completed', {
         userId: req.user._id,
         groupId,
         challengeId,

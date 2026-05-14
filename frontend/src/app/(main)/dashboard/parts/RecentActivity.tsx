@@ -56,7 +56,7 @@ export default function RecentActivity({ activities, isLoading }: RecentActivity
       <Card className={styles.container} noHover>
         <div className={styles.header}>
           <h3 className={styles.title}>Recent Activity</h3>
-          <Link href={ROUTES.PROGRESS} className={styles.viewAllLink}>
+          <Link href={ROUTES.ACTIVITY.ROOT} className={styles.viewAllLink}>
             View All →
           </Link>
         </div>
@@ -74,7 +74,7 @@ export default function RecentActivity({ activities, isLoading }: RecentActivity
       <Card className={styles.container} noHover>
         <div className={styles.header}>
           <h3 className={styles.title}>Recent Activity</h3>
-          <Link href={ROUTES.PROGRESS} className={styles.viewAllLink}>
+          <Link href={ROUTES.ACTIVITY.ROOT} className={styles.viewAllLink}>
             View All →
           </Link>
         </div>
@@ -89,7 +89,7 @@ export default function RecentActivity({ activities, isLoading }: RecentActivity
     <Card className={styles.container} noHover>
       <div className={styles.header}>
         <h3 className={styles.title}>Recent Activity</h3>
-        <Link href={ROUTES.PROGRESS} className={styles.viewAllLink}>
+        <Link href={ROUTES.ACTIVITY.ROOT} className={styles.viewAllLink}>
           View All →
         </Link>
       </div>

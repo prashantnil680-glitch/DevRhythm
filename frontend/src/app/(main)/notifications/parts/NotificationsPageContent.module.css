@@ -38,6 +38,30 @@
   color: var(--accent);
 }
 
+/* Sentinel for sticky detection */
+.sentinel {
+  height: 1px;
+  margin-bottom: -1px;
+}
+
+/* Filter wrapper – normal state */
+.filterWrapper {
+  transition: box-shadow 0.2s ease, background 0.2s ease;
+}
+
+/* Sticky state – applied when scrolled past sentinel */
+.filterWrapper.sticky {
+  position: sticky;
+  top: 4rem;
+  z-index: 10;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 8px var(--shadow);
+  margin-bottom: 1rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
 /* Notification list container */
 .notifList {
   display: flex;
@@ -91,6 +115,12 @@
 }
 
 /* Mobile adjustments */
+@media (max-width: 768px) {
+  .filterWrapper.sticky {
+    top: 3.5rem;
+  }
+}
+
 @media (max-width: 480px) {
   .container {
     padding: 0.5rem;
@@ -107,6 +137,9 @@
   .emptyState,
   .errorState {
     padding: 1.5rem;
+  }
+  .filterWrapper.sticky {
+    top: 3rem;
   }
 }
 

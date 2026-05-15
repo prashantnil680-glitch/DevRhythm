@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -31,6 +31,11 @@ const renderLink = (item: BreadcrumbItem, props: { className: string; children: 
   );
 };
 
+// Helper to scroll to top smoothly
+const scrollToTop = () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
 export const NotificationsPageContent: React.FC = () => {
   const router = useRouter();
 
@@ -54,6 +59,11 @@ export const NotificationsPageContent: React.FC = () => {
   useEffect(() => {
     setPage(1);
   }, [typeFilter, unreadOnly, dateFilter, debouncedSearch]);
+
+  // Scroll to top whenever page or filters change (after they have taken effect)
+  useEffect(() => {
+    scrollToTop();
+  }, [page, typeFilter, unreadOnly, dateFilter, debouncedSearch]);
 
   // Convert Date to YYYY-MM-DD string for API
   const dateFilterString = dateFilter ? dateFilter.toISOString().split('T')[0] : undefined;
@@ -98,6 +108,8 @@ export const NotificationsPageContent: React.FC = () => {
 
   const handleMarkAllRead = useCallback(() => {
     markAllAsReadMutation.mutate();
+    // Scroll to top after marking all as read (filter changes may trigger useEffect anyway)
+    scrollToTop();
   }, [markAllAsReadMutation]);
 
   const handleDelete = useCallback((id: string) => {
@@ -110,6 +122,12 @@ export const NotificationsPageContent: React.FC = () => {
     setDateFilter(null);
     setSearchQuery('');
     setPage(1);
+    scrollToTop();
+  }, []);
+
+  // Handle page change (pagination)
+  const handlePageChange = useCallback((newPage: number) => {
+    setPage(newPage);
   }, []);
 
   // Extract pagination
@@ -123,30 +141,60 @@ export const NotificationsPageContent: React.FC = () => {
     { label: 'Notifications' },
   ];
 
+  // Sticky filter logic
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const filterWrapperRef = useRef<HTMLDivElement>(null);
+  const [isSticky, setIsSticky] = useState(false);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsSticky(!entry.isIntersecting);
+      },
+      { threshold: [0] }
+    );
+
+    observer.observe(sentinel);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   return (
     <div className={styles.container}>
-      {/* Breadcrumb */}
+      {/* Breadcrumb - no separator prop, uses default "//" */}
       <Breadcrumb
         items={breadcrumbItems}
         renderLink={renderLink}
         aria-label="Breadcrumb"
       />
 
-      {/* Filters */}
-      <NotificationFilters
-        unreadCount={unreadCountData?.unreadCount ?? 0}
-        typeFilter={typeFilter}
-        onTypeChange={setTypeFilter}
-        unreadOnly={unreadOnly}
-        onUnreadOnlyChange={setUnreadOnly}
-        dateFilter={dateFilter}
-        onDateChange={setDateFilter}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onMarkAllRead={handleMarkAllRead}
-        onResetFilters={handleResetFilters}
-        isMarkingAll={markAllAsReadMutation.isPending}
-      />
+      {/* Sentinel for sticky detection */}
+      <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />
+
+      {/* Filter wrapper with sticky behavior */}
+      <div
+        ref={filterWrapperRef}
+        className={`${styles.filterWrapper} ${isSticky ? styles.sticky : ''}`}
+      >
+        <NotificationFilters
+          unreadCount={unreadCountData?.unreadCount ?? 0}
+          typeFilter={typeFilter}
+          onTypeChange={setTypeFilter}
+          unreadOnly={unreadOnly}
+          onUnreadOnlyChange={setUnreadOnly}
+          dateFilter={dateFilter}
+          onDateChange={setDateFilter}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onMarkAllRead={handleMarkAllRead}
+          onResetFilters={handleResetFilters}
+          isMarkingAll={markAllAsReadMutation.isPending}
+        />
+      </div>
 
       {/* Notification list */}
       {isLoading && <NotificationsSkeleton count={PAGE_SIZE} />}
@@ -162,7 +210,7 @@ export const NotificationsPageContent: React.FC = () => {
 
       {!isLoading && !error && data?.notifications.length === 0 && (
         <div className={styles.emptyState}>
-          <p>No notifications found. <br /> click on Reset button.</p>
+          <p>No notifications found.</p>
         </div>
       )}
 
@@ -181,13 +229,12 @@ export const NotificationsPageContent: React.FC = () => {
               />
             ))}
           </div>
-          {/* Pagination */}
           {showPagination && (
             <div className={styles.paginationWrapper}>
               <Pagination
                 currentPage={page}
                 totalPages={totalPages}
-                onPageChange={setPage}
+                onPageChange={handlePageChange}
                 showFirstLast
                 showPrevNext
                 size="md"

@@ -1,4 +1,4 @@
-import apiClient, { buildQueryString } from '@/shared/lib/apiClient';
+import apiClient, { buildQueryString, ApiClientResponse } from '@/shared/lib/apiClient';
 import type { Notification } from '@/shared/types';
 
 export interface GetNotificationsParams {
@@ -6,29 +6,54 @@ export interface GetNotificationsParams {
   limit?: number;
   unreadOnly?: boolean;
   type?: string;
+  category?: string;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
 }
+
 
 export interface NotificationsResponse {
   notifications: Notification[];
   unreadCount: number;
-  pagination: any;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
 }
 
 export const notificationService = {
-  /**
-   * Get notifications for the authenticated user.
-   */
   async getNotifications(params?: GetNotificationsParams): Promise<NotificationsResponse> {
     const query = buildQueryString(params);
-    const response = await apiClient.get<NotificationsResponse>(
-      `/notifications${query}`
-    );
-    return response.data;
+    const response = await apiClient.get<{
+      notifications: Notification[];
+      unreadCount: number;
+    }>(`/notifications${query}`) as ApiClientResponse<{
+      notifications: Notification[];
+      unreadCount: number;
+    }>;
+
+    // Extract pagination from meta (backend returns it under meta.pagination)
+    const pagination = response.meta?.pagination || {
+      page: params?.page || 1,
+      limit: params?.limit || 20,
+      total: response.data.notifications.length,
+      pages: 1,
+      hasNext: false,
+      hasPrev: false,
+    };
+
+    return {
+      notifications: response.data.notifications,
+      unreadCount: response.data.unreadCount,
+      pagination,
+    };
   },
 
-  /**
-   * Mark a specific notification as read.
-   */
   async markAsRead(notificationId: string): Promise<Notification> {
     const response = await apiClient.patch<{ notification: Notification }>(
       `/notifications/${notificationId}/read`
@@ -36,9 +61,6 @@ export const notificationService = {
     return response.data.notification;
   },
 
-  /**
-   * Mark multiple notifications as read.
-   */
   async markMultipleAsRead(notificationIds: string[]): Promise<{ modifiedCount: number }> {
     const response = await apiClient.post<{ modifiedCount: number }>(
       '/notifications/read-multiple',
@@ -47,24 +69,15 @@ export const notificationService = {
     return response.data;
   },
 
-  /**
-   * Mark all notifications as read.
-   */
   async markAllAsRead(): Promise<{ modifiedCount: number }> {
     const response = await apiClient.post('/notifications/read-all');
     return response.data;
   },
 
-  /**
-   * Delete a notification.
-   */
   async deleteNotification(notificationId: string): Promise<void> {
     await apiClient.delete(`/notifications/${notificationId}`);
   },
 
-  /**
-   * Get only the unread count.
-   */
   async getUnreadCount(): Promise<{ unreadCount: number }> {
     const response = await apiClient.get('/notifications/unread-count');
     return response.data;

@@ -727,7 +727,9 @@ export interface Notification extends Timestamp {
     | 'weekly_report'
     | 'question_solved'
     | 'question_mastered'
-    | 'revision_completed';
+    | 'revision_completed'
+    | 'pod_solved'      // ✅ added
+    | 'pod_available';  // ✅ added
   title: string;
   message: string;
   data: Record<string, any>; // flexible, based on type

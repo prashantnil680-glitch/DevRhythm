@@ -1,0 +1,138 @@
+/* NotificationFilters.module.css */
+
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.filterRow::-webkit-scrollbar {
+  display: none;
+}
+
+.unreadBadge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1rem;         
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.unreadCount {
+  background: var(--accent);
+  color: white;
+  padding: 2px 8px;       
+  border-radius: 20px;     
+  font-size: 0.9rem;       
+  font-weight: 700;
+}
+
+.filterSelect {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  white-space: nowrap;
+  min-width: 110px;
+}
+
+.filterSelect:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.checkboxWrapper {
+  display: flex;
+  align-items: center;
+}
+
+/* Date picker wrapper - prevents full width stretching */
+.datePickerWrapper {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+/* Search bar wrapper – takes remaining space */
+.searchWrapper {
+  flex: 1;
+  min-width: 180px;
+}
+
+.searchBar {
+  width: 100%;
+}
+
+.filterButton {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.filterButton:hover {
+  background: var(--hover-bg);
+  border-color: var(--accent);
+}
+
+.primaryButton {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.primaryButton:hover {
+  background: #2563eb;
+}
+
+.primaryButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Mobile breakpoint (≤480px) */
+@media (max-width: 480px) {
+  .filterRow {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 0.5rem;
+  }
+  .filterSelect,
+  .datePickerWrapper,
+  .searchWrapper {
+    flex: 1 0 auto;
+  }
+  .filterButton {
+    flex: 1 0 auto;
+    justify-content: center;
+  }
+}
+
+/* Tablet (768px) */
+@media (min-width: 481px) and (max-width: 768px) {
+  .filterRow {
+    gap: 8px;
+  }
+}

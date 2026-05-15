@@ -54,7 +54,7 @@ const { handleUserTimezoneChange } = require('./queueHandlers/userTimezoneChange
 const { handleTestCaseExecuted } = require('./queueHandlers/testCaseExecuted.handler');
 const { handleTimeThresholdReached } = require('./queueHandlers/timeThresholdReached.handler');
 const { handleConfidenceIncrement } = require('./queueHandlers/confidenceIncrement.handler');
-// REMOVED: const { handleRevisionAutoComplete } = require('./queueHandlers/revisionAutoComplete.handler');
+const { handlePodAvailable } = require('./queueHandlers/podAvailable.handler');
 
 // Register each job type with its dedicated processor
 jobQueue.process('question.solved', handleQuestionSolved);
@@ -74,7 +74,7 @@ jobQueue.process('user.timezone_change', handleUserTimezoneChange);
 jobQueue.process('test_case.executed', handleTestCaseExecuted);
 jobQueue.process('time.threshold_reached', handleTimeThresholdReached);
 jobQueue.process('confidence.increment', handleConfidenceIncrement);
-// REMOVED: jobQueue.process('revision.auto_complete', handleRevisionAutoComplete);
+jobQueue.process('pod.available', handlePodAvailable);
 
 const startQueueWorkers = async () => {
   if (!jobQueue) {

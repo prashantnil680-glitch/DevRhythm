@@ -10,11 +10,8 @@ import clsx from 'clsx';
 import styles from './PlatformIcon.module.css';
 
 export interface PlatformIconProps {
-  /** Platform name (case‑insensitive) */
   platform: string;
-  /** Icon size */
   size?: 'sm' | 'md' | 'lg' | number;
-  /** Additional CSS class */
   className?: string;
 }
 
@@ -29,27 +26,24 @@ const platformIcons: Record<string, React.ComponentType<{ size?: number; classNa
   hackerrank: SiHackerrank,
   codeforces: SiCodeforces,
   geeksforgeeks: SiGeeksforgeeks,
-  // add more as needed
 };
 
-/**
- * Renders an icon for a given coding platform.
- * Falls back to a generic code icon if platform is not recognized.
- */
 export const PlatformIcon: React.FC<PlatformIconProps> = ({
   platform,
   size = 'md',
   className,
 }) => {
-  const normalizedPlatform = platform.toLowerCase().replace(/\s+/g, '');
-  const IconComponent = platformIcons[normalizedPlatform] || FaCode;
+  // Guard against undefined/null/empty platform
+  const safePlatform = platform?.trim() || '';
+  const normalizedPlatform = safePlatform ? safePlatform.toLowerCase().replace(/\s+/g, '') : '';
+  const IconComponent = normalizedPlatform && platformIcons[normalizedPlatform] ? platformIcons[normalizedPlatform] : FaCode;
 
   const iconSize = typeof size === 'number' ? size : sizeMap[size];
 
   return (
     <span
       className={clsx(styles.iconWrapper, className)}
-      aria-label={`${platform} icon`}
+      aria-label={`${safePlatform || 'unknown'} icon`}
       role="img"
     >
       <IconComponent size={iconSize} className={styles.icon} />

@@ -1,0 +1,118 @@
+/* NotificationsPageContent.module.css */
+
+.container {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 1rem 0;
+  width: 100%;
+}
+
+/* Title row */
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.pageTitle {
+  font-weight: 600;
+  font-size: 1.5rem;
+  letter-spacing: -0.5px;
+  margin: 0;
+  color: var(--text);
+}
+
+.viewAllLink {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color var(--transition);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.viewAllLink:hover {
+  color: var(--accent);
+}
+
+/* Notification list container */
+.notifList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: opacity 0.15s ease;
+}
+
+/* Empty state */
+.emptyState {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+/* Error state */
+.errorState {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.retryButton {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.retryButton:hover {
+  background: #2563eb;
+}
+
+/* Pagination wrapper */
+.paginationWrapper {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Mobile adjustments */
+@media (max-width: 480px) {
+  .container {
+    padding: 0.5rem;
+  }
+  .titleRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    margin-bottom: 1rem;
+  }
+  .pageTitle {
+    font-size: 1.3rem;
+  }
+  .emptyState,
+  .errorState {
+    padding: 1.5rem;
+  }
+}
+
+/* Tablet */
+@media (min-width: 481px) and (max-width: 768px) {
+  .container {
+    padding: 0.75rem;
+  }
+}

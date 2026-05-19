@@ -99,12 +99,13 @@
 
 .primaryButton {
   background: var(--accent);
-  color: white;
+  color: var(--text-primary);
   border-color: var(--accent);
 }
 
 .primaryButton:hover {
-  background: #2563eb;
+  color: var(--bg-surface);
+  background: var(--accent-moss);
 }
 
 .primaryButton:disabled {

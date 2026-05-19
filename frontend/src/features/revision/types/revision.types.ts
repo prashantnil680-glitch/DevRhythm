@@ -45,6 +45,7 @@ export interface RevisionDashboardStats {
     totalCompletedSchedules: number;
     totalOverdueSchedules: number;
     totalRevisionsCompleted: number;
+    totalRevisionsScheduled: number;
     totalRevisionsPending: number;
     completionRate: number;
     averageOverdueDays: number;

@@ -209,9 +209,9 @@ export default function ActionStream() {
         const diffOrder = { Easy: 1, Medium: 2, Hard: 3 };
         items.sort((a, b) => diffOrder[a.difficulty] - diffOrder[b.difficulty]);
         break;
-      case 'title':
-        items.sort((a, b) => a.title.localeCompare(b.title));
-        break;
+      // case 'title':
+      //   items.sort((a, b) => a.title.localeCompare(b.title));
+      //   break;
     }
     return items;
   }, [allUpcomingItems, upcomingSearch, upcomingDifficulty, upcomingSort]);
@@ -291,9 +291,9 @@ export default function ActionStream() {
         const diffOrder = { Easy: 1, Medium: 2, Hard: 3 };
         items.sort((a, b) => diffOrder[a.difficulty] - diffOrder[b.difficulty]);
         break;
-      case 'title':
-        items.sort((a, b) => a.title.localeCompare(b.title));
-        break;
+      // case 'title':
+      //   items.sort((a, b) => a.title.localeCompare(b.title));
+      //   break;
     }
     return items;
   }, [allOverdueItems, overdueSearch, overdueDifficulty, overdueSort]);
@@ -578,7 +578,7 @@ export default function ActionStream() {
                 <option value="date-asc">Due (earliest first)</option>
                 <option value="date-desc">Due (latest first)</option>
                 <option value="difficulty">Difficulty</option>
-                <option value="title">Title</option>
+                {/* <option value="title">Title</option> */}
               </select>
               <button
                 onClick={() => {
@@ -675,7 +675,7 @@ export default function ActionStream() {
                 <option value="date-asc">Due (earliest first)</option>
                 <option value="date-desc">Due (latest first)</option>
                 <option value="difficulty">Difficulty</option>
-                <option value="title">Title</option>
+                {/* <option value="title">Title</option> */}
               </select>
               <button
                 onClick={() => {

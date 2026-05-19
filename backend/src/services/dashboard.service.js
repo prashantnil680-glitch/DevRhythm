@@ -892,6 +892,6 @@ module.exports = {
   getActivePlannedGoals,
   getTopWeakestPattern,
   getCurrentMonthHeatmap,
-  getDailyTrend,      // newly exported
-  getMonthlyTrend,    // newly exported
+  getDailyTrend,      
+  getMonthlyTrend,    
 };

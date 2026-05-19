@@ -1,5 +1,4 @@
 'use client';
-
 import Link from 'next/link';
 import Card from '@/shared/components/Card';
 import ProgressBar from '@/shared/components/ProgressBar';
@@ -16,8 +15,17 @@ export default function HeroSummary({ summary, goals }: HeroSummaryProps) {
   const dailyGoal = goals.daily;
   const weeklyGoal = goals.weekly;
 
-  const dailyPercentage = dailyGoal?.completionPercentage ?? 0;
-  const weeklyPercentage = weeklyGoal?.completionPercentage ?? 0;
+  // Helper to check if a goal is active (exists and has target > 0)
+  const hasActiveGoal = (goal: GoalsData['current']['daily']): boolean => {
+    return !!goal && goal.targetCount > 0;
+  };
+
+  const dailyActive = hasActiveGoal(dailyGoal);
+  const weeklyActive = hasActiveGoal(weeklyGoal);
+
+  // Compute percentages only if goal exists (safe to access)
+  const dailyPercentage = dailyActive ? dailyGoal!.completionPercentage : 0;
+  const weeklyPercentage = weeklyActive ? weeklyGoal!.completionPercentage : 0;
 
   return (
     <Card className={styles.container}>
@@ -48,43 +56,33 @@ export default function HeroSummary({ summary, goals }: HeroSummaryProps) {
       </div>
 
       <div className={styles.goalsSection}>
-        <div className={styles.goalItem}>
-          <div className={styles.goalHeader}>
-            <span className={styles.goalTitle}>Daily Goal</span>
-            {dailyGoal && (
+        {/* Only render Daily Goal if active */}
+        {dailyActive && (
+          <div className={styles.goalItem}>
+            <div className={styles.goalHeader}>
+              <span className={styles.goalTitle}>Daily Goal</span>
               <span className={styles.goalCount}>
-                {dailyGoal.completedCount} / {dailyGoal.targetCount}
+                {dailyGoal!.completedCount} / {dailyGoal!.targetCount}
               </span>
-            )}
+            </div>
+            <ProgressBar value={dailyPercentage} max={100} size="md" showValue={false} rounded />
+            <span className={styles.goalPercentage}>{dailyPercentage}%</span>
           </div>
-          <ProgressBar
-            value={dailyPercentage}
-            max={100}
-            size="md"
-            showValue={false}
-            rounded
-          />
-          <span className={styles.goalPercentage}>{dailyPercentage}%</span>
-        </div>
+        )}
 
-        <div className={styles.goalItem}>
-          <div className={styles.goalHeader}>
-            <span className={styles.goalTitle}>Weekly Goal</span>
-            {weeklyGoal && (
+        {/* Only render Weekly Goal if active */}
+        {weeklyActive && (
+          <div className={styles.goalItem}>
+            <div className={styles.goalHeader}>
+              <span className={styles.goalTitle}>Weekly Goal</span>
               <span className={styles.goalCount}>
-                {weeklyGoal.completedCount} / {weeklyGoal.targetCount}
+                {weeklyGoal!.completedCount} / {weeklyGoal!.targetCount}
               </span>
-            )}
+            </div>
+            <ProgressBar value={weeklyPercentage} max={100} size="md" showValue={false} rounded />
+            <span className={styles.goalPercentage}>{weeklyPercentage}%</span>
           </div>
-          <ProgressBar
-            value={weeklyPercentage}
-            max={100}
-            size="md"
-            showValue={false}
-            rounded
-          />
-          <span className={styles.goalPercentage}>{weeklyPercentage}%</span>
-        </div>
+        )}
       </div>
     </Card>
   );

@@ -18,6 +18,7 @@ export default function HeroSummary({ date }: HeroSummaryProps) {
   const dayQuery = useDayActivity(date || '');
   const { data, isLoading, error } = date ? dayQuery : todayQuery;
 
+  console.log("================ Data : ", data);
   const isDayPage = !!date;
 
   // Compute previous and next day dates (only on day page and when data loaded)
@@ -168,7 +169,7 @@ export default function HeroSummary({ date }: HeroSummaryProps) {
               </Tooltip>
             )}
           </div>
-          <span className={styles.statLabel}>Study Time</span>
+          <span className={styles.statLabel}>Today Study Time</span>
         </div>
 
         {/* Goal Completion */}

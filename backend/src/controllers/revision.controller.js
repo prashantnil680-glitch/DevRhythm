@@ -6,6 +6,7 @@ const { formatResponse, paginate, getPaginationParams, getStartOfDay, getEndOfDa
 const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 const revisionService = require('../services/revision.service');
+const heatmapService = require('../services/heatmap.service');
 const revisionActivityService = require('../services/revisionActivity.service');
 const { jobQueue } = require('../services/queue.service');
 const { client: redisClient } = require('../config/redis');
@@ -559,8 +560,23 @@ const recordTimeSpent = async (req, res, next) => {
     const { questionId } = req.params;
     const { minutes } = req.body;
     const today = new Date();
+    const timeZone = req.userTimeZone || 'UTC';
 
     await revisionActivityService.recordTimeSpent(req.user._id, questionId, today, minutes);
+
+    try {
+      await heatmapService.incrementDailyActivity({
+        userId: req.user._id,
+        date: today,
+        timeZone: timeZone,
+        increments: {
+          totalTimeSpentMinutes: minutes
+        }
+      });
+    } catch (heatmapErr) {
+      console.error('Failed to update heatmap time:', heatmapErr);
+      // Don't fail the request – time already recorded in revision service
+    }
 
     let progress = await UserQuestionProgress.findOne({
       userId: req.user._id,

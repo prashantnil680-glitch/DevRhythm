@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const revisionController = require('../../controllers/revision.controller');
 const { auth } = require('../../middleware/auth');
-const { attachUserTimeZone } = require('../../middleware/timezone'); 
+const { attachUserTimeZone } = require('../../middleware/timezone');   // ← NEW
 const validate = require('../../middleware/validator');
 const { cache } = require('../../middleware/cache');
 const { progressValidator } = require('../../utils/validators');
@@ -72,7 +72,16 @@ router.post('/question/:questionId/complete-past',
   revisionController.completePastRevision
 );
 
-router.post('/:questionId/time-spent', auth, rateLimiters.revisionCompleteLimiter, validate(Joi.object({ minutes: Joi.number().integer().min(1).max(480).required() }), 'body'), revisionController.recordTimeSpent);
+// ========== MODIFIED ROUTE ==========
+router.post('/:questionId/time-spent', 
+  auth, 
+  attachUserTimeZone,               // ← NEW middleware
+  rateLimiters.revisionCompleteLimiter, 
+  validate(Joi.object({ minutes: Joi.number().integer().min(1).max(480).required() }), 'body'), 
+  revisionController.recordTimeSpent
+);
+// ===================================
+
 router.put('/:revisionId/reschedule', auth, rateLimiters.progressUpdateLimiter, validate(progressValidator.rescheduleRevision, 'body'), revisionController.rescheduleRevision);
 router.delete('/:revisionId', auth, rateLimiters.progressUpdateLimiter, revisionController.deleteRevision);
 router.delete('/question/:questionId', auth, rateLimiters.progressUpdateLimiter, revisionController.deleteQuestionRevision);

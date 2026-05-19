@@ -112,7 +112,7 @@ export const NotificationFilters: React.FC<NotificationFiltersProps> = ({
         disabled={isMarkingAll || unreadCount === 0}
         title="Mark all as read"
       >
-        <FiCheck /> All
+        <FiCheck />  Read All
       </button>
 
       {/* Reset button */}

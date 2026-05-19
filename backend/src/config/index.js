@@ -76,6 +76,11 @@ module.exports = {
       cpuTimeLimit: parseFloat(process.env.JUDGE0_CPU_TIME_LIMIT) || 2,
       memoryLimit: parseInt(process.env.JUDGE0_MEMORY_LIMIT) || 128000,
     },
+    onlineCompiler: {
+      apiUrl: process.env.ONLINECOMPILER_API_URL,
+      apiKey: process.env.ONLINECOMPILER_API_KEY,
+      timeout: parseInt(process.env.ONLINECOMPILER_TIMEOUT) || 30000,
+    },
   },
 
   // ========== USER LIST OPTIMIZATION CONSTANTS ==========

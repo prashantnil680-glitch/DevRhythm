@@ -285,7 +285,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               />
             </div>
 
-            <div className={styles.formGroup}>
+            {/* <div className={styles.formGroup}>
               <label htmlFor="dailyGoal">Daily Goal</label>
               <input
                 id="dailyGoal"
@@ -304,7 +304,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 max={100}
                 {...control.register('weeklyGoal', { valueAsNumber: true })}
               />
-            </div>
+            </div> */}
             {/* <div className={styles.formGroup}>
               <label htmlFor="timezone">Timezone</label>
               <select {...control.register('timezone')}>

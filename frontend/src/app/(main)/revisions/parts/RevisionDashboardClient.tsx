@@ -83,9 +83,9 @@ export default function RevisionDashboardClient() {
         <div className={styles.leftColumn}>
           <RevisionFunnel data={byRevisionIndex} />
         </div>
-        <div className={styles.rightColumn}>
+        {/* <div className={styles.rightColumn}>
           <QuickStats {...quickStats} />
-        </div>
+        </div> */}
       </div>
       <RhythmCenter trends={transformedTrends} />
       <div className={styles.wisdomBoard}>

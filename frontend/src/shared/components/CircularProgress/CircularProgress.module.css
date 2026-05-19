@@ -3,8 +3,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.3s ease;
+  cursor: pointer;
 }
 
+.container:hover {
+  transform: scale(1.02);
+}
+
+/* keep existing styles */
 .svg {
   position: absolute;
   top: 0;

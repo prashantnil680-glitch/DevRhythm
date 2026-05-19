@@ -368,6 +368,51 @@ const getDetailedRevisionStats = async (userId, timeZone = 'UTC') => {
     }
   }
 
+  const totalIndices = 5;
+  const revisionIndexStats = Array(totalIndices).fill().map(() => ({
+    totalQuestions: 0,
+    completed: 0,
+    totalTimeSpent: 0,
+    confidenceSum: 0,
+    confidenceCount: 0,
+    skipped: 0,
+  }));
+
+  for (const schedule of allSchedules) {
+    for (let i = 0; i < schedule.schedule.length && i < totalIndices; i++) {
+      revisionIndexStats[i].totalQuestions++;
+    }
+    for (const cr of schedule.completedRevisions) {
+      if (cr.status !== 'completed') continue;
+      const idx = schedule.schedule.findIndex(d => d.getTime() === cr.date.getTime());
+      if (idx >= 0 && idx < totalIndices) {
+        revisionIndexStats[idx].completed++;
+        revisionIndexStats[idx].totalTimeSpent += cr.timeSpent || 0;
+        if (cr.confidenceAfter) {
+          revisionIndexStats[idx].confidenceSum += cr.confidenceAfter;
+          revisionIndexStats[idx].confidenceCount++;
+        }
+      }
+    }
+  }
+
+  const byRevisionIndex = revisionIndexStats.map((stats, idx) => {
+    const completionRate = stats.totalQuestions ? (stats.completed / stats.totalQuestions) * 100 : 0;
+    const averageTimeSpent = stats.completed ? (stats.totalTimeSpent / stats.completed).toFixed(1) : '0.0';
+    const averageConfidenceAfter = stats.confidenceCount ? (stats.confidenceSum / stats.confidenceCount).toFixed(1) : null;
+    const dropoutRate = stats.totalQuestions ? ((stats.totalQuestions - stats.completed) / stats.totalQuestions) * 100 : 0;
+    return {
+      index: idx,
+      totalQuestions: stats.totalQuestions,
+      completed: stats.completed,
+      completionRate: parseFloat(completionRate.toFixed(2)),
+      skipped: stats.skipped,
+      averageTimeSpent: parseFloat(averageTimeSpent),
+      averageConfidenceAfter,
+      dropoutRate: parseFloat(dropoutRate.toFixed(2)),
+    };
+  });
+
   const computeStats = (obj) => {
     obj.completionRate = obj.totalRevisions ? (obj.completed / obj.totalRevisions) * 100 : 0;
     obj.averageTimeSpent = obj.completed ? (obj.totalTimeSpent / obj.completed).toFixed(1) : '0.0';
@@ -398,29 +443,24 @@ const getDetailedRevisionStats = async (userId, timeZone = 'UTC') => {
   for (const val of confidenceAfterValues) confidenceDist[val]++;
 
   const improvementByIndex = [];
+  const totalRevisionsScheduled = allSchedules.reduce((sum, s) => sum + s.schedule.length, 0);
+  const totalRevisionsCompleted = allCompleted.length;
+  const dynamicCompletionRate = totalRevisionsScheduled ? (totalRevisionsCompleted / totalRevisionsScheduled) * 100 : 0;
 
   const detailedStats = {
     summary: {
       totalActiveSchedules: baseStats.totalActive,
-      totalCompletedSchedules: baseStats.totalCompleted,
-      totalOverdueSchedules: baseStats.totalOverdue,
+      // totalCompletedSchedules: baseStats.totalCompleted,
+      // totalOverdueSchedules: baseStats.totalOverdue,
       totalRevisionsCompleted: allCompleted.length,
+      totalRevisionsScheduled: allSchedules.reduce((sum, s) => sum + s.schedule.length, 0), 
       totalRevisionsPending: baseStats.pendingWeek,
-      completionRate: baseStats.completionRate,
-      averageOverdueDays: baseStats.averageOverdue,
-      maxOverdueDays: 0,
-      revisionStreak: { current: 0, longest: 0 }
+      completionRate: Math.round(dynamicCompletionRate),
+      // averageOverdueDays: baseStats.averageOverdue,
+      // maxOverdueDays: 0,
+      // revisionStreak: { current: 0, longest: 0 }
     },
-    byRevisionIndex: Object.entries(baseStats.byRevisionIndex).map(([idx, count]) => ({
-      index: parseInt(idx),
-      totalQuestions: count,
-      completed: 0,
-      completionRate: 0,
-      skipped: 0,
-      averageTimeSpent: 0,
-      averageConfidenceAfter: null,
-      dropoutRate: 0
-    })),
+    byRevisionIndex,
     trends: { daily: dailyTrends, weekly: [], monthly: [] },
     overdueDistribution: distribution,
     byDifficulty,

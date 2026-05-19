@@ -13,8 +13,13 @@ const getNotificationsSchema = Joi.object({
   unreadOnly: Joi.boolean().default(false),
   type: Joi.string().valid(
     'revision_reminder_daily', 'revision_reminder_urgent', 'goal_completion',
-    'streak_reminder', 'new_follower', 'weekly_report'
-  )
+    'streak_reminder', 'new_follower', 'weekly_report', 'question_solved',
+    'question_mastered', 'revision_completed', 'pod_available', 'pod_solved'
+  ),
+  startDate: Joi.date().iso(),
+  endDate: Joi.date().iso(),
+  category: Joi.string().regex(/^(revision|goal|solved|pod|social)(,(revision|goal|solved|pod|social))*$/),
+  search: Joi.string().trim().max(100).optional()
 });
 
 const markMultipleSchema = Joi.object({

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import {
@@ -135,7 +135,8 @@ function QuestionCard({ question, timeline, type }: QuestionCardProps) {
   const handleLeave = () => setFillHeight(0);
 
   const patternSlug = getPatternSlug(question.pattern, question.patternSlugs);
-  const isRevision = type === 'revision';
+  // fallback for missing difficulty
+  const difficulty = question.difficulty?.toLowerCase() ?? 'easy';
 
   return (
     <div className={styles.timelineCard}>
@@ -145,8 +146,8 @@ function QuestionCard({ question, timeline, type }: QuestionCardProps) {
         </Link>
         <div className={styles.cardMeta}>
           <PlatformIcon platform={question.platform} size="sm" />
-          <Badge variant={question.difficulty.toLowerCase() as 'easy' | 'medium' | 'hard'} size="sm">
-            {question.difficulty}
+          <Badge variant={difficulty as 'easy' | 'medium' | 'hard'} size="sm">
+            {question.difficulty || 'Easy'}
           </Badge>
           {patternSlug && (
             <Link href={`/patterns/${patternSlug}`} className={styles.patternBadge}>
@@ -446,38 +447,44 @@ export default function AllActivityLog() {
   // ---- Solved Tab ----
   const renderSolvedTab = () => {
     const groups = solvedLogs?.question_solved;
-    if (solvedLoading) return <div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div>;
-    if (solvedError || !groups || Object.keys(groups).length === 0) return <div className={styles.emptyState}>No solved questions found</div>;
+    if (solvedLoading) return <React.Fragment key="solved-loading"><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></React.Fragment>;
+    if (solvedError || !groups || Object.keys(groups).length === 0) return <React.Fragment key="solved-empty"><div className={styles.emptyState}>No solved questions found</div></React.Fragment>;
+    
+    const cards = Object.values(groups).map((group: QuestionSolvedGroup) => (
+      <QuestionCard key={group.question._id} question={group.question} timeline={group.solves_timeline} type="solve" />
+    ));
+    const pagination = solvedTotalPages > 1 && (
+      <div key="pagination" className={styles.paginationWrapper}>
+        <Pagination currentPage={pageSolved} totalPages={solvedTotalPages} onPageChange={setPageSolved} showFirstLast showPrevNext size="md" />
+      </div>
+    );
     return (
-      <>
-        {Object.values(groups).map((group: QuestionSolvedGroup) => (
-          <QuestionCard key={group.question._id} question={group.question} timeline={group.solves_timeline} type="solve" />
-        ))}
-        {solvedTotalPages > 1 && (
-          <div className={styles.paginationWrapper}>
-            <Pagination currentPage={pageSolved} totalPages={solvedTotalPages} onPageChange={setPageSolved} showFirstLast showPrevNext size="md" />
-          </div>
-        )}
-      </>
+      <React.Fragment key="solved-tab">
+        {cards}
+        {pagination}
+      </React.Fragment>
     );
   };
 
   // ---- Mastered Tab ----
   const renderMasteredTab = () => {
     const groups = masteredLogs?.question_mastered;
-    if (masteredLoading) return <div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div>;
-    if (masteredError || !groups || Object.keys(groups).length === 0) return <div className={styles.emptyState}>No mastered questions found</div>;
+    if (masteredLoading) return <React.Fragment key="mastered-loading"><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></React.Fragment>;
+    if (masteredError || !groups || Object.keys(groups).length === 0) return <React.Fragment key="mastered-empty"><div className={styles.emptyState}>No mastered questions found</div></React.Fragment>;
+    
+    const cards = Object.values(groups).map((group: QuestionSolvedGroup) => (
+      <QuestionCard key={group.question._id} question={group.question} timeline={group.solves_timeline} type="mastered" />
+    ));
+    const pagination = masteredTotalPages > 1 && (
+      <div key="pagination" className={styles.paginationWrapper}>
+        <Pagination currentPage={pageMastered} totalPages={masteredTotalPages} onPageChange={setPageMastered} showFirstLast showPrevNext size="md" />
+      </div>
+    );
     return (
-      <>
-        {Object.values(groups).map((group: QuestionSolvedGroup) => (
-          <QuestionCard key={group.question._id} question={group.question} timeline={group.solves_timeline} type="mastered" />
-        ))}
-        {masteredTotalPages > 1 && (
-          <div className={styles.paginationWrapper}>
-            <Pagination currentPage={pageMastered} totalPages={masteredTotalPages} onPageChange={setPageMastered} showFirstLast showPrevNext size="md" />
-          </div>
-        )}
-      </>
+      <React.Fragment key="mastered-tab">
+        {cards}
+        {pagination}
+      </React.Fragment>
     );
   };
 
@@ -485,10 +492,12 @@ export default function AllActivityLog() {
   const renderRevisionsTab = () => {
     if (onTimeLoading || overdueLoading) {
       return (
-        <div className={styles.revisionsGrid}>
-          <div className={styles.revisionsColumn}><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></div>
-          <div className={styles.revisionsColumn}><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></div>
-        </div>
+        <React.Fragment key="revisions-loading">
+          <div className={styles.revisionsGrid}>
+            <div className={styles.revisionsColumn}><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></div>
+            <div className={styles.revisionsColumn}><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></div>
+          </div>
+        </React.Fragment>
       );
     }
 
@@ -499,7 +508,7 @@ export default function AllActivityLog() {
     const hasOverdue = overdueGroups && Object.keys(overdueGroups).length > 0;
 
     return (
-      <>
+      <React.Fragment key="revisions-tab">
         <div className={styles.revisionsGrid}>
           <div className={styles.revisionsColumn}>
             <div className={styles.cardHeader} style={{ paddingLeft: 0, marginBottom: '0.5rem' }}>
@@ -537,7 +546,7 @@ export default function AllActivityLog() {
             <span>{revisionMessage}</span>
           </div>
         )}
-      </>
+      </React.Fragment>
     );
   };
 
@@ -545,10 +554,10 @@ export default function AllActivityLog() {
   const renderGoalsTab = () => {
     const completed = goalsLogs?.completed || [];
     const failed = goalsLogs?.failed || [];
-    if (goalsLoading) return <div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div>;
-    if (goalsError || (completed.length === 0 && failed.length === 0)) return <div className={styles.emptyState}>No goals completed or failed</div>;
+    if (goalsLoading) return <React.Fragment key="goals-loading"><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></React.Fragment>;
+    if (goalsError || (completed.length === 0 && failed.length === 0)) return <React.Fragment key="goals-empty"><div className={styles.emptyState}>No goals completed or failed</div></React.Fragment>;
     return (
-      <>
+      <React.Fragment key="goals-tab">
         {completed.map(goal => <GoalCard key={goal._id} goal={goal} status="completed" />)}
         {failed.map(goal => <GoalCard key={goal._id} goal={goal} status="failed" />)}
         {goalsTotalPages > 1 && (
@@ -556,7 +565,7 @@ export default function AllActivityLog() {
             <Pagination currentPage={goalPage} totalPages={goalsTotalPages} onPageChange={setGoalPage} showFirstLast showPrevNext size="md" />
           </div>
         )}
-      </>
+      </React.Fragment>
     );
   };
 
@@ -570,18 +579,18 @@ export default function AllActivityLog() {
     ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     const visibleItems = allItems.slice(0, groupVisibleCount);
 
-    if (groupLoading) return <div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div>;
-    if (groupError || allItems.length === 0) return <div className={styles.emptyState}>No group activity yet</div>;
+    if (groupLoading) return <React.Fragment key="group-loading"><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></React.Fragment>;
+    if (groupError || allItems.length === 0) return <React.Fragment key="group-empty"><div className={styles.emptyState}>No group activity yet</div></React.Fragment>;
 
     return (
-      <>
+      <React.Fragment key="group-tab">
         <GroupCard items={visibleItems} />
         {groupVisibleCount < allItems.length && (
           <div className={styles.loadMore}>
             <Button variant="outline" size="sm" onClick={() => setGroupVisibleCount(prev => prev + 6)}>Load More</Button>
           </div>
         )}
-      </>
+      </React.Fragment>
     );
   };
 

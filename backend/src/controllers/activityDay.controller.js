@@ -1,3 +1,4 @@
+const { DateTime } = require('luxon');
 const heatmapService = require('../services/heatmap.service');
 const ActivityLog = require('../models/ActivityLog');
 const RevisionSchedule = require('../models/RevisionSchedule');
@@ -184,10 +185,14 @@ const fetchGoalsForDate = async (userId, startDate, endDate) => {
 const getTodayActivity = async (req, res, next) => {
   try {
     const timeZone = req.userTimeZone || 'UTC';
-    const today = new Date();
-    const dayStart = getStartOfDay(today, timeZone);
-    const dayEnd = getEndOfDay(today, timeZone);
+    const now = new Date();
+    const dayStart = getStartOfDay(now, timeZone);
+    const dayEnd = getEndOfDay(now, timeZone);
     const userId = req.user._id;
+
+    // Use luxon for reliable local date formatting
+    const localDateStr = DateTime.now().setZone(timeZone).toFormat('yyyy-MM-dd');
+    const localDayOfWeek = DateTime.now().setZone(timeZone).toFormat('cccc');
 
     // Fetch all actions for today
     const [questionSolvedLogs, questionMasteredLogs, revisionLogs, groupGoalProgress, groupGoalCompleted, groupChallengeProgress, groupChallengeCompleted] = await Promise.all([
@@ -204,8 +209,7 @@ const getTodayActivity = async (req, res, next) => {
       ActivityLog.find({ userId, action: 'group_challenge_completed', timestamp: { $gte: dayStart, $lte: dayEnd } }).lean()
     ]);
 
-    // Summary from heatmap (optional)
-    const dayData = await heatmapService.getDayData(userId, today, timeZone);
+    const dayData = await heatmapService.getDayData(userId, now, timeZone);
     const summary = dayData || {
       problemsSolved: 0,
       revisionsCompleted: 0,
@@ -250,13 +254,20 @@ const getTodayActivity = async (req, res, next) => {
       group_challenge_completed: groupChallengeCompleted
     };
 
+    // Exclude the UTC date and dayOfWeek from summary
+    const { date: _, dayOfWeek: __, ...summaryWithoutDate } = summary;
     const response = {
-      date: formatDate(today),
-      dayOfWeek: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][today.getUTCDay()],
-      ...summary,
+      ...summaryWithoutDate,
+      date: localDateStr,
+      dayOfWeek: localDayOfWeek,
+      todayStudyTimeInMinutes: summary.studyTimeMinutes,
       ...grouped
     };
 
+    // Prevent any external caching
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.json(formatResponse('Today\'s activity retrieved successfully', response, { timezone: timeZone }));
   } catch (error) {
     next(error);
@@ -275,6 +286,12 @@ const getDayActivityByDate = async (req, res, next) => {
     }
     const dayStart = getStartOfDay(targetDate, timeZone);
     const dayEnd = getEndOfDay(targetDate, timeZone);
+
+    // Use the original date string for display
+    const outputDate = date;
+    // Compute correct day of week from the input date in the user's timezone
+    const localDateTime = DateTime.fromFormat(date, 'yyyy-MM-dd', { zone: timeZone });
+    const outputDayOfWeek = localDateTime.toFormat('cccc');
 
     // Fetch all actions for the specific day
     const [questionSolvedLogs, questionMasteredLogs, revisionLogs, groupGoalProgress, groupGoalCompleted, groupChallengeProgress, groupChallengeCompleted] = await Promise.all([
@@ -336,13 +353,20 @@ const getDayActivityByDate = async (req, res, next) => {
       group_challenge_completed: groupChallengeCompleted
     };
 
+    // Exclude the UTC date and dayOfWeek from summary
+    const { date: _, dayOfWeek: __, ...summaryWithoutDate } = summary;
     const response = {
-      date: formatDate(targetDate),
-      dayOfWeek: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][targetDate.getUTCDay()],
-      ...summary,
+      ...summaryWithoutDate,
+      date: outputDate,
+      dayOfWeek: outputDayOfWeek,
+      todayStudyTimeInMinutes: summary.studyTimeMinutes,
       ...grouped
     };
 
+    // Prevent any external caching
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.json(formatResponse(`Activity for ${date} retrieved successfully`, response, { timezone: timeZone }));
   } catch (error) {
     next(error);

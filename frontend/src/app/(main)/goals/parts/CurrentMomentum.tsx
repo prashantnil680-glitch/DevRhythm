@@ -1,5 +1,4 @@
 'use client';
-
 import { format } from 'date-fns';
 import CircularProgress from '@/shared/components/CircularProgress';
 import Card from '@/shared/components/Card';
@@ -45,21 +44,12 @@ export default function CurrentMomentum({ daily, weekly, isLoading }: CurrentMom
     return `ends ${format(date, 'MMM d')}`;
   };
 
-  const renderGoalCard = (title: string, goal?: GoalData) => {
-    if (!goal) {
-      return (
-        <Card className={styles.emptyCard} noHover>
-          <div className={styles.ringPlaceholder}>
-            <span className={styles.noGoalText}>No active {title.toLowerCase()} goal</span>
-          </div>
-          <div className={styles.details}>
-            <div className={styles.progressText}>— / —</div>
-            <div className={styles.status}>Inactive</div>
-          </div>
-        </Card>
-      );
-    }
+  // Helper to check if a goal is "empty" (no active goal)
+  const hasActiveGoal = (goal?: GoalData): boolean => {
+    return !!goal && goal.targetCount > 0;
+  };
 
+  const renderGoalCard = (title: string, goal: GoalData) => {
     const percentage = Math.round(goal.completionPercentage);
     const progressText = `${goal.completedCount} / ${goal.targetCount} completed`;
     const remainingText = goal.remaining > 0 ? `${goal.remaining} left` : 'All done!';
@@ -90,8 +80,8 @@ export default function CurrentMomentum({ daily, weekly, isLoading }: CurrentMom
 
   return (
     <div className={styles.container}>
-      {renderGoalCard('Daily', daily)}
-      {renderGoalCard('Weekly', weekly)}
+      {hasActiveGoal(daily) && renderGoalCard('Daily', daily!)}
+      {hasActiveGoal(weekly) && renderGoalCard('Weekly', weekly!)}
     </div>
   );
 }

@@ -18,6 +18,7 @@ const heatmapService = require("../heatmap.service");
 const { updateUserActivity } = require("../user.service");
 const { client: redisClient } = require("../../config/redis");
 const constants = require("../../config/constants");
+const leetcodeService = require("../leetcode.service"); // NEW
 
 const getGoalDailySolveKey = (userId, dateStr) => `goal:solved:daily:${userId}:${dateStr}`;
 
@@ -31,6 +32,18 @@ const handleQuestionSolved = async (job) => {
   try {
     const question = await Question.findById(questionId);
     if (!question) throw new Error("Question not found");
+
+    // ========== NEW: Check if this is the Problem of the Day (POD) ==========
+    let isPod = false;
+    let dailyProblem = null;
+    try {
+      dailyProblem = await leetcodeService.getDailyProblem();
+      if (dailyProblem && dailyProblem.titleSlug === question.platformQuestionId) {
+        isPod = true;
+      }
+    } catch (err) {
+      console.warn(`[question.solved] Failed to check daily problem: ${err.message}`);
+    }
 
     const user = await User.findById(userId);
     if (!user) throw new Error("User not found");
@@ -188,13 +201,12 @@ const handleQuestionSolved = async (job) => {
       }
     }
 
-    // ========== REVISION SCHEDULE HANDLING (TIMEZONE-AWARE, NO AUTO-COMPLETION) ==========
+    // ========== REVISION SCHEDULE HANDLING ==========
     const existingRevision = await RevisionSchedule.findOne({ userId, questionId });
 
     if (!existingRevision) {
-      const scheduleDays = constants.REVISION_SCHEDULE; // [1, 3, 7, 14, 30]
+      const scheduleDays = constants.REVISION_SCHEDULE;
       const scheduleUTC = scheduleDays.map(days => {
-        // For all offsets, use start of the target day (midnight)
         const localDate = solvedLocal.startOf('day').plus({ days });
         return localDate.toUTC().toJSDate();
       });
@@ -208,7 +220,6 @@ const handleQuestionSolved = async (job) => {
         completedRevisions: []
       });
     } else {
-      // Ensure no auto‑completion (if the schedule already exists but was created with auto‑completion in the past)
       if (existingRevision.completedRevisions.length === 0 && existingRevision.currentRevisionIndex !== 0) {
         existingRevision.currentRevisionIndex = 0;
         existingRevision.completedRevisions = [];
@@ -218,8 +229,41 @@ const handleQuestionSolved = async (job) => {
     }
     await invalidateCache(`revisions:*:user:${userId}:*`);
     await invalidateCache(`question-details:*:${questionId}:*`);
-    // =========================================================================
+    if (isPod) {
+      // Check if a pod_solved notification already exists for this user and question within the last 24 hours
+      const oneDayAgo = new Date();
+      oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
+      const existingPodNotification = await Notification.findOne({
+        userId,
+        type: 'pod_solved',
+        'data.questionId': questionId.toString(),
+        createdAt: { $gte: oneDayAgo }
+      });
+
+      if (!existingPodNotification) {
+        await Notification.create({
+          userId,
+          type: 'pod_solved',
+          title: 'Daily Problem Solved!',
+          message: `You solved today's POD: "${question.title}"`,
+          data: {
+            questionId,
+            platformQuestionId: question.platformQuestionId,
+            title: question.title,
+            difficulty: question.difficulty,
+            link: dailyProblem?.link || question.problemLink,
+          },
+          channel: 'in-app',
+          status: 'sent',
+          scheduledAt: new Date(),
+        });
+        await invalidateCache(`notifications:${userId}:*`);
+        console.log(`[question.solved] Created pod_solved notification for user ${userId}`);
+      } else {
+        console.log(`[question.solved] Skipping duplicate pod_solved notification for user ${userId}, question ${questionId}`);
+      }
+    }
     if (!wasSolvedToday) {
       let isGoalRelated = false;
 

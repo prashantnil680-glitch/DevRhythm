@@ -19,7 +19,9 @@ module.exports = {
     GOAL_COMPLETION: 'goal_completion',
     STREAK_REMINDER: 'streak_reminder',
     NEW_FOLLOWER: 'new_follower',
-    WEEKLY_REPORT: 'weekly_report'
+    WEEKLY_REPORT: 'weekly_report',
+    POD_AVAILABLE: 'pod_available',
+    POD_SOLVED: 'pod_solved',      
   },
   LEADERBOARD_TYPES: ['weekly', 'monthly'],
   SNAPSHOT_PERIODS: ['daily', 'weekly', 'monthly'],
@@ -28,10 +30,10 @@ module.exports = {
   MAX_DAILY_GOAL: 50,
   MAX_WEEKLY_GOAL: 100,
 
-  // Goal snapshot configuration (NEW)
+  // Goal snapshot configuration
   GOAL_SNAPSHOT_PERIODS: ['monthly', 'yearly'],
-  GOAL_SNAPSHOT_RETENTION_DAYS: 1095, // 3 years
-  GOAL_CHART_CACHE_TTL_SECONDS: 3600, // 1 hour
+  GOAL_SNAPSHOT_RETENTION_DAYS: 1095,
+  GOAL_CHART_CACHE_TTL_SECONDS: 3600,
   GOAL_CHART_DEFAULT_MONTHS_BACK: 12,
   GOAL_CHART_MAX_MONTHS_BACK: 36,
   GOAL_RELATED_SOLVE_REDIS_TTL_DAYS: 90,

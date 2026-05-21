@@ -34,7 +34,7 @@ export default function RecentQuestionsList({ questions }: RecentQuestionsListPr
     );
   }
 
-  console.log("=================: questions", questions);
+  // console.log("=================: questions", questions);
 
   return (
     <div className={styles.container}>

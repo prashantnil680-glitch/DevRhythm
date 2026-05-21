@@ -166,10 +166,10 @@ export default function ActionStream() {
         platform: q.questionId?.platform ?? 'Unknown',
         scheduledDate: group.date,
         revisionIndex: q.revisionIndex,
-        totalTimeSpent: 0,
-        attemptsCount: 0,
+        totalTimeSpent: q.totalTimeSpent ?? 0,
+        attemptsCount: q.attempts ?? 0,
         revisionCount: q.revisionIndex || 0,
-        confidenceLevel: 3,
+        confidenceLevel: q.confidenceAfter,
         status: q.status,
       }))
     );
@@ -234,10 +234,9 @@ export default function ActionStream() {
   const allOverdueItems = useMemo(() => {
     return overdueItems.map((item) => {
       const lastCompleted = item.completedRevisions?.slice(-1)[0];
-      const confidenceLevel = lastCompleted?.confidenceAfter || 3;
-      const totalTimeSpent =
-        item.completedRevisions?.reduce((sum: number, cr: any) => sum + (cr.timeSpent || 0), 0) || 0;
-      const attemptsCount = item.completedRevisions?.length || 0;
+      const confidenceLevel = item.confidenceAfter ?? 0;
+      const totalTimeSpent = item.totalTimeSpent ?? 0;
+      const attemptsCount = item.attempts ?? 0;
       const revisionCount = item.currentRevisionIndex || 0;
       const scheduledDateRaw = item.scheduledDate;
       const scheduledDate = safeParseDate(scheduledDateRaw) ? scheduledDateRaw : null;

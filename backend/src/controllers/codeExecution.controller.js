@@ -1,11 +1,12 @@
 const { DateTime } = require('luxon');
 const { executeBatch } = require("../services/codeExecution.service");
+const normalizeCode = require('../services/codeNormalizer'); // NEW
 const { formatResponse } = require("../utils/helpers/response");
 const AppError = require("../utils/errors/AppError");
 const Question = require("../models/Question");
 const UserQuestionProgress = require("../models/UserQuestionProgress");
 const CodeExecutionHistory = require("../models/CodeExecutionHistory");
-const RevisionSchedule = require("../models/RevisionSchedule"); 
+const RevisionSchedule = require("../models/RevisionSchedule");
 const { invalidateCache, invalidateProgressCache } = require('../middleware/cache');
 const revisionActivityService = require("../services/revisionActivity.service");
 const { jobQueue } = require('../services/queue.service');
@@ -15,7 +16,6 @@ const constants = require('../config/constants');
 const SUPPORTED_LANGUAGES = ["cpp", "python", "java", "javascript"];
 const normalize = (str) => (str || "").replace(/\s/g, "");
 
-// Normalize language aliases: "C++" → "cpp", "Python3" → "python"
 const normalizeLanguage = (lang) => {
   const lower = lang.toLowerCase();
   if (lower === 'c++') return 'cpp';
@@ -24,7 +24,6 @@ const normalizeLanguage = (lang) => {
   if (lower === 'java') return 'java';
   return lower;
 };
-
 
 const hasSolveFunction = (code, language) => {
   if (language === "python") return /def\s+solve\s*\(/.test(code);
@@ -448,17 +447,12 @@ def serialize_graph(node):
 
   let nodeType = null;
   if (neededDS.has("Node")) {
-    const nodeClassMatch = userCode.match(
-      /class\s+Node\s*:\s*([^]*?)(?=\n\S|$)/,
-    );
+    const nodeClassMatch = userCode.match(/class\s+Node\s*:\s*([^]*?)(?=\n\S|$)/);
     if (nodeClassMatch) {
       const classBody = nodeClassMatch[1];
       if (classBody.includes("self.random") || classBody.includes("random =")) {
         nodeType = "random";
-      } else if (
-        classBody.includes("self.neighbors") ||
-        classBody.includes("neighbors =")
-      ) {
+      } else if (classBody.includes("self.neighbors") || classBody.includes("neighbors =")) {
         nodeType = "graph";
       } else {
         nodeType = "graph";
@@ -519,9 +513,7 @@ def serialize_graph(node):
     return `values[${idx}]`;
   };
 
-  const deserializeCalls = params.map((_, i) =>
-    deserializeCall(params[i].typeHint, i),
-  );
+  const deserializeCalls = params.map((_, i) => deserializeCall(params[i].typeHint, i));
 
   // ----- Serialization of result -----
   const serializeResult = (typeHint, resultVar) => {
@@ -663,7 +655,15 @@ from collections import deque
   let usedHelpers = "";
   for (const ds of neededDS) {
     if (ds === "RandomList") {
-      usedHelpers += helpers.RandomList.funcs + "\n";
+    const nodeClassDef = `
+class Node:
+    def __init__(self, val=0, next=None, random=None):
+        self.val = val
+        self.next = next
+        self.random = random
+`;
+    usedHelpers += nodeClassDef + "\n";
+    usedHelpers += helpers.RandomList.funcs + "\n";
     } else if (ds === "Graph") {
       const helper = helpers.Graph;
       if (!classDefined("Node")) {
@@ -2212,7 +2212,23 @@ function generateJavaWrapper(userCode, starterCode) {
 
   // Generate components
   const jsonParser = generateJsonParser();
-  const dataStructures = generateJavaDataStructures(neededHelpers, userCode);
+  let dataStructures = generateJavaDataStructures(neededHelpers, userCode);
+  if (neededHelpers.has("RandomList") && !/^\s*class\s+Node\s*\{/m.test(userCode)) {
+    const nodeClassDef = `
+  class Node {
+      int val;
+      Node next;
+      Node random;
+
+      public Node(int val) {
+          this.val = val;
+          this.next = null;
+          this.random = null;
+      }
+  }
+  `;
+    dataStructures = nodeClassDef + '\n' + dataStructures;
+  }
   const helpers = generateJavaHelpers(neededHelpers);
 
   // Generate Main class
@@ -3029,6 +3045,17 @@ const runCode = async (req, res, next) => {
     ]);
     if (!question) throw new AppError("Question not found", 404);
 
+    // ========== Normalize user code (with user-friendly error handling) ==========
+    let normalizedCode;
+    try {
+      normalizedCode = normalizeCode(language, code, question.starterCode);
+    } catch (normalizeError) {
+      // Catch indentation or detection errors and return a clear 400 message
+      throw new AppError(normalizeError.message, 400);
+    }
+    let finalCode = normalizedCode;
+    // ============================================================================
+
     // --- Check if result order is irrelevant ---
     let isOrderIrrelevant = false;
     if (question.contentRef) {
@@ -3047,7 +3074,7 @@ const runCode = async (req, res, next) => {
       }));
     }
 
-    // 2. Extract existing custom test cases from user progress (already stored)
+    // 2. Extract existing custom test cases from user progress
     let userCustomTestCases = [];
     if (
       userProgress &&
@@ -3067,12 +3094,10 @@ const runCode = async (req, res, next) => {
       ...(testCases && Array.isArray(testCases) ? testCases : []),
     ];
 
-    // Add single test case from stdin/expected if provided
     if (stdin !== undefined && !testCases) {
       allTestCases.push({ stdin: stdin || "", expected: expected || "" });
     }
 
-    // Deduplicate using a Map keyed by normalized stdin|expected
     const uniqueMap = new Map();
     for (const tc of allTestCases) {
       const key = `${normalizeForCompare(tc.stdin)}|${normalizeForCompare(tc.expected)}`;
@@ -3086,15 +3111,14 @@ const runCode = async (req, res, next) => {
       throw new AppError("No test cases available for this question", 400);
     }
 
-    // Auto‑wrap if needed
-    let finalCode = code;
-    if (!hasSolveFunction(code, language)) {
+    // Auto‑wrap if needed (only if normalized code still lacks a solve function)
+    if (!hasSolveFunction(finalCode, language)) {
       if (language === "python") {
         const starterCode = question.starterCode
           ? question.starterCode["Python3"]
           : null;
         try {
-          finalCode = generatePythonWrapper(code, starterCode, finalTestCases);
+          finalCode = generatePythonWrapper(finalCode, starterCode, finalTestCases);
         } catch (wrapErr) {
           console.error("Wrapper generation error:", wrapErr.message);
         }
@@ -3103,7 +3127,7 @@ const runCode = async (req, res, next) => {
           ? question.starterCode["C++"]
           : null;
         try {
-          finalCode = generateCppWrapper(code, starterCode);
+          finalCode = generateCppWrapper(finalCode, starterCode);
         } catch (wrapErr) {
           console.error("C++ wrapper generation error:", wrapErr.message);
           finalCode = code;
@@ -3113,7 +3137,7 @@ const runCode = async (req, res, next) => {
           ? question.starterCode["Java"]
           : null;
         try {
-          finalCode = generateJavaWrapper(code, starterCode);
+          finalCode = generateJavaWrapper(finalCode, starterCode);
         } catch (wrapErr) {
           console.error("Java wrapper generation error:", wrapErr.message);
         }
@@ -3124,19 +3148,19 @@ const runCode = async (req, res, next) => {
       }
     }
 
-    // ----- CONVERT TEST CASES FOR C++ -----
+    // Convert test cases for C++ (JSON wrapping)
+    let processedTestCases = [...finalTestCases];
     if (language === "cpp") {
-      finalTestCases = finalTestCases.map((tc) => ({
+      processedTestCases = processedTestCases.map((tc) => ({
         stdin: convertToJsonArgs(tc.stdin),
         expected: tc.expected,
       }));
     }
-    // -------------------------------------
 
     const batchResults = await executeBatch({
       language,
       code: finalCode,
-      testCases: finalTestCases,
+      testCases: processedTestCases,
     });
 
     const results = batchResults.map((res, idx) => {
@@ -3175,12 +3199,12 @@ const runCode = async (req, res, next) => {
       };
     });
 
-    // --- EMIT ONE AGGREGATED JOB FOR THE ENTIRE SUBMISSION (not per test case) ---
+    // --- EMIT ONE AGGREGATED JOB FOR THE ENTIRE SUBMISSION ---
     if (jobQueue) {
       const passedCount = results.filter(r => r.passed).length;
       const failedCount = results.filter(r => !r.passed).length;
       const totalTestCases = results.length;
-       await jobQueue.add('test_case.executed', {
+      await jobQueue.add('test_case.executed', {
         userId: req.user._id,
         questionId,
         passedCount,
@@ -3191,13 +3215,12 @@ const runCode = async (req, res, next) => {
         language,
       });
     }
-    // ---------------------------------------------------------------------------
 
     const passedCount = results.filter((r) => r.passed).length;
     const totalCount = finalTestCases.length;
     const allPassed = passedCount === totalCount;
 
-    // ========== SAVE CUSTOM TEST CASES (only those that are NOT default) ==========
+    // ========== SAVE CUSTOM TEST CASES ==========
     let customToSave = [];
     if (testCases && Array.isArray(testCases)) {
       customToSave = testCases;
@@ -3217,7 +3240,6 @@ const runCode = async (req, res, next) => {
         const key = `${normalizeForCompare(tc.stdin)}|${normalizeForCompare(tc.expected)}`;
         return !defaultSet.has(key);
       });
-
       customToSave = uniqueCustom;
     }
 
@@ -3236,16 +3258,14 @@ const runCode = async (req, res, next) => {
         { upsert: true, new: true }
       );
     } else if (testCases || stdin !== undefined) {
-      // If custom test cases were provided but all were duplicates, clear stored ones
       await UserQuestionProgress.findOneAndUpdate(
         { userId: req.user._id, questionId },
         { $set: { customTestCases: [] } },
         { upsert: true }
       );
     }
-    // ======================================================================
 
-    // --- Save execution history with original user code ---
+    // --- Save execution history ---
     await CodeExecutionHistory.create({
       userId: req.user._id,
       questionId,
@@ -3318,9 +3338,8 @@ const runCode = async (req, res, next) => {
     if (!existingRevision) {
       const timeZone = req.user.preferences?.timezone || 'UTC';
       const solvedLocal = DateTime.fromJSDate(new Date(), { zone: timeZone });
-      const scheduleDays = constants.REVISION_SCHEDULE; // [1, 3, 7, 14, 30]
+      const scheduleDays = constants.REVISION_SCHEDULE;
       const scheduleUTC = scheduleDays.map(days => {
-        // For all offsets, use start of the target day (midnight)
         const localDate = solvedLocal.startOf('day').plus({ days });
         return localDate.toUTC().toJSDate();
       });
@@ -3370,11 +3389,8 @@ const runCode = async (req, res, next) => {
       }
 
       await revisionActivityService.recordCodeSubmission(req.user._id, questionId, new Date());
-      
-      // Mark test passed for active revision sessions AND cancel any pending auto-completion jobs
       await markTestPassedForQuestion(req.user._id, questionId);
 
-      // Automatically complete today's revision by skipping any overdue revisions
       const revisionResult = await revisionActivityService.checkAndCompleteRevision(
         req.user._id,
         questionId,

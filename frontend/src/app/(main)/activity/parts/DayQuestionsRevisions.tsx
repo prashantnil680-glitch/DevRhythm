@@ -1,5 +1,4 @@
 'use client';
-
 import Link from 'next/link';
 import { formatDistanceToNow, format } from 'date-fns';
 import Card from '@/shared/components/Card';
@@ -17,6 +16,9 @@ export default function DayQuestionsRevisions({ date }: DayQuestionsRevisionsPro
   const todayQuery = useTodayActivity();
   const dayQuery = useDayActivity(date || '');
   const { data, isLoading, error } = date ? dayQuery : todayQuery;
+
+  // Determine the correct date string for the "View All" link
+  const viewAllDate = date || new Date().toISOString().split('T')[0];
 
   if (isLoading) {
     return (
@@ -50,7 +52,7 @@ export default function DayQuestionsRevisions({ date }: DayQuestionsRevisionsPro
       <Card className={styles.container}>
         <div className={styles.header}>
           <h3 className={styles.title}>Day&apos;s Questions &amp; Revisions</h3>
-          <Link href="/activity/today" className={styles.viewAllLink}>
+          <Link href={`/activity/${viewAllDate}`} className={styles.viewAllLink}>
             View All →
           </Link>
         </div>
@@ -128,11 +130,15 @@ export default function DayQuestionsRevisions({ date }: DayQuestionsRevisionsPro
     ),
   ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
+  // Show up to 2 items each
+  const displayedSolved = solvedItems.slice(0, 2);
+  const displayedRevisions = revisionItems.slice(0, 2);
+
   return (
     <Card className={styles.container}>
       <div className={styles.header}>
         <h3 className={styles.title}>Day&apos;s Questions &amp; Revisions</h3>
-        <Link href="/activity/today" className={styles.viewAllLink}>
+        <Link href={`/activity/${viewAllDate}`} className={styles.viewAllLink}>
           View All →
         </Link>
       </div>
@@ -140,14 +146,11 @@ export default function DayQuestionsRevisions({ date }: DayQuestionsRevisionsPro
       {/* Solved today section */}
       <div className={styles.section}>
         <div className={styles.sectionTitle}>Solved today</div>
-        {solvedItems.length > 0 ? (
+        {displayedSolved.length > 0 ? (
           <div className={styles.list}>
-            {solvedItems.map((item, idx) => (
+            {displayedSolved.map((item, idx) => (
               <div key={`${item._id}-${idx}`} className={styles.listItem}>
-                <Link
-                  href={`/questions/${item.question.platformQuestionId}`}
-                  className={styles.questionLink}
-                >
+                <Link href={`/questions/${item.question.platformQuestionId}`} className={styles.questionLink}>
                   <span className={styles.questionTitle}>{item.question.title}</span>
                 </Link>
                 <div className={styles.metaRow}>
@@ -161,10 +164,7 @@ export default function DayQuestionsRevisions({ date }: DayQuestionsRevisionsPro
                   {item.isFirstSolve && (
                     <span className={styles.firstSolveBadge}>first solve</span>
                   )}
-                  <Link
-                    href={`/activity/${getDateFromTimestamp(item.timestamp)}`}
-                    className={styles.dateLink}
-                  >
+                  <Link href={`/activity/${getDateFromTimestamp(item.timestamp)}`} className={styles.dateLink}>
                     {formatTimeAgo(item.timestamp)}
                   </Link>
                 </div>
@@ -179,14 +179,11 @@ export default function DayQuestionsRevisions({ date }: DayQuestionsRevisionsPro
       {/* Revisions done section */}
       <div className={styles.section}>
         <div className={styles.sectionTitle}>Revisions done</div>
-        {revisionItems.length > 0 ? (
+        {displayedRevisions.length > 0 ? (
           <div className={styles.list}>
-            {revisionItems.map((item, idx) => (
+            {displayedRevisions.map((item, idx) => (
               <div key={`${item._id}-${idx}`} className={styles.listItem}>
-                <Link
-                  href={`/questions/${item.question.platformQuestionId}`}
-                  className={styles.questionLink}
-                >
+                <Link href={`/questions/${item.question.platformQuestionId}`} className={styles.questionLink}>
                   <span className={styles.questionTitle}>{item.question.title}</span>
                 </Link>
                 <div className={styles.metaRow}>
@@ -199,10 +196,7 @@ export default function DayQuestionsRevisions({ date }: DayQuestionsRevisionsPro
                       Overdue
                     </Badge>
                   )}
-                  <Link
-                    href={`/activity/${getDateFromTimestamp(item.timestamp)}`}
-                    className={styles.dateLink}
-                  >
+                  <Link href={`/activity/${getDateFromTimestamp(item.timestamp)}`} className={styles.dateLink}>
                     {formatTimeAgo(item.timestamp)}
                   </Link>
                 </div>

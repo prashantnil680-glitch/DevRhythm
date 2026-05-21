@@ -18,7 +18,7 @@ export default function HeroSummary({ date }: HeroSummaryProps) {
   const dayQuery = useDayActivity(date || '');
   const { data, isLoading, error } = date ? dayQuery : todayQuery;
 
-  console.log("================ Data : ", data);
+  // console.log("================ Data : ", data);
   const isDayPage = !!date;
 
   // Compute previous and next day dates (only on day page and when data loaded)

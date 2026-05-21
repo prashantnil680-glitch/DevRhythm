@@ -141,6 +141,10 @@ export interface UpcomingRevisionsListResponse {
       };
       revisionIndex: number;
       status: string;
+      scheduledDate?: string;      
+      totalTimeSpent?: number;     
+      attempts?: number;           
+      confidenceAfter?: number;           
     }>;
   }>;
   pagination?: {
@@ -156,16 +160,18 @@ export interface UpcomingRevisionsListResponse {
 export interface OverdueRevisionsListResponse {
   revisions: Array<{
     _id: string;
-    questionId: {
-      _id: string;
-      platformQuestionId: string;
-      title: string;
-      difficulty: string;
-      platform: string;
-    } | null;
+    questionId: string | null;
     schedule: string[];
     currentRevisionIndex: number;
     status: string;
+    platformQuestionId?: string;   
+    title?: string;                
+    difficulty?: string;           
+    platform?: string;             
+    scheduledDate?: string;        
+    totalTimeSpent?: number;       
+    confidenceAfter?: number | null; 
+    overdue?: boolean;             
   }>;
   pagination?: {
     page: number;

@@ -199,6 +199,18 @@ const getUpcomingRevisions = async (req, res, next) => {
       },
       { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } },
       {
+        $lookup: {
+          from: 'userquestionprogresses',
+          let: { uid: '$userId', qid: '$questionId' },
+          pipeline: [
+            { $match: { $expr: { $and: [ { $eq: ['$userId', '$$uid'] }, { $eq: ['$questionId', '$$qid'] } ] } } },
+            { $limit: 1 }
+          ],
+          as: 'progress'
+        }
+      },
+      { $unwind: { path: '$progress', preserveNullAndEmptyArrays: true } },
+      {
         $group: {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$pendingDue' } },
           date: { $first: '$pendingDue' },
@@ -207,25 +219,22 @@ const getUpcomingRevisions = async (req, res, next) => {
             $push: {
               _id: '$_id',
               questionId: {
-                $cond: {
-                  if: { $eq: ['$question', null] },
-                  then: null,
-                  else: {
-                    _id: '$question._id',
-                    platformQuestionId: '$question.platformQuestionId',
-                    title: '$question.title',
-                    platform: '$question.platform',
-                    difficulty: '$question.difficulty'
-                  }
-                }
+                _id: '$question._id',
+                platformQuestionId: '$question.platformQuestionId',
+                title: '$question.title',
+                platform: '$question.platform',
+                difficulty: '$question.difficulty'
               },
               revisionIndex: '$currentRevisionIndex',
-              scheduledDate: '$pendingDue'
+              scheduledDate: '$pendingDue',
+              totalTimeSpent: { $ifNull: ['$progress.totalTimeSpent', 0] },
+              attempts: { $ifNull: ['$progress.attempts.count', 0] },
+              confidenceAfter: { $ifNull: ['$progress.confidenceLevel', null] }
             }
           }
         }
       },
-      { $sort: { date: 1 } },
+      { $sort: { date: 1 } }
     ]);
     
     // Compute today's boundaries in the user's timezone
@@ -237,7 +246,6 @@ const getUpcomingRevisions = async (req, res, next) => {
       ...group,
       date: toLocalISOString(group.date, timeZone),
       questions: group.questions.map(q => {
-        // Parse the scheduled date (already converted to local ISO string)
         const scheduledDateLocal = new Date(toLocalISOString(q.scheduledDate, timeZone));
         const isToday = scheduledDateLocal >= todayStart && scheduledDateLocal <= todayEnd;
         const status = isToday ? 'Pending' : 'Upcoming';
@@ -780,7 +788,7 @@ const fetchOverdueRevisionsForStats = async (userId, timeZone, limit = 50) => {
         platform: '$question.platform',
         currentRevisionIndex: 1,
         nextRevisionDue: '$pendingDue',
-        totalTimeSpent: { $sum: '$completedRevisions.timeSpent' },
+        totalTimeSpent: { $ifNull: ['$progress.totalTimeSpent', 0] },
         confidenceLevel: { $arrayElemAt: ['$completedRevisions.confidenceAfter', -1] },
         status: { $literal: 'overdue' }
       }
@@ -899,6 +907,7 @@ const getOverdueRevisions = async (req, res, next) => {
       { $sort: { pendingDue: 1 } },
       { $skip: skip },
       { $limit: limit },
+      // Lookup question details
       {
         $lookup: {
           from: 'questions',
@@ -908,6 +917,18 @@ const getOverdueRevisions = async (req, res, next) => {
         }
       },
       { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'userquestionprogresses',
+          let: { uid: '$userId', qid: '$questionId' },
+          pipeline: [
+            { $match: { $expr: { $and: [ { $eq: ['$userId', '$$uid'] }, { $eq: ['$questionId', '$$qid'] } ] } } },
+            { $limit: 1 }
+          ],
+          as: 'progress'
+        }
+      },
+      { $unwind: { path: '$progress', preserveNullAndEmptyArrays: true } },
       {
         $project: {
           _id: 1,
@@ -920,8 +941,9 @@ const getOverdueRevisions = async (req, res, next) => {
           scheduledDate: '$pendingDue',
           overdue: { $literal: true },
           currentRevisionIndex: 1,
-          totalTimeSpent: { $sum: '$completedRevisions.timeSpent' },
-          confidenceAfter: { $arrayElemAt: ['$completedRevisions.confidenceAfter', -1] }
+          totalTimeSpent: { $ifNull: ['$progress.totalTimeSpent', 0] },
+          confidenceAfter: { $ifNull: ['$progress.confidenceLevel', null] },
+          attempts: { $ifNull: ['$progress.attempts.count', 0] }
         }
       }
     ]);

@@ -65,18 +65,18 @@ const getNotificationLink = (notification: Notification): string | null => {
       if (data?.platformQuestionId) {
         return `/questions/${data.platformQuestionId}`;
       }
-      if (data?.questionId && typeof data.questionId === 'string') {
-        return `/questions/${data.questionId}`;
-      }
+      // if (data?.questionId && typeof data.questionId === 'string') {
+      //   return `/questions/${data.questionId}`;
+      // }
       return null;
 
     case 'new_follower':
-      if (data?.followerUsername) {
-        return `/user/${data.followerUsername}`;
+      if (data?.followerName) {
+        return `/user/${data.followerName}`;
       }
-      if (data?.username) {
-        return `/user/${data.username}`;
-      }
+      // if (data?.username) {
+      //   return `/user/${data.username}`;
+      // }
       return null;
 
     case 'goal_completion':

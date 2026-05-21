@@ -590,6 +590,7 @@ const getDailyProblemAndGoal = async (req, res, next) => {
   try {
     const userId = req.user._id;
     const timeZone = req.userTimeZone;
+    const refresh = req.query.refresh === 'true';
 
     const currentStreak = req.user.streak.current;
     const longestStreak = req.user.streak.longest;
@@ -612,7 +613,7 @@ const getDailyProblemAndGoal = async (req, res, next) => {
       status: dailyGoal.status
     } : null;
 
-    const dashboardDaily = await dashboardService.getDailyProblem(userId);
+    const dashboardDaily = await dashboardService.getDailyProblem(userId, refresh);
     
     let dailyProblem = null;
     if (dashboardDaily && dashboardDaily.title) {
@@ -641,7 +642,7 @@ const getDailyProblemAndGoal = async (req, res, next) => {
       
       if (!question) {
         try {
-          const rawDaily = await leetcodeService.getDailyProblem();
+          const rawDaily = await leetcodeService.getDailyProblem(refresh);
           if (rawDaily && rawDaily.titleSlug) {
             const fullDetails = await leetcodeService.fetchProblemDetails(rawDaily.link);
             let extractedTestCases = [];

@@ -7,13 +7,14 @@ class OnlineCompilerProvider extends BaseCodeExecutionProvider {
     this.apiUrl = apiUrl.replace(/\/$/, '');
     this.apiKey = apiKey;
     this.timeout = timeout;
+    this.isFirstLog = true;
   }
 
   mapLanguage(language) {
     const map = {
-      cpp: 'cpp',
+      cpp: 'g++-15',
       python: 'python-3.14',
-      java: 'java',
+      java: 'openjdk-25',
       javascript: 'nodejs',
     };
     const mapped = map[language];
@@ -29,7 +30,6 @@ class OnlineCompilerProvider extends BaseCodeExecutionProvider {
     }
 
     let finalCode = code;
-    // Add entry point for Python to call solve() function
     if (language === 'python') {
       finalCode = code + `
 
@@ -49,7 +49,16 @@ if __name__ == "__main__":
     };
 
     const url = `${this.apiUrl}/api/run-code-sync/`;
-    console.log(`[OnlineCompilerProvider] Request to ${url}`);
+    
+    if (this.isFirstLog) {
+      this.isFirstLog = false;
+      // console.log('[OnlineCompilerProvider] ===== DEBUG FIRST EXECUTION =====');
+      // console.log('[OnlineCompilerProvider] Language:', language);
+      // console.log('[OnlineCompilerProvider] Compiler:', compiler);
+      // console.log('[OnlineCompilerProvider] Input (stdin):', stdin);
+      // console.log('[OnlineCompilerProvider] Code (full):\n', finalCode);
+      // console.log('[OnlineCompilerProvider] =================================');
+    }
 
     try {
       const response = await axios.post(url, payload, {
@@ -61,7 +70,7 @@ if __name__ == "__main__":
       });
 
       const data = response.data;
-      console.log('[OnlineCompilerProvider] Response data:', JSON.stringify(data, null, 2));
+      // console.log('[OnlineCompilerProvider] Response data:', JSON.stringify(data, null, 2));
 
       return {
         stdout: data.output || '',

@@ -257,9 +257,9 @@ const getHeatmapSummary = async (userId) => {
   };
 };
 
-const getDailyProblem = async (userId) => {
+const getDailyProblem = async (userId, refresh = false) => {
   try {
-    const daily = await leetcodeService.getDailyProblem();
+    const daily = await leetcodeService.getDailyProblem(refresh);
     if (!daily) return null;
     const todayUTC = new Date().toISOString().split('T')[0];
     const isActive = daily.date === todayUTC;

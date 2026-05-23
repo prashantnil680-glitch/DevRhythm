@@ -569,6 +569,7 @@ static JsonValue serializeNestedInteger(const NestedInteger& ni) {
     if (returnType.includes("Node")) return `std::cout << serializeNode(${resultVar});`;
     if (returnType.includes("NestedInteger")) return `std::cout << serializeNestedInteger(${resultVar});`;
     if (returnType == "std::string") return `std::cout << "\\"" << ${resultVar} << "\\"";`;
+    if (returnType == "bool") return `std::cout << std::boolalpha << ${resultVar};`;
     if (returnType == "vector<int>") return `std::cout << serializeIntVector(${resultVar});`;
     if (returnType == "vector<vector<int>>") return `std::cout << serializeIntVectorVector(${resultVar});`;
     if (returnType == "vector<string>") return `std::cout << serializeStringVector(${resultVar});`;

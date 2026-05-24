@@ -10,11 +10,15 @@ class CppGenerator {
       throw new Error('Invalid metadata: missing methodName');
     }
 
+    // If metadata claims a class name, verify that the user code actually defines that class.
+    if (metadata.className && !userCode.includes(`class ${metadata.className}`)) {
+      metadata.className = null;
+    }
+
     const helpersCode = this._embeddedHelpers();
     const { deserCode, callCode, interactiveMain } = this._generateExecutionCode(metadata);
     const includes = this._generateIncludes();
 
-    // Wrap user code with pragmas to suppress common warnings
     const wrappedUserCode = `
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-compare"
@@ -54,7 +58,7 @@ ${userCode}
 #include <stack>
 
 // ----------------------------------------------------------------------
-// JSON Parser
+// JSON Parser (lightweight, used by wrapper)
 // ----------------------------------------------------------------------
 class JsonValue {
 public:
@@ -337,7 +341,6 @@ static JsonValue serializeStringVector(const std::vector<std::string>& vec) {
     return JsonValue(res);
 }
 
-// ---------- Helpers for char vectors ----------
 static std::vector<char> deserializeCharVector(const JsonValue& val) {
     std::vector<char> res;
     if (!val.isArray()) return res;
@@ -377,7 +380,6 @@ static JsonValue serializeCharVectorVector(const std::vector<std::vector<char>>&
     }
     return JsonValue(res);
 }
-// ---------------------------------------------
 
 static ListNode* deserializeListNode(const JsonValue& val) {
     if (!val.isArray()) return nullptr;

@@ -138,7 +138,8 @@ const runCode = async (req, res, next) => {
     try {
       metadata = await metadataService.getExecutionMetadata(questionId, language);
     } catch (err) {
-      throw new AppError(`Failed to extract problem metadata: ${err.message}`, 400);
+      console.error(`[CodeExecution] Metadata extraction failed for question ${questionId}, language ${language}:`, err);
+      throw new AppError(`Failed to extract problem metadata: ${err.message}. Please ensure the starter code is valid.`, 400);
     }
 
     const defaultTestCases = (question.testCases || []).map(tc => ({
@@ -154,7 +155,13 @@ const runCode = async (req, res, next) => {
     try {
       fullCode = generator.generateWrapper(code, metadata, finalTestCases);
     } catch (err) {
+      console.error(`[CodeExecution] Wrapper generation failed for language ${language}:`, err);
       throw new AppError(`Wrapper generation failed: ${err.message}`, 400);
+    }
+
+    // Log a snippet of the generated code in development for debugging
+    if (process.env.NODE_ENV === 'development' && language === 'python') {
+      console.log(`[CodeExecution] Generated Python code (first 500 chars):\n${fullCode.substring(0, 500)}`);
     }
 
     let batchResults;

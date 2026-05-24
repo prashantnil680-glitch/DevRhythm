@@ -10,16 +10,15 @@ class PythonGenerator {
       throw new Error('Invalid metadata: missing methodName');
     }
 
-    const helperCode = this._getRequiredHelpers(metadata.dataStructures || []);
-    const { deserCode, callCode, interactiveMain } = this._generateExecutionCode(metadata);
+    const helperCode = this._getRequiredHelpers();
+    const missingImpl = this._injectMissingImports(userCode);
     const imports = this._generateImports(metadata);
-    const fullCode = `${imports}\n\n${helperCode}\n\n${userCode}\n\n${interactiveMain ? interactiveMain : this._buildNonInteractiveMain(deserCode, callCode)}\n`;
-
-    return fullCode;
+    const { deserCode, callCode, interactiveMain } = this._generateExecutionCode(metadata);
+    const finalCode = `${imports}\n\n${helperCode}\n${missingImpl}\n\n${userCode}\n\n${interactiveMain || this._buildNonInteractiveMain(deserCode, callCode, metadata.returnType, metadata.methodName, metadata.className)}\n`;
+    return finalCode;
   }
 
-  _getRequiredHelpers(dataStructures) {
-    if (!dataStructures.length) return '';
+  _getRequiredHelpers() {
     const structuresPath = path.join(__dirname, '../helpers/python/structures.py');
     try {
       return fs.readFileSync(structuresPath, 'utf-8');
@@ -31,7 +30,11 @@ class PythonGenerator {
 
   _fallbackHelpers() {
     return `
-# Minimal fallback helpers (should not be used in production)
+# Fallback helpers (should not be used in production)
+import json
+from collections import deque
+from typing import List, Optional, Any
+
 class ListNode:
     def __init__(self, val=0, next=None):
         self.val = val
@@ -75,7 +78,6 @@ def serialize_linked_list(head):
 
 def deserialize_tree(arr):
     if not arr: return None
-    from collections import deque
     root = TreeNode(arr[0])
     q = deque([root])
     i = 1
@@ -91,7 +93,6 @@ def deserialize_tree(arr):
 
 def serialize_tree(root):
     if not root: return []
-    from collections import deque
     res = []
     q = deque([root])
     while q:
@@ -120,7 +121,6 @@ def serialize_graph(node):
     if not node: return []
     visited = set()
     order = []
-    from collections import deque
     q = deque([node])
     while q:
         cur = q.popleft()
@@ -183,6 +183,33 @@ def serialize_nested_integer(ni):
 `;
   }
 
+  _injectMissingImports(userCode) {
+    if (userCode.includes('SortedList')) {
+      return `
+# Auto-injected SortedList implementation for compatibility
+import bisect
+
+class SortedList:
+    def __init__(self, iterable=None):
+        self._list = []
+        if iterable:
+            for item in iterable:
+                self.add(item)
+    def add(self, value):
+        bisect.insort(self._list, value)
+    def bisect_left(self, value):
+        return bisect.bisect_left(self._list, value)
+    def bisect_right(self, value):
+        return bisect.bisect_right(self._list, value)
+    def __len__(self):
+        return len(self._list)
+    def __getitem__(self, index):
+        return self._list[index]
+`;
+    }
+    return '';
+  }
+
   _generateExecutionCode(metadata) {
     const { interactive, className, methodName, parameters, constructorParams, methods } = metadata;
     if (interactive) {
@@ -201,21 +228,69 @@ def serialize_nested_integer(ni):
     lines.push(`            args += [None] * (${parameters.length} - len(args))`);
     for (let i = 0; i < parameters.length; i++) {
       const param = parameters[i];
-      const paramType = param.type;
+      const paramName = param.name;
+      const lowerName = (paramName || '').toLowerCase();
       let expr = `args[${i}]`;
-      if (paramType.includes('ListNode')) expr = `deserialize_linked_list(args[${i}])`;
-      else if (paramType.includes('TreeNode')) expr = `deserialize_tree(args[${i}])`;
-      else if (paramType.includes('Node')) expr = `deserialize_node(args[${i}])`;
-      else if (paramType.includes('NestedInteger')) expr = `deserialize_nested_integer(args[${i}])`;
+
+      if (lowerName === 'head' || lowerName === 'list' || (lowerName === 'node' && !lowerName.includes('tree'))) {
+        expr = `deserialize_linked_list(args[${i}]) if isinstance(args[${i}], list) else args[${i}]`;
+      } else if (lowerName === 'root' || lowerName === 'tree') {
+        expr = `deserialize_tree(args[${i}]) if isinstance(args[${i}], list) else args[${i}]`;
+      } else if (lowerName.includes('graph') || lowerName.includes('adj')) {
+        expr = `deserialize_graph(args[${i}]) if isinstance(args[${i}], list) else args[${i}]`;
+      } else if (lowerName === 'node' || lowerName === 'random') {
+        expr = `deserialize_node(args[${i}]) if isinstance(args[${i}], list) else args[${i}]`;
+      } else if (lowerName.includes('nested')) {
+        expr = `deserialize_nested_integer(args[${i}])`;
+      } else {
+        const baseType = this._getBaseType(param.type);
+        switch (baseType) {
+          case 'ListNode':
+            expr = `deserialize_linked_list(args[${i}])`;
+            break;
+          case 'TreeNode':
+            expr = `deserialize_tree(args[${i}])`;
+            break;
+          case 'Node':
+            expr = `deserialize_node(args[${i}])`;
+            break;
+          case 'NestedInteger':
+            expr = `deserialize_nested_integer(args[${i}])`;
+            break;
+          default:
+            break;
+        }
+      }
       lines.push(`        arg_${i} = ${expr}`);
     }
     return lines.join('\n');
   }
 
+  _getBaseType(typeStr) {
+    if (!typeStr) return 'Any';
+    let cleaned = typeStr;
+    if (cleaned.includes(' | None')) {
+      cleaned = cleaned.split(' | None')[0];
+    } else if (cleaned.startsWith('Optional[') && cleaned.endsWith(']')) {
+      cleaned = cleaned.slice(9, -1);
+    } else if (cleaned.startsWith('Union[') && cleaned.endsWith(']')) {
+      const inner = cleaned.slice(6, -1);
+      const parts = inner.split(',');
+      const nonNone = parts.find(p => p.trim() !== 'None');
+      if (nonNone) cleaned = nonNone.trim();
+    }
+    const bracketIndex = cleaned.indexOf('[');
+    if (bracketIndex !== -1) {
+      cleaned = cleaned.substring(0, bracketIndex);
+    }
+    return cleaned;
+  }
+
   _generateStandardCall(className, methodName, parameters) {
     const argNames = parameters.map((_, i) => `arg_${i}`).join(', ');
     if (className) {
-      return `        obj = ${className}()\n        result = obj.${methodName}(${argNames})`;
+      return `        obj = ${className}()
+        result = obj.${methodName}(${argNames})`;
     } else {
       return `        result = ${methodName}(${argNames})`;
     }
@@ -260,10 +335,40 @@ def solve(input_str):
         sys.stderr.write(str(e))
         return "null"
 `;
-    return { deserCode: '', callCode: '', interactiveMain: interactiveCode };
+    return interactiveCode;
   }
 
-  _buildNonInteractiveMain(deserCode, callCode) {
+  _buildNonInteractiveMain(deserCode, callCode, returnType, methodName, className) {
+    if (className === 'Codec') {
+      return `
+def solve(input_str):
+    import json
+    import sys
+    try:
+        data = json.loads(input_str)
+        args = data.get("args", [])
+        if len(args) > 0:
+            root_arg = args[0]
+            root = deserialize_tree(root_arg) if isinstance(root_arg, list) else None
+        else:
+            root = None
+        codec = Codec()
+        serialized = codec.serialize(root)
+        result = codec.deserialize(serialized)
+        if result is None:
+            return "[]"
+        return json.dumps(serialize_tree(result))
+    except Exception as e:
+        sys.stderr.write(str(e))
+        return "null"
+
+if __name__ == "__main__":
+    import sys
+    input_data = sys.stdin.read()
+    output = solve(input_data)
+    sys.stdout.write(output)
+`;
+    }
     return `
 def solve(input_str):
     import json
@@ -273,7 +378,11 @@ def solve(input_str):
         args = data.get("args", [])
 ${deserCode}
 ${callCode}
-        # Serialise result
+        if result is None:
+            if "Node" in ${JSON.stringify(returnType)} or ${JSON.stringify(methodName)} in ("cloneGraph", "copyRandomList"):
+                return "[]"
+            else:
+                return "null"
         if isinstance(result, (ListNode, TreeNode, Node, NestedInteger)):
             if isinstance(result, ListNode):
                 return json.dumps(serialize_linked_list(result))
@@ -288,16 +397,31 @@ ${callCode}
     except Exception as e:
         sys.stderr.write(str(e))
         return "null"
+
+if __name__ == "__main__":
+    import sys
+    input_data = sys.stdin.read()
+    output = solve(input_data)
+    sys.stdout.write(output)
 `;
   }
 
   _generateImports(metadata) {
-    const imports = new Set(['import json', 'import sys']);
-    if ((metadata.dataStructures || []).includes('TreeNode')) {
-      imports.add('from collections import deque');
-    }
-    imports.add('from typing import List, Optional, Dict, Any, Set, Tuple');
-    return Array.from(imports).join('\n');
+    const standardImports = [
+      'import json',
+      'import sys',
+      'import math',
+      'import bisect',
+      'import heapq',
+      'import itertools',
+      'import functools',
+      'import copy',
+      'from collections import defaultdict, deque, Counter, OrderedDict',
+      'from typing import List, Optional, Dict, Any, Set, Tuple, Union, Callable',
+      'from itertools import accumulate, product, combinations, permutations',
+      'from functools import reduce'
+    ];
+    return standardImports.join('\n');
   }
 }
 

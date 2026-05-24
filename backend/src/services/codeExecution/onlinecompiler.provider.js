@@ -29,18 +29,9 @@ class OnlineCompilerProvider extends BaseCodeExecutionProvider {
       throw new Error('OnlineCompiler API URL or API key not configured');
     }
 
-    let finalCode = code;
-    if (language === 'python') {
-      finalCode = code + `
-
-if __name__ == "__main__":
-    import sys
-    input_data = sys.stdin.read()
-    output = solve(input_data)
-    sys.stdout.write(str(output))
-`;
-    }
-
+    // No extra wrapping for any language – the language‑specific generator
+    // already produces a fully runnable program with its own entry point.
+    const finalCode = code;
     const compiler = this.mapLanguage(language);
     const payload = {
       compiler: compiler,
@@ -52,12 +43,8 @@ if __name__ == "__main__":
     
     if (this.isFirstLog) {
       this.isFirstLog = false;
-      // console.log('[OnlineCompilerProvider] ===== DEBUG FIRST EXECUTION =====');
-      // console.log('[OnlineCompilerProvider] Language:', language);
-      // console.log('[OnlineCompilerProvider] Compiler:', compiler);
-      // console.log('[OnlineCompilerProvider] Input (stdin):', stdin);
-      // console.log('[OnlineCompilerProvider] Code (full):\n', finalCode);
-      // console.log('[OnlineCompilerProvider] =================================');
+      // Optional debug log – can be removed in production
+      // console.log('[OnlineCompilerProvider] First execution, language:', language);
     }
 
     try {
@@ -70,8 +57,6 @@ if __name__ == "__main__":
       });
 
       const data = response.data;
-      // console.log('[OnlineCompilerProvider] Response data:', JSON.stringify(data, null, 2));
-
       return {
         stdout: data.output || '',
         stderr: data.error || '',

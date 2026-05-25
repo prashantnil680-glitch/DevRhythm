@@ -37,7 +37,7 @@ const fetchDailyQuestion = async () => {
   }
 
   if (!acquired) {
-    console.log('[DailyQuestion] Already fetched today (or another instance is fetching), skipping');
+    // console.log('[DailyQuestion] Already fetched today (or another instance is fetching), skipping');
     return;
   }
 
@@ -51,7 +51,7 @@ const fetchDailyQuestion = async () => {
     if (response.status === 200) {
       const dailyProblem = response.data?.data?.dailyProblem;
       if (dailyProblem) {
-        console.log(`[DailyQuestion] Successfully fetched and cached (TTL until 5:45 AM IST)`);
+        // console.log(`[DailyQuestion] Successfully fetched and cached (TTL until 5:45 AM IST)`);
 
         if (jobQueue) {
           await jobQueue.add('pod.available', {
@@ -60,7 +60,7 @@ const fetchDailyQuestion = async () => {
             link: dailyProblem.link,
             date: dailyProblem.date,
           });
-          console.log(`[DailyQuestion] Queued pod.available job for ${dailyProblem.title}`);
+          // console.log(`[DailyQuestion] Queued pod.available job for ${dailyProblem.title}`);
         }
       } else {
         console.warn('[DailyQuestion] Response missing dailyProblem');

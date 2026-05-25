@@ -115,7 +115,7 @@ const monthlySnapshotJob = new cron.CronJob('15 0 1 * *', updateMonthlySnapshot)
 const startGoalSnapshotJob = () => {
   dailySnapshotJob.start();
   monthlySnapshotJob.start();
-  console.log('Goal snapshot cron jobs started (user-timezone aware)');
+  // console.log('Goal snapshot cron jobs started (user-timezone aware)');
 };
 
 const stopGoalSnapshotJob = () => {

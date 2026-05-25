@@ -46,7 +46,7 @@ const formatActivityMessage = (activity: ActivityItem): string => {
 
 // Helper to determine if activity is clickable (leads to question page)
 const isClickableActivity = (activity: ActivityItem): boolean => {
-  const clickableTypes = ['question_solved', 'question_mastered', 'revision_completed', 'revision'];
+  const clickableTypes = ['solved', 'question_solved', 'question_mastered', 'revision_completed', 'revision'];
   return clickableTypes.includes(activity.type) && !!activity.platformQuestionId;
 };
 

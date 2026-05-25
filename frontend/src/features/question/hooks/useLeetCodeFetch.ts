@@ -32,14 +32,12 @@ export function useLeetCodeFetch() {
       return questionService.fetchLeetCodeQuestion(url, abortControllerRef.current?.signal);
     },
     onError: (error: any) => {
-      // Check if the request was cancelled (ignore)
       if (error?.code === 'ERR_CANCELED' || error?.message?.includes('canceled')) {
         return;
       }
 
       const status = error.response?.status;
 
-      // Handle 429 rate limit
       if (status === 429) {
         const retryAfterHeader = error.response?.headers?.['retry-after'];
         let waitSeconds = 60;
@@ -57,13 +55,16 @@ export function useLeetCodeFetch() {
         return;
       }
 
-      // Handle 404 Not Found – permanent error, no retry
       if (status === 404) {
         toast.error('Problem not found on LeetCode. Please check the URL.');
         return;
       }
 
-      // All other errors
+      if (status === 403 && error.response?.data?.message?.toLowerCase().includes('vip')) {
+        toast.error('LeetCode Premium (VIP) questions are not supported.');
+        return;
+      }
+
       toast.error(error.message || 'Failed to fetch LeetCode problem');
     },
   });

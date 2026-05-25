@@ -100,7 +100,7 @@ const overdueJob = new cron.CronJob('0 * * * *', updateOverdueRevisions);
 
 const startOverdueRevisionsJob = () => {
   overdueJob.start();
-  console.log('Overdue revisions job started (user-timezone aware)');
+  // console.log('Overdue revisions job started (user-timezone aware)');
 };
 
 const stopOverdueRevisionsJob = () => {

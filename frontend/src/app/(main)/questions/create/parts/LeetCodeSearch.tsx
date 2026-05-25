@@ -55,10 +55,8 @@ export const LeetCodeSearch: React.FC<LeetCodeSearchProps> = ({ onSelect }) => {
   };
 
   const handleSelect = (result: any) => {
-    // Fetch full problem details (including description) using the URL
     fetchMutation.mutate(result.url, {
       onSuccess: (fullData) => {
-        // Merge search result with fetched data
         const enriched = {
           ...result,
           description: fullData.description || '',
@@ -68,7 +66,11 @@ export const LeetCodeSearch: React.FC<LeetCodeSearchProps> = ({ onSelect }) => {
         setQuery('');
       },
       onError: (err) => {
-        toast.error('Failed to fetch problem details. Please try again.');
+        if (err.response?.status === 403 && err.response?.data?.message?.toLowerCase().includes('vip')) {
+          toast.error('LeetCode Premium (VIP) questions are not supported.');
+        } else {
+          toast.error('Failed to fetch problem details. Please try again.');
+        }
         console.error(err);
       },
     });

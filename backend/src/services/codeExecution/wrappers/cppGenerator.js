@@ -10,7 +10,6 @@ class CppGenerator {
       throw new Error('Invalid metadata: missing methodName');
     }
 
-    // If metadata claims a class name, verify that the user code actually defines that class.
     if (metadata.className && !userCode.includes(`class ${metadata.className}`)) {
       metadata.className = null;
     }
@@ -30,7 +29,6 @@ ${userCode}
 `;
 
     const finalCode = `${includes}\n\n${helpersCode}\n\n${wrappedUserCode}\n\n${interactiveMain || this._buildNonInteractiveMain(deserCode, callCode)}\n`;
-
     return finalCode;
   }
 
@@ -658,23 +656,67 @@ static JsonValue serializeNestedInteger(const NestedInteger& ni) {
 
   _generateStandardCall(className, methodName, parameters, returnType) {
     const argNames = parameters.map((_, i) => `arg${i}`).join(', ');
+    const isVoid = returnType === "void";
+
+    // For void methods that modify the first parameter (TreeNode*, ListNode*, Node*)
+    // we need to serialise that parameter after the call.
+    let voidSerialization = '';
+    if (isVoid && parameters.length > 0) {
+      const firstParamType = parameters[0].type;
+      // Normalize the type to detect custom structures
+      let normalized = firstParamType.replace(/[&*]/g, '').replace(/const/g, '').trim();
+      normalized = normalized.replace(/\s+/g, ' ');
+      if (normalized.includes("TreeNode")) {
+        voidSerialization = 'std::cout << serializeTreeNode(arg0);';
+      } else if (normalized.includes("ListNode")) {
+        voidSerialization = 'std::cout << serializeListNode(arg0);';
+      } else if (normalized.includes("Node")) {
+        voidSerialization = 'std::cout << serializeNode(arg0);';
+      } else {
+        voidSerialization = 'std::cout << "null";';
+      }
+    } else if (isVoid) {
+      voidSerialization = 'std::cout << "null";';
+    }
+
     if (className) {
-      return `    ${className} obj;
+      if (isVoid) {
+        return `    ${className} obj;
     try {
-        ${returnType === "void" ? "" : "auto result = "}obj.${methodName}(${argNames});
+        obj.${methodName}(${argNames});
+        ${voidSerialization}
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        std::cout << "null";
+    }`;
+      } else {
+        return `    ${className} obj;
+    try {
+        auto result = obj.${methodName}(${argNames});
         ${this._serializeResult(returnType, "result")}
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         std::cout << "null";
     }`;
+      }
     } else {
-      return `    try {
-        ${returnType === "void" ? "" : "auto result = "}${methodName}(${argNames});
+      if (isVoid) {
+        return `    try {
+        ${methodName}(${argNames});
+        ${voidSerialization}
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        std::cout << "null";
+    }`;
+      } else {
+        return `    try {
+        auto result = ${methodName}(${argNames});
         ${this._serializeResult(returnType, "result")}
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         std::cout << "null";
     }`;
+      }
     }
   }
 
@@ -683,17 +725,16 @@ static JsonValue serializeNestedInteger(const NestedInteger& ni) {
     let normalized = typeStr.replace(/[&*]/g, '').replace(/const/g, '').trim();
     normalized = normalized.replace(/\s+/g, ' ');
     if (normalized === "void") return 'std::cout << "null";';
-    // Most specific patterns first
     if (normalized.includes("vector<vector<string>>")) return `std::cout << serializeStringVectorVector(${resultVar});`;
     if (normalized.includes("vector<vector<char>>")) return `std::cout << serializeCharVectorVector(${resultVar});`;
+    if (normalized.includes("vector<vector<int>>")) return `std::cout << serializeIntVectorVector(${resultVar});`;
     if (normalized.includes("vector<char>")) return `std::cout << serializeCharVector(${resultVar});`;
+    if (normalized.includes("vector<string>")) return `std::cout << serializeStringVector(${resultVar});`;
+    if (normalized.includes("vector<int>")) return `std::cout << serializeIntVector(${resultVar});`;
     if (normalized.includes("ListNode")) return `std::cout << serializeListNode(${resultVar});`;
     if (normalized.includes("TreeNode")) return `std::cout << serializeTreeNode(${resultVar});`;
     if (normalized.includes("Node")) return `std::cout << serializeNode(${resultVar});`;
     if (normalized.includes("NestedInteger")) return `std::cout << serializeNestedInteger(${resultVar});`;
-    if (normalized.includes("vector<vector<int>>")) return `std::cout << serializeIntVectorVector(${resultVar});`;
-    if (normalized.includes("vector<int>")) return `std::cout << serializeIntVector(${resultVar});`;
-    if (normalized.includes("vector<string>")) return `std::cout << serializeStringVector(${resultVar});`;
     if (normalized === "std::string") return `std::cout << "\\"" << ${resultVar} << "\\"";`;
     if (normalized === "bool" || normalized.includes("bool")) return `std::cout << std::boolalpha << ${resultVar};`;
     if (normalized === "int" || normalized === "double") return `std::cout << ${resultVar};`;
@@ -882,10 +923,10 @@ using namespace std;`;
     normalized = normalized.replace(/\s+/g, ' ');
     if (normalized.includes("vector<vector<string>>")) return "std::vector<std::vector<std::string>>";
     if (normalized.includes("vector<vector<char>>")) return "std::vector<std::vector<char>>";
-    if (normalized.includes("vector<char>")) return "std::vector<char>";
     if (normalized.includes("vector<vector<int>>")) return "std::vector<std::vector<int>>";
-    if (normalized.includes("vector<int>")) return "std::vector<int>";
+    if (normalized.includes("vector<char>")) return "std::vector<char>";
     if (normalized.includes("vector<string>")) return "std::vector<std::string>";
+    if (normalized.includes("vector<int>")) return "std::vector<int>";
     if (normalized.includes("ListNode")) return "ListNode*";
     if (normalized.includes("TreeNode")) return "TreeNode*";
     if (normalized.includes("Node")) return "Node*";

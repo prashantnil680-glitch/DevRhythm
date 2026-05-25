@@ -232,7 +232,7 @@ class SortedList:
       const lowerName = (paramName || '').toLowerCase();
       let expr = `args[${i}]`;
 
-      if (lowerName === 'head' || lowerName === 'list' || (lowerName === 'node' && !lowerName.includes('tree'))) {
+      if (lowerName === 'head' || lowerName === 'list') {
         expr = `deserialize_linked_list(args[${i}]) if isinstance(args[${i}], list) else args[${i}]`;
       } else if (lowerName === 'root' || lowerName === 'tree') {
         expr = `deserialize_tree(args[${i}]) if isinstance(args[${i}], list) else args[${i}]`;
@@ -376,13 +376,24 @@ def solve(input_str):
     try:
         data = json.loads(input_str)
         args = data.get("args", [])
+        raw_args = args.copy()
 ${deserCode}
 ${callCode}
+        # If the method returns None (void) but modifies the first argument,
+        # serialise that argument (TreeNode, ListNode, Node) as the result.
         if result is None:
-            if "Node" in ${JSON.stringify(returnType)} or ${JSON.stringify(methodName)} in ("cloneGraph", "copyRandomList"):
+            first_arg = arg_0 if 'arg_0' in locals() else None
+            if first_arg is not None:
+                if isinstance(first_arg, TreeNode):
+                    return json.dumps(serialize_tree(first_arg))
+                elif isinstance(first_arg, ListNode):
+                    return json.dumps(serialize_linked_list(first_arg))
+                elif isinstance(first_arg, Node):
+                    return json.dumps(serialize_node(first_arg))
+            # Fallback: if raw input was an empty list, output empty list
+            if len(raw_args) > 0 and isinstance(raw_args[0], list) and len(raw_args[0]) == 0:
                 return "[]"
-            else:
-                return "null"
+            return "null"
         if isinstance(result, (ListNode, TreeNode, Node, NestedInteger)):
             if isinstance(result, ListNode):
                 return json.dumps(serialize_linked_list(result))

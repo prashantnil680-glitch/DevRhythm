@@ -341,6 +341,23 @@ static JsonValue serializeStringVector(const std::vector<std::string>& vec) {
     return JsonValue(res);
 }
 
+static std::vector<std::vector<std::string>> deserializeStringVectorVector(const JsonValue& val) {
+    std::vector<std::vector<std::string>> res;
+    if (!val.isArray()) return res;
+    for (const auto& elem : val.asArray()) {
+        res.push_back(deserializeStringVector(elem));
+    }
+    return res;
+}
+
+static JsonValue serializeStringVectorVector(const std::vector<std::vector<std::string>>& vec) {
+    std::vector<JsonValue> res;
+    for (const auto& inner : vec) {
+        res.push_back(serializeStringVector(inner));
+    }
+    return JsonValue(res);
+}
+
 static std::vector<char> deserializeCharVector(const JsonValue& val) {
     std::vector<char> res;
     if (!val.isArray()) return res;
@@ -602,16 +619,19 @@ static JsonValue serializeNestedInteger(const NestedInteger& ni) {
       normalized = normalized.replace(/\s+/g, ' ');
       let expr = `argsArray[${i}]`;
 
-      if (normalized.includes("vector<vector<char>>")) {
+      // Order of checks: most specific first
+      if (normalized.includes("vector<vector<string>>")) {
+        expr = `deserializeStringVectorVector(argsArray[${i}])`;
+      } else if (normalized.includes("vector<vector<char>>")) {
         expr = `deserializeCharVectorVector(argsArray[${i}])`;
-      } else if (normalized.includes("vector<char>")) {
-        expr = `deserializeCharVector(argsArray[${i}])`;
       } else if (normalized.includes("vector<vector<int>>")) {
         expr = `deserializeIntVectorVector(argsArray[${i}])`;
-      } else if (normalized.includes("vector<int>")) {
-        expr = `deserializeIntVector(argsArray[${i}])`;
+      } else if (normalized.includes("vector<char>")) {
+        expr = `deserializeCharVector(argsArray[${i}])`;
       } else if (normalized.includes("vector<string>")) {
         expr = `deserializeStringVector(argsArray[${i}])`;
+      } else if (normalized.includes("vector<int>")) {
+        expr = `deserializeIntVector(argsArray[${i}])`;
       } else if (normalized.includes("ListNode")) {
         expr = `deserializeListNode(argsArray[${i}])`;
       } else if (normalized.includes("TreeNode")) {
@@ -663,6 +683,8 @@ static JsonValue serializeNestedInteger(const NestedInteger& ni) {
     let normalized = typeStr.replace(/[&*]/g, '').replace(/const/g, '').trim();
     normalized = normalized.replace(/\s+/g, ' ');
     if (normalized === "void") return 'std::cout << "null";';
+    // Most specific patterns first
+    if (normalized.includes("vector<vector<string>>")) return `std::cout << serializeStringVectorVector(${resultVar});`;
     if (normalized.includes("vector<vector<char>>")) return `std::cout << serializeCharVectorVector(${resultVar});`;
     if (normalized.includes("vector<char>")) return `std::cout << serializeCharVector(${resultVar});`;
     if (normalized.includes("ListNode")) return `std::cout << serializeListNode(${resultVar});`;
@@ -673,7 +695,7 @@ static JsonValue serializeNestedInteger(const NestedInteger& ni) {
     if (normalized.includes("vector<int>")) return `std::cout << serializeIntVector(${resultVar});`;
     if (normalized.includes("vector<string>")) return `std::cout << serializeStringVector(${resultVar});`;
     if (normalized === "std::string") return `std::cout << "\\"" << ${resultVar} << "\\"";`;
-    if (normalized === "bool") return `std::cout << std::boolalpha << ${resultVar};`;
+    if (normalized === "bool" || normalized.includes("bool")) return `std::cout << std::boolalpha << ${resultVar};`;
     if (normalized === "int" || normalized === "double") return `std::cout << ${resultVar};`;
     if (normalized === "char") return `std::cout << "\\"" << ${resultVar} << "\\"";`;
     return `std::cout << ${resultVar};`;
@@ -699,6 +721,7 @@ static JsonValue serializeNestedInteger(const NestedInteger& ni) {
         else if constexpr (std::is_same_v<T, std::vector<int>>) return deserializeIntVector(val);
         else if constexpr (std::is_same_v<T, std::vector<std::vector<int>>>) return deserializeIntVectorVector(val);
         else if constexpr (std::is_same_v<T, std::vector<std::string>>) return deserializeStringVector(val);
+        else if constexpr (std::is_same_v<T, std::vector<std::vector<std::string>>>) return deserializeStringVectorVector(val);
         else if constexpr (std::is_same_v<T, std::vector<char>>) return deserializeCharVector(val);
         else if constexpr (std::is_same_v<T, std::vector<std::vector<char>>>) return deserializeCharVectorVector(val);
         else return val;
@@ -817,32 +840,47 @@ int main() {
   _generateIncludes() {
     return `#include <iostream>
 #include <fstream>
+#include <sstream>
+#include <iomanip>
 #include <string>
 #include <vector>
-#include <map>
-#include <set>
-#include <unordered_map>
-#include <unordered_set>
-#include <list>
 #include <deque>
-#include <queue>
+#include <list>
+#include <set>
+#include <map>
+#include <unordered_set>
+#include <unordered_map>
 #include <stack>
+#include <queue>
 #include <algorithm>
 #include <numeric>
 #include <iterator>
 #include <functional>
 #include <memory>
-#include <sstream>
+#include <utility>
+#include <tuple>
 #include <cctype>
 #include <cmath>
 #include <cstring>
-#include <tuple>
+#include <cstdlib>
+#include <cstdint>
+#include <climits>
+#include <cfloat>
+#include <cassert>
+#include <ctime>
+#include <chrono>
+#include <random>
+#include <regex>
+#include <thread>
+#include <mutex>
+#include <future>
 using namespace std;`;
   }
 
   _cppTypeFromString(type) {
     let normalized = type.replace(/[&*]/g, '').replace(/const/g, '').trim();
     normalized = normalized.replace(/\s+/g, ' ');
+    if (normalized.includes("vector<vector<string>>")) return "std::vector<std::vector<std::string>>";
     if (normalized.includes("vector<vector<char>>")) return "std::vector<std::vector<char>>";
     if (normalized.includes("vector<char>")) return "std::vector<char>";
     if (normalized.includes("vector<vector<int>>")) return "std::vector<std::vector<int>>";

@@ -1,5 +1,3 @@
-// This file is actually JavaScript (Node.js) that generates Java code.
-// It produces a complete Main.java with JSON parser, helpers, and user class.
 const fs = require('fs');
 const path = require('path');
 
@@ -80,36 +78,67 @@ class NestedInteger {
     for (let i = 0; i < parameters.length; i++) {
       const param = parameters[i];
       const type = param.type;
-      let deserExpr = `argsArray.get(${i})`;
-      if (type.contains("ListNode")) {
-        deserExpr = `deserializeListNode(argsArray.get(${i}))`;
-      } else if (type.contains("TreeNode")) {
-        deserExpr = `deserializeTreeNode(argsArray.get(${i}))`;
-      } else if (type.contains("Node")) {
-        deserExpr = `deserializeNode(argsArray.get(${i}))`;
-      } else if (type.contains("NestedInteger")) {
-        deserExpr = `deserializeNestedInteger(argsArray.get(${i}))`;
-      }
-      lines.push(`        ${this._javaTypeCast(type)} arg${i} = ${deserExpr};`);
+      const typeStr = (typeof type === 'string') ? type : String(type);
+      const expr = this._deserializeExpression(typeStr, i);
+      lines.push(`        ${this._javaTypeCast(typeStr)} arg${i} = ${expr};`);
     }
     return lines.join('\n');
   }
 
+  /**
+   * Generate the correct Java expression to convert an Object from argsArray
+   * into the desired parameter type.
+   */
+  _deserializeExpression(typeStr, index) {
+    // Custom data structures
+    if (typeStr.includes("ListNode")) {
+      return `deserializeListNode(argsArray.get(${index}))`;
+    }
+    if (typeStr.includes("TreeNode")) {
+      return `deserializeTreeNode(argsArray.get(${index}))`;
+    }
+    if (typeStr.includes("Node")) {
+      return `deserializeNode(argsArray.get(${index}))`;
+    }
+    if (typeStr.includes("NestedInteger")) {
+      return `deserializeNestedInteger(argsArray.get(${index}))`;
+    }
+    // Primitive and standard types
+    if (typeStr === "int") {
+      return `((Number) argsArray.get(${index})).intValue()`;
+    }
+    if (typeStr === "long") {
+      return `((Number) argsArray.get(${index})).longValue()`;
+    }
+    if (typeStr === "double") {
+      return `((Number) argsArray.get(${index})).doubleValue()`;
+    }
+    if (typeStr === "boolean") {
+      return `(boolean) argsArray.get(${index})`;
+    }
+    if (typeStr === "String") {
+      return `(String) argsArray.get(${index})`;
+    }
+    // Fallback: treat as Object (may cause issues but prevents compilation error)
+    return `argsArray.get(${index})`;
+  }
+
   _generateStandardCall(className, methodName, parameters, returnType) {
     const argNames = parameters.map((_, i) => `arg${i}`).join(', ');
+    const returnTypeStr = (typeof returnType === 'string') ? returnType : String(returnType);
     if (className) {
       return `        ${className} obj = new ${className}();
         try {
-            ${returnType.equals("void") ? "" : returnType + " result = "}obj.${methodName}(${argNames});
-            ${this._serializeResult(returnType, "result")}
+            ${returnTypeStr === "void" ? "" : returnTypeStr + " result = "}obj.${methodName}(${argNames});
+            ${this._serializeResult(returnTypeStr, "result")}
         } catch (Exception e) {
             System.err.println(e.toString());
             System.out.print("null");
         }`;
     } else {
       return `        try {
-            ${returnType.equals("void") ? "" : returnType + " result = "}${methodName}(${argNames});
-            ${this._serializeResult(returnType, "result")}
+            ${returnTypeStr === "void" ? "" : returnTypeStr + " result = "}${methodName}(${argNames});
+            ${this._serializeResult(returnTypeStr, "result")}
         } catch (Exception e) {
             System.err.println(e.toString());
             System.out.print("null");
@@ -140,7 +169,7 @@ class NestedInteger {
     const interactiveCode = `
     public static String solveInteractive(String inputStr) {
         try {
-            JSONParser parser = new JSONParser(inputStr);
+            SimpleJsonParser parser = new SimpleJsonParser(inputStr);
             Map<String, Object> data = parser.parseObject();
             List<Object> constrArgs = (List<Object>) data.get("constructor");
             List<List<Object>> methodsList = (List<List<Object>>) data.get("methods");
@@ -167,7 +196,10 @@ class NestedInteger {
   }
 
   _buildNonInteractiveMain(deserCode, callCode, returnType) {
+    const parserClass = this._getJsonParserClass();
     return `
+    ${parserClass}
+
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
         StringBuilder inputBuilder = new StringBuilder();
@@ -176,7 +208,7 @@ class NestedInteger {
         }
         String input = inputBuilder.toString();
         try {
-            JSONParser parser = new JSONParser(input);
+            SimpleJsonParser parser = new SimpleJsonParser(input);
             Object parsed = parser.parse();
             Map<String, Object> data;
             if (parsed instanceof Map) {
@@ -230,65 +262,229 @@ class NestedInteger {
     private static String escape(String s) {
         return s.replace("\\\\", "\\\\\\\\").replace("\\"", "\\\\\\"");
     }
+`;
+  }
 
-    private static String serialize(Object obj) { return serialize(obj); } // alias
+  _getJsonParserClass() {
+    return `
+    private static class SimpleJsonParser {
+        private final String json;
+        private int pos;
+
+        public SimpleJsonParser(String json) {
+            this.json = json;
+            this.pos = 0;
+        }
+
+        public Object parse() {
+            skipWhitespace();
+            return parseValue();
+        }
+
+        public Map<String, Object> parseObject() {
+            Object val = parse();
+            if (val instanceof Map) return (Map<String, Object>) val;
+            throw new RuntimeException("Expected JSON object");
+        }
+
+        private void skipWhitespace() {
+            while (pos < json.length() && Character.isWhitespace(json.charAt(pos))) pos++;
+        }
+
+        private Object parseValue() {
+            skipWhitespace();
+            if (pos >= json.length()) throw new RuntimeException("Unexpected end of input");
+            char c = json.charAt(pos);
+            if (c == '{') return parseObjectValue();
+            if (c == '[') return parseArray();
+            if (c == '"') return parseString();
+            if (c == 't' || c == 'f') return parseBoolean();
+            if (c == 'n') return parseNull();
+            return parseNumber();
+        }
+
+        private Map<String, Object> parseObjectValue() {
+            pos++;
+            Map<String, Object> map = new HashMap<>();
+            skipWhitespace();
+            if (pos < json.length() && json.charAt(pos) == '}') {
+                pos++;
+                return map;
+            }
+            while (true) {
+                skipWhitespace();
+                String key = parseString();
+                skipWhitespace();
+                if (pos >= json.length() || json.charAt(pos) != ':')
+                    throw new RuntimeException("Expected ':' after key");
+                pos++;
+                Object value = parseValue();
+                map.put(key, value);
+                skipWhitespace();
+                if (pos >= json.length()) break;
+                char c = json.charAt(pos);
+                if (c == '}') {
+                    pos++;
+                    break;
+                }
+                if (c != ',') throw new RuntimeException("Expected ',' or '}'");
+                pos++;
+            }
+            return map;
+        }
+
+        private List<Object> parseArray() {
+            pos++;
+            List<Object> list = new ArrayList<>();
+            skipWhitespace();
+            if (pos < json.length() && json.charAt(pos) == ']') {
+                pos++;
+                return list;
+            }
+            while (true) {
+                list.add(parseValue());
+                skipWhitespace();
+                if (pos >= json.length()) break;
+                char c = json.charAt(pos);
+                if (c == ']') {
+                    pos++;
+                    break;
+                }
+                if (c != ',') throw new RuntimeException("Expected ',' or ']'");
+                pos++;
+                skipWhitespace();
+            }
+            return list;
+        }
+
+        private String parseString() {
+            pos++;
+            StringBuilder sb = new StringBuilder();
+            while (pos < json.length()) {
+                char c = json.charAt(pos);
+                if (c == '"') {
+                    pos++;
+                    return sb.toString();
+                }
+                if (c == '\\\\') {
+                    pos++;
+                    if (pos >= json.length()) throw new RuntimeException("Incomplete escape sequence");
+                    char esc = json.charAt(pos);
+                    switch (esc) {
+                        case '"': sb.append('"'); break;
+                        case '\\\\': sb.append('\\\\'); break;
+                        case '/': sb.append('/'); break;
+                        case 'b': sb.append('\\b'); break;
+                        case 'f': sb.append('\\f'); break;
+                        case 'n': sb.append('\\n'); break;
+                        case 'r': sb.append('\\r'); break;
+                        case 't': sb.append('\\t'); break;
+                        default: sb.append(esc);
+                    }
+                } else {
+                    sb.append(c);
+                }
+                pos++;
+            }
+            throw new RuntimeException("Unterminated string");
+        }
+
+        private Object parseBoolean() {
+            if (json.startsWith("true", pos)) {
+                pos += 4;
+                return Boolean.TRUE;
+            }
+            if (json.startsWith("false", pos)) {
+                pos += 5;
+                return Boolean.FALSE;
+            }
+            throw new RuntimeException("Invalid boolean literal");
+        }
+
+        private Object parseNull() {
+            if (json.startsWith("null", pos)) {
+                pos += 4;
+                return null;
+            }
+            throw new RuntimeException("Invalid null literal");
+        }
+
+        private Number parseNumber() {
+            int start = pos;
+            while (pos < json.length() && (Character.isDigit(json.charAt(pos)) ||
+                   json.charAt(pos) == '.' || json.charAt(pos) == '-' ||
+                   json.charAt(pos) == '+' || json.charAt(pos) == 'e' ||
+                   json.charAt(pos) == 'E')) {
+                pos++;
+            }
+            String numStr = json.substring(start, pos);
+            try {
+                if (numStr.contains(".") || numStr.contains("e") || numStr.contains("E"))
+                    return Double.parseDouble(numStr);
+                else
+                    return Long.parseLong(numStr);
+            } catch (NumberFormatException e) {
+                throw new RuntimeException("Invalid number: " + numStr);
+            }
+        }
+    }
 `;
   }
 
   _serializeResult(returnType, resultVar) {
-    if (returnType.equals("void")) {
+    const typeStr = (typeof returnType === 'string') ? returnType : String(returnType);
+    if (typeStr === "void") {
       return 'System.out.print("null");';
     }
-    if (returnType.contains("ListNode")) {
+    if (typeStr.includes("ListNode")) {
       return `System.out.print(serializeListNode(${resultVar}));`;
     }
-    if (returnType.contains("TreeNode")) {
+    if (typeStr.includes("TreeNode")) {
       return `System.out.print(serializeTreeNode(${resultVar}));`;
     }
-    if (returnType.contains("Node")) {
+    if (typeStr.includes("Node")) {
       return `System.out.print(serializeNode(${resultVar}));`;
     }
-    if (returnType.contains("NestedInteger")) {
+    if (typeStr.includes("NestedInteger")) {
       return `System.out.print(serializeNestedInteger(${resultVar}));`;
     }
-    if (returnType.equals("String")) {
+    if (typeStr === "String") {
       return `System.out.print("\\"" + ${resultVar} + "\\"");`;
     }
     return `System.out.print(${resultVar});`;
   }
 
   _javaTypeCast(type) {
-    if (type.contains("ListNode")) return "ListNode";
-    if (type.contains("TreeNode")) return "TreeNode";
-    if (type.contains("Node")) return "Node";
-    if (type.contains("NestedInteger")) return "NestedInteger";
-    if (type.equals("int")) return "int";
-    if (type.equals("long")) return "long";
-    if (type.equals("double")) return "double";
-    if (type.equals("boolean")) return "boolean";
-    if (type.equals("String")) return "String";
+    const typeStr = (typeof type === 'string') ? type : String(type);
+    if (typeStr.includes("ListNode")) return "ListNode";
+    if (typeStr.includes("TreeNode")) return "TreeNode";
+    if (typeStr.includes("Node")) return "Node";
+    if (typeStr.includes("NestedInteger")) return "NestedInteger";
+    if (typeStr === "int") return "int";
+    if (typeStr === "long") return "long";
+    if (typeStr === "double") return "double";
+    if (typeStr === "boolean") return "boolean";
+    if (typeStr === "String") return "String";
     return "Object";
   }
 
   _javaTypeFromString(type) {
-    if (type.contains("ListNode")) return "ListNode";
-    if (type.contains("TreeNode")) return "TreeNode";
-    if (type.contains("Node")) return "Node";
-    if (type.contains("NestedInteger")) return "NestedInteger";
-    if (type.equals("int")) return "int";
-    if (type.equals("long")) return "long";
-    if (type.equals("double")) return "double";
-    if (type.equals("boolean")) return "boolean";
-    if (type.equals("String")) return "String";
+    const typeStr = (typeof type === 'string') ? type : String(type);
+    if (typeStr.includes("ListNode")) return "ListNode";
+    if (typeStr.includes("TreeNode")) return "TreeNode";
+    if (typeStr.includes("Node")) return "Node";
+    if (typeStr.includes("NestedInteger")) return "NestedInteger";
+    if (typeStr === "int") return "int";
+    if (typeStr === "long") return "long";
+    if (typeStr === "double") return "double";
+    if (typeStr === "boolean") return "boolean";
+    if (typeStr === "String") return "String";
     return "Object";
   }
 
   _generateImports() {
     return "import java.util.*;\nimport java.lang.*;\nimport java.io.*;";
   }
-
-  // JSONParser class is embedded in the generated code (string), but we'll include it via a helper method
-  // For brevity, we assume the parser is already in the helpers; otherwise we add it in main.
 }
 
 module.exports = JavaGenerator;

@@ -2,6 +2,8 @@
  * JavaMetadataExtractor – Extracts execution metadata from Java starter code.
  * Uses regex with advanced patterns to handle generics, arrays, and detect interactive problems.
  * Fully self‑contained, no TODOs, no placeholders.
+ * 
+ * CHANGES: now accepts both "public class" and "class" (package‑private) as valid class definitions.
  */
 class JavaMetadataExtractor {
   extract(starterCode) {
@@ -10,9 +12,10 @@ class JavaMetadataExtractor {
     }
 
     const codeWithoutComments = this._removeComments(starterCode);
-    const classMatch = codeWithoutComments.match(/public\s+class\s+(\w+)\s*\{/);
+    // Allow optional "public" modifier – now matches "class" or "public class"
+    const classMatch = codeWithoutComments.match(/(?:public\s+)?class\s+(\w+)\s*\{/);
     if (!classMatch) {
-      throw new Error('No public class found in starter code');
+      throw new Error('No class found in starter code');
     }
     const className = classMatch[1];
 

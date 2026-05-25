@@ -9,7 +9,7 @@ const startServer = async () => {
   try {
     // Wait for database and Redis
     await mongoose.connect(config.database.uri, config.database.connectionOptions);
-    console.log('MongoDB connected');
+    // console.log('MongoDB connected');
     await waitForRedis();
 
     // Start queue workers

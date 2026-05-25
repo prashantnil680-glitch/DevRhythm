@@ -18,10 +18,6 @@ const revisionService = require('../services/revision.service');
 const dashboardService = require('../services/dashboard.service');
 const leetcodeService = require('../services/leetcode.service');
 
-/**
- * Convert a UTC date to user's local ISO string with offset.
- * Example output: "2026-05-15T00:00:00+05:30"
- */
 const toLocalISOString = (utcDate, timeZone) => {
   if (!utcDate) return null;
   if (!timeZone) timeZone = 'UTC';
@@ -29,9 +25,6 @@ const toLocalISOString = (utcDate, timeZone) => {
   return dt.setZone(timeZone).toISO({ includeOffset: true });
 };
 
-/**
- * Convert all date fields in a revision object to local timezone.
- */
 const convertRevisionDatesToLocal = (revision, timeZone) => {
   if (!revision) return revision;
   const converted = { ...revision };
@@ -71,6 +64,9 @@ const fetchLeetCodeQuestion = async (req, res, next) => {
     const details = await fetchProblemDetails(url);
     res.json(formatResponse('Problem fetched from LeetCode', details));
   } catch (error) {
+    if (error.code === 'VIP_QUESTION_NOT_ALLOWED') {
+      return next(new AppError('VIP questions are not supported', 403));
+    }
     next(error);
   }
 };
@@ -248,23 +244,25 @@ const getQuestionDetailsByPlatform = async (req, res, next) => {
 
 const createQuestion = async (req, res, next) => {
   try {
-    const { isManual = false, contentRef, testCases, starterCode } = req.body;
+    const { isManual = false, contentRef, testCases, starterCode, isPaidOnly } = req.body;
+
+    // Block VIP questions
+    if (isPaidOnly === true) {
+      throw new AppError('VIP questions are not allowed', 403);
+    }
 
     let platformQuestionId = req.body.platformQuestionId;
     if (!platformQuestionId || platformQuestionId.trim() === '') {
       if (!req.body.title) {
         throw new AppError('Title is required to generate question ID', 400);
       }
-
       const baseSlug = slugify(req.body.title);
       let slug = baseSlug;
       let counter = 1;
-
       while (await Question.findOne({ platform: req.body.platform, platformQuestionId: slug })) {
         slug = `${baseSlug}-${counter}`;
         counter++;
       }
-
       platformQuestionId = slug;
       req.body.platformQuestionId = slug;
     }
@@ -276,7 +274,6 @@ const createQuestion = async (req, res, next) => {
     if (!pattern || pattern === '') {
       pattern = generatePatternFromTags(tags || []);
     }
-
     if (pattern && !Array.isArray(pattern)) {
       req.body.pattern = [pattern];
     } else {
@@ -293,44 +290,85 @@ const createQuestion = async (req, res, next) => {
       req.body.createdBy = null;
     }
 
-    let filteredStarterCode = null;
-    if (starterCode) {
-      const allowedLanguages = ['cpp', 'javascript', 'java', 'python', 'python3'];
-      filteredStarterCode = {};
-      for (const [lang, code] of Object.entries(starterCode)) {
-        const normalizedLang = lang.toLowerCase();
-        if (allowedLanguages.includes(normalizedLang)) {
-          filteredStarterCode[normalizedLang] = code;
-        }
-      }
-      req.body.starterCode = filteredStarterCode;
-    }
+    // Create the question without starterCode (to avoid validation errors)
+    const questionData = { ...req.body };
+    delete questionData.starterCode;
+    const question = await Question.create(questionData);
 
-    const question = await Question.create(req.body);
-
-    if (!isManual && (!starterCode || Object.keys(starterCode).length === 0)) {
+    // For LeetCode questions, fetch the latest starter code snippets
+    if (!isManual) {
       try {
         const problemUrl = req.body.problemLink;
         if (problemUrl) {
+          // console.log(`[createQuestion] Fetching details for ${problemUrl}`);
           const details = await fetchProblemDetails(problemUrl);
-          if (details.codeSnippets && Object.keys(details.codeSnippets).length > 0) {
-            const allowedLanguages = ['cpp', 'javascript', 'java', 'python', 'python3'];
-            const filteredSnippets = {};
-            for (const [lang, code] of Object.entries(details.codeSnippets)) {
+          // console.log(`[createQuestion] Fetched codeSnippets keys:`, Object.keys(details.codeSnippets));
+
+          const allowedLanguages = ['cpp', 'c++', 'javascript', 'java', 'python', 'python3'];
+          const finalSnippets = {};
+
+          // Process fetched snippets
+          for (const [lang, code] of Object.entries(details.codeSnippets)) {
+            const normalizedLang = lang.toLowerCase();
+            if (allowedLanguages.includes(normalizedLang)) {
+              const targetLang = normalizedLang === 'c++' ? 'cpp' : normalizedLang;
+              finalSnippets[targetLang] = code;
+              // console.log(`[createQuestion] Added snippet for ${targetLang}`);
+            }
+          }
+
+          // Override with user‑provided starterCode (if any)
+          if (starterCode && typeof starterCode === 'object') {
+            for (const [lang, code] of Object.entries(starterCode)) {
               const normalizedLang = lang.toLowerCase();
               if (allowedLanguages.includes(normalizedLang)) {
-                filteredSnippets[normalizedLang] = code;
+                const targetLang = normalizedLang === 'c++' ? 'cpp' : normalizedLang;
+                finalSnippets[targetLang] = code;
+                // console.log(`[createQuestion] Overridden snippet for ${targetLang} with user code`);
               }
             }
-            question.starterCode = filteredSnippets;
-            await question.save();
           }
+
+          // console.log(`[createQuestion] Final snippets languages:`, Object.keys(finalSnippets));
+          question.starterCode = finalSnippets;
+          await question.save();
+          // console.log(`[createQuestion] Successfully saved starterCode for question ${question._id}`);
         }
       } catch (fetchErr) {
-        console.error('Failed to fetch starter code as fallback:', fetchErr.message);
+        console.error(`[createQuestion] Failed to fetch starter code:`, fetchErr.message);
+        // Fallback to user‑provided starterCode
+        if (starterCode && typeof starterCode === 'object') {
+          const allowedLanguages = ['cpp', 'c++', 'javascript', 'java', 'python', 'python3'];
+          const filteredSnippets = {};
+          for (const [lang, code] of Object.entries(starterCode)) {
+            const normalizedLang = lang.toLowerCase();
+            if (allowedLanguages.includes(normalizedLang)) {
+              const targetLang = normalizedLang === 'c++' ? 'cpp' : normalizedLang;
+              filteredSnippets[targetLang] = code;
+            }
+          }
+          question.starterCode = filteredSnippets;
+          await question.save();
+        }
+      }
+    } else {
+      // Manual question: use provided starterCode as is
+      if (starterCode && typeof starterCode === 'object') {
+        const allowedLanguages = ['cpp', 'c++', 'javascript', 'java', 'python', 'python3'];
+        const filteredSnippets = {};
+        for (const [lang, code] of Object.entries(starterCode)) {
+          const normalizedLang = lang.toLowerCase();
+          if (allowedLanguages.includes(normalizedLang)) {
+            const targetLang = normalizedLang === 'c++' ? 'cpp' : normalizedLang;
+            filteredSnippets[targetLang] = code;
+          }
+        }
+        question.starterCode = filteredSnippets;
+        await question.save();
       }
     }
 
+    // Extract test cases if contentRef exists and no test cases provided
     if (question.contentRef && (!question.testCases || question.testCases.length === 0)) {
       await jobQueue.add('question.extract_testcases', {
         questionId: question._id
@@ -616,7 +654,9 @@ const getDailyProblemAndGoal = async (req, res, next) => {
     const dashboardDaily = await dashboardService.getDailyProblem(userId, refresh);
     
     let dailyProblem = null;
-    if (dashboardDaily && dashboardDaily.title) {
+    if (dashboardDaily && dashboardDaily.isPaidOnly) {
+      dailyProblem = null;
+    } else if (dashboardDaily && dashboardDaily.title) {
       const question = await Question.findOne({
         platform: 'LeetCode',
         platformQuestionId: dashboardDaily.platformQuestionId,
@@ -643,7 +683,10 @@ const getDailyProblemAndGoal = async (req, res, next) => {
       if (!question) {
         try {
           const rawDaily = await leetcodeService.getDailyProblem(refresh);
-          if (rawDaily && rawDaily.titleSlug) {
+          if (rawDaily && rawDaily.isPaidOnly) {
+            console.log(`[DailyProblem] Skipping VIP daily problem: ${rawDaily.title}`);
+            dailyProblem = null;
+          } else if (rawDaily && rawDaily.titleSlug) {
             const fullDetails = await leetcodeService.fetchProblemDetails(rawDaily.link);
             let extractedTestCases = [];
             if (fullDetails.description) {
@@ -679,6 +722,7 @@ const getDailyProblemAndGoal = async (req, res, next) => {
               const { jobQueue } = require('../services/queue.service');
               await jobQueue.add('question.extract_testcases', { questionId: newQuestion._id });
             }
+            if (!dailyProblem) dailyProblem = {};
             dailyProblem.tags = newQuestion.tags;
             dailyProblem.codeSnippets = newQuestion.starterCode;
             dailyProblem.questionId = newQuestion._id;

@@ -2,30 +2,52 @@ const axios = require('axios');
 const { client: redisClient } = require('../config/redis');
 
 const LEETCODE_GRAPHQL_URL = 'https://leetcode.com/graphql';
-const CACHE_TTL = 60 * 60;
+const CACHE_TTL = 60 * 60;          // 1 hour for normal search cache
+const VIP_BLACKLIST_TTL = 60 * 60;  // 1 hour for VIP slug blacklist
 
-/**
- * Convert a user-friendly tag name to a LeetCode tag slug.
- * Example: "Binary Search" -> "binary-search"
- */
 const slugifyTag = (tag) => {
   return tag.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
 };
 
-/**
- * Extract the problem slug from a LeetCode URL.
- */
 const extractSlug = (url) => {
   const match = url.match(/\/problems\/([^/?#]+)/);
   return match ? match[1] : null;
 };
 
 /**
+ * Check if a slug is known to be a VIP problem (cached in Redis).
+ * If yes, throw error immediately without making a GraphQL request.
+ */
+const checkVipBlacklist = async (slug) => {
+  if (!redisClient) return false;
+  const key = `vip:slug:${slug}`;
+  const exists = await redisClient.exists(key);
+  return exists === 1;
+};
+
+const addToVipBlacklist = async (slug) => {
+  if (!redisClient) return;
+  const key = `vip:slug:${slug}`;
+  await redisClient.setEx(key, VIP_BLACKLIST_TTL, '1');
+};
+
+/**
  * Fetch problem details from LeetCode using the GraphQL API.
+ * Blocks VIP problems by throwing an error if isPaidOnly === true.
+ * Also caches VIP slugs to avoid repeated requests.
  */
 const fetchProblemDetails = async (url) => {
   const slug = extractSlug(url);
   if (!slug) throw new Error('Invalid LeetCode URL');
+
+  // Quick VIP blacklist check before making any request
+  const isBlacklisted = await checkVipBlacklist(slug);
+  if (isBlacklisted) {
+    const vipError = new Error('VIP problems are not supported');
+    vipError.code = 'VIP_QUESTION_NOT_ALLOWED';
+    vipError.statusCode = 403;
+    throw vipError;
+  }
 
   const query = `
     query getProblemDetail($titleSlug: String!) {
@@ -33,6 +55,7 @@ const fetchProblemDetails = async (url) => {
         title
         difficulty
         content
+        isPaidOnly
         topicTags {
           name
         }
@@ -57,7 +80,15 @@ const fetchProblemDetails = async (url) => {
       throw error;
     }
 
-    // Convert codeSnippets array to a Map-friendly object
+    // Block VIP (paid-only) problems
+    if (question.isPaidOnly === true) {
+      await addToVipBlacklist(slug);
+      const vipError = new Error('VIP problems are not supported');
+      vipError.code = 'VIP_QUESTION_NOT_ALLOWED';
+      vipError.statusCode = 403;
+      throw vipError;
+    }
+
     const codeSnippets = {};
     if (question.codeSnippets && Array.isArray(question.codeSnippets)) {
       for (const snippet of question.codeSnippets) {
@@ -71,10 +102,9 @@ const fetchProblemDetails = async (url) => {
       tags: question.topicTags.map(t => t.name),
       link: url,
       description: question.content,
-      codeSnippets,  // new field
+      codeSnippets,
     };
   } catch (error) {
-    // If it's a 404 error we already threw, rethrow it as is
     if (error.statusCode === 404) throw error;
     console.error('LeetCode fetch error:', error.message);
     throw new Error('Failed to fetch problem from LeetCode');
@@ -83,13 +113,11 @@ const fetchProblemDetails = async (url) => {
 
 /**
  * Search LeetCode problems by name or tag, with Redis caching.
- * @param {string} query - The search term.
- * @param {string} filterType - 'name' (default) or 'tag'.
+ * Filters out VIP problems (isPaidOnly === true).
  */
 const searchProblems = async (query, filterType = 'name') => {
   const cacheKey = `leetcode:search:${filterType}:${query.toLowerCase()}`;
 
-  // Try to get from cache first
   if (redisClient) {
     try {
       const cached = await redisClient.get(cacheKey);
@@ -101,7 +129,6 @@ const searchProblems = async (query, filterType = 'name') => {
     }
   }
 
-  // Build filters
   const filters = {};
   if (filterType === 'tag') {
     const tagSlug = slugifyTag(query);
@@ -123,6 +150,7 @@ const searchProblems = async (query, filterType = 'name') => {
           title
           titleSlug
           difficulty
+          isPaidOnly
           topicTags {
             name
           }
@@ -144,7 +172,17 @@ const searchProblems = async (query, filterType = 'name') => {
       variables,
     });
 
-    const questions = response.data?.data?.problemsetQuestionList?.questions || [];
+    let questions = response.data?.data?.problemsetQuestionList?.questions || [];
+    // Filter out VIP (paid-only) problems
+    questions = questions.filter(q => q.isPaidOnly !== true);
+
+    // Optionally, add VIP slugs to blacklist for future direct fetches
+    for (const q of questions) {
+      if (q.isPaidOnly === true) {
+        await addToVipBlacklist(q.titleSlug);
+      }
+    }
+
     const results = questions.map(q => ({
       title: q.title,
       slug: q.titleSlug,
@@ -153,7 +191,6 @@ const searchProblems = async (query, filterType = 'name') => {
       url: `https://leetcode.com/problems/${q.titleSlug}/`,
     }));
 
-    // Store in cache if we got results
     if (redisClient && results.length > 0) {
       await redisClient.setEx(cacheKey, CACHE_TTL, JSON.stringify(results));
     }
@@ -167,12 +204,11 @@ const searchProblems = async (query, filterType = 'name') => {
 
 /**
  * Fetch today's LeetCode Problem of the Day.
- * Cached for 24 hours.
+ * Cached for 24 hours. VIP detection is not needed as daily problem is never VIP.
  */
 const getDailyProblem = async (forceRefresh = false) => {
   const cacheKey = 'leetcode:daily';
 
-  // Try to get from cache only if not forcing a refresh
   if (!forceRefresh && redisClient) {
     try {
       const cached = await redisClient.get(cacheKey);
@@ -195,6 +231,7 @@ const getDailyProblem = async (forceRefresh = false) => {
           titleSlug
           difficulty
           content
+          isPaidOnly
           topicTags {
             name
           }
@@ -212,6 +249,10 @@ const getDailyProblem = async (forceRefresh = false) => {
   if (!daily) {
     throw new Error('No daily problem found on LeetCode');
   }
+  // Daily problem is never VIP, but we still check for safety
+  if (daily.question.isPaidOnly === true) {
+    throw new Error('Daily problem is VIP – not supported');
+  }
 
   const result = {
     date: daily.date,
@@ -226,8 +267,6 @@ const getDailyProblem = async (forceRefresh = false) => {
     }, {})
   };
 
-  // Always cache the result (overwrite) after a successful fetch,
-  // regardless of forceRefresh. This ensures the cache stays up‑to‑date.
   if (redisClient) {
     try {
       await redisClient.setEx(cacheKey, 86400, JSON.stringify(result));

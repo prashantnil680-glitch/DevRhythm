@@ -29,11 +29,11 @@ export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({
   const failedUrlRef = useRef<string>('');
   const fetchingUrlRef = useRef<string | null>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const processedUrlRef = useRef<string>('');
 
   const validateAndFetch = useCallback(
     (urlToValidate: string) => {
-      if (!urlToValidate) {
-        setError(null);
+      if (!urlToValidate || urlToValidate === processedUrlRef.current) {
         return;
       }
 
@@ -46,18 +46,17 @@ export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({
         return;
       }
 
-      // Skip if the same URL was already fetched successfully
       if (lastFetchedUrlRef.current === urlToValidate) {
+        processedUrlRef.current = urlToValidate;
         return;
       }
 
-      // Skip if the URL previously failed with a permanent error (e.g., 404)
       if (failedUrlRef.current === urlToValidate) {
         setError('This problem could not be found. Please check the URL.');
+        processedUrlRef.current = urlToValidate;
         return;
       }
 
-      // Skip if we're already fetching the same URL
       if (fetchingUrlRef.current === urlToValidate) {
         return;
       }
@@ -70,18 +69,18 @@ export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({
           fetchingUrlRef.current = null;
           lastFetchedUrlRef.current = urlToValidate;
           failedUrlRef.current = '';
+          processedUrlRef.current = urlToValidate;
           onFetch(data);
           toast.success('Problem details fetched');
         },
         onError: (err: any) => {
           fetchingUrlRef.current = null;
+          processedUrlRef.current = urlToValidate;
 
-          // Ignore cancellation errors
           if (err?.code === 'ERR_CANCELED' || err?.message?.includes('canceled')) {
             return;
           }
 
-          // If it's a 404, mark the URL as permanently failed
           if (err.response?.status === 404) {
             failedUrlRef.current = urlToValidate;
             const errorMessage = 'Problem not found on LeetCode. Please check the URL.';
@@ -90,10 +89,15 @@ export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({
             return;
           }
 
-          // For other errors (network, rate-limit, etc.) show generic message
+          if (err.response?.status === 403 && err.response?.data?.message?.toLowerCase().includes('vip')) {
+            const vipMessage = 'LeetCode Premium (VIP) questions are not supported.';
+            setError(vipMessage);
+            // Toast is already shown by useLeetCodeFetch hook – no duplicate
+            return;
+          }
+
           const errorMessage = err.message || 'Failed to fetch problem';
           setError(errorMessage);
-          // Avoid duplicate toast for rate-limit (already handled in hook)
           if (err.response?.status !== 429) {
             toast.error(errorMessage);
           }
@@ -103,13 +107,12 @@ export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({
     [fetchMutation, onFetch]
   );
 
-  // Debounced fetch
   useEffect(() => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
 
-    if (url) {
+    if (url && url !== processedUrlRef.current) {
       debounceTimeoutRef.current = setTimeout(() => {
         validateAndFetch(url);
       }, 500);
@@ -123,7 +126,7 @@ export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({
   }, [url, validateAndFetch]);
 
   const handleBlur = () => {
-    if (url) {
+    if (url && url !== processedUrlRef.current) {
       validateAndFetch(url);
     }
   };
@@ -132,7 +135,9 @@ export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({
     const newUrl = e.target.value;
     setUrl(newUrl);
 
-    // Reset success and failure tracking when the URL changes
+    if (newUrl !== processedUrlRef.current) {
+      processedUrlRef.current = '';
+    }
     if (newUrl !== lastFetchedUrlRef.current) {
       lastFetchedUrlRef.current = '';
     }

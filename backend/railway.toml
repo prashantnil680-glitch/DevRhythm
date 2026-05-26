@@ -5,8 +5,8 @@ watch = ["package.json", "src/**"]
 [deploy]
 healthcheckPath = "/api/v1/health"
 healthcheckTimeout = 30
-restartPolicyType = "onFailure"
-restartPolicyMaxRetries = 3
+# Remove restartPolicyType unless you specifically need it
+# restartPolicyType = "on-failure"
 
 [build.buildPhase]
 command = "npm install"

@@ -3,7 +3,7 @@ const User = require('../models/User');
 
 /**
  * Attaches `req.userTimeZone` (string IANA timezone, e.g. 'Asia/Kolkata', 'UTC')
- * For authenticated users, reads from their preferences or auto‑detects.
+ * For authenticated users, reads from their preferences or auto‑detects
  * For non‑authenticated, defaults to UTC.
  */
 const attachUserTimeZone = async (req, res, next) => {

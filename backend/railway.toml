@@ -9,7 +9,7 @@ restartPolicyType = "onFailure"
 restartPolicyMaxRetries = 3
 
 [build.buildPhase]
-command = "npm install && npm run build"
+command = "npm install"
 
 [build.startPhase]
 command = "npm start"
@@ -21,18 +21,11 @@ PORT = "5000"
 [[services]]
 name = "devrhythm-backend"
 port = 5000
-autoscaling = { enabled = true, min = 2, max = 3 }
-cpu = { limit = "1" }
-memory = { limit = "512MB" }
+cpu = { limit = "0.5" }
+memory = { limit = "512" }
 
 [services.checks.http]
 path = "/api/v1/health"
 interval = "10s"
-timeout = "5s"
-initialDelay = "10s"
-
-[services.checks.tcp]
-port = 5000
-interval = "30s"
 timeout = "5s"
 initialDelay = "10s"

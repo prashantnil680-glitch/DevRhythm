@@ -8,24 +8,23 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get('auth_token')?.value;
 
-  // ✅ Let static assets and root pass through
-  if (pathname === '/' || pathname.startsWith('/_next') || pathname.includes('.')) {
-    return NextResponse.next();
-  }
-
+  // Authenticated user trying to access login → redirect to dashboard
   if (token && authRoutes.some(route => pathname.startsWith(route))) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
+  // Unauthenticated user trying to access protected route → redirect to login
   if (!token && protectedRoutes.some(route => pathname.startsWith(route))) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('returnTo', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
+  // For all other matched routes (should not happen with matcher below), let through
   return NextResponse.next();
 }
 
+// ✅ Only run the proxy on these exact route patterns
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)'],
+  matcher: ['/dashboard/:path*', '/user/u/:path*', '/login'],
 };

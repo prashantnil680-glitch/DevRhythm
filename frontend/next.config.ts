@@ -6,23 +6,18 @@ const bundleAnalyzer = withBundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
   images: {
-    domains: [
-      'lh3.googleusercontent.com',
-      'avatars.githubusercontent.com',
-      'res.cloudinary.com',
-    ],
+    // replace `domains` with `remotePatterns` (see warning)
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'ui-avatars.com',
-        pathname: '/api/**',
-      },
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      { protocol: 'https', hostname: 'avatars.githubusercontent.com' },
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
+      { protocol: 'https', hostname: 'ui-avatars.com', pathname: '/api/**' },
     ],
   },
   reactStrictMode: true,
   poweredByHeader: false,
+  // output: 'standalone',   // <- REMOVE this line
 };
 
 export default bundleAnalyzer(nextConfig);

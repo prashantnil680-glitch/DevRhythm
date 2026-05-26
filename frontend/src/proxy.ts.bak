@@ -8,9 +8,9 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get('auth_token')?.value;
 
-  // ✅ Let static assets and root pass through
+  // Let Next.js handle these paths without interference
   if (pathname === '/' || pathname.startsWith('/_next') || pathname.includes('.')) {
-    return NextResponse.next();
+    return NextResponse.next();   // ✅ explicit passthrough
   }
 
   if (token && authRoutes.some(route => pathname.startsWith(route))) {
@@ -23,7 +23,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  return NextResponse.next();
+  return NextResponse.next(); // passthrough for everything else
 }
 
 export const config = {

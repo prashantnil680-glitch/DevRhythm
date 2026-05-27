@@ -457,9 +457,9 @@ const getWeeklyStudyTime = async (userId, timeZone) => {
   if (!heatmap?.dailyData) return {
     currentWeekMinutes: 0,
     previousWeekMinutes: 0,
-    weekOverWeekChangePercent: null,
+    weekOverWeekChangePercent: 0,
     monthlyAverageWeeklyMinutes: 0,
-    changeFromMonthlyAveragePercent: null
+    changeFromMonthlyAveragePercent: 0
   };
 
   const weekStartCurrent = getStartOfWeek(now, timeZone);

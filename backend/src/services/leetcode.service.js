@@ -15,6 +15,25 @@ const extractSlug = (url) => {
 };
 
 /**
+ * Internal helper to make GraphQL requests to LeetCode.
+ * @param {string} query - GraphQL query string
+ * @param {object} variables - Query variables
+ * @returns {Promise<object>} Response data
+ */
+const _graphqlRequest = async (query, variables) => {
+  const response = await axios.post(LEETCODE_GRAPHQL_URL, { query, variables }, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    timeout: 30000,
+  });
+  if (response.data.errors) {
+    throw new Error(`GraphQL error: ${response.data.errors[0].message}`);
+  }
+  return response.data;
+};
+
+/**
  * Check if a slug is known to be a VIP problem (cached in Redis).
  * If yes, throw error immediately without making a GraphQL request.
  */
@@ -68,12 +87,8 @@ const fetchProblemDetails = async (url) => {
   `;
 
   try {
-    const response = await axios.post(LEETCODE_GRAPHQL_URL, {
-      query,
-      variables: { titleSlug: slug },
-    });
-
-    const question = response.data?.data?.question;
+    const response = await _graphqlRequest(query, { titleSlug: slug });
+    const question = response?.data?.question;
     if (!question) {
       const error = new Error('Problem not found on LeetCode');
       error.statusCode = 404;
@@ -167,12 +182,8 @@ const searchProblems = async (query, filterType = 'name') => {
   };
 
   try {
-    const response = await axios.post(LEETCODE_GRAPHQL_URL, {
-      query: searchQuery,
-      variables,
-    });
-
-    let questions = response.data?.data?.problemsetQuestionList?.questions || [];
+    const response = await _graphqlRequest(searchQuery, variables);
+    let questions = response.data?.problemsetQuestionList?.questions || [];
     // Filter out VIP (paid-only) problems
     questions = questions.filter(q => q.isPaidOnly !== true);
 
@@ -244,8 +255,8 @@ const getDailyProblem = async (forceRefresh = false) => {
     }
   `;
 
-  const response = await axios.post(LEETCODE_GRAPHQL_URL, { query });
-  const daily = response.data?.data?.activeDailyCodingChallengeQuestion;
+  const response = await _graphqlRequest(query, {});
+  const daily = response.data?.activeDailyCodingChallengeQuestion;
   if (!daily) {
     throw new Error('No daily problem found on LeetCode');
   }
@@ -282,4 +293,5 @@ module.exports = {
   fetchProblemDetails,
   searchProblems,
   getDailyProblem,
+  _graphqlRequest,   // <-- EXPORTED for use in leetcodeSync.service.js
 };

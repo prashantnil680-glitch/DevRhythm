@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -14,6 +14,7 @@ import {
   FiBookOpen,
   FiZap,
   FiAward,
+  FiChevronDown,
 } from 'react-icons/fi';
 import { useMediaQuery } from '@/shared/hooks';
 import {
@@ -22,6 +23,7 @@ import {
   useWeakestPatterns,
   usePatternMastery,
 } from '@/features/patternMastery';
+import { usePatterns } from '@/features/question/hooks/usePatterns';
 import ConfidenceStars from '@/shared/components/ConfidenceStars';
 import Pagination from '@/shared/components/Pagination';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
@@ -32,8 +34,13 @@ import styles from './PatternsDashboardClient.module.css';
 import Tooltip from '@/shared/components/Tooltip';
 
 const ITEMS_PER_PAGE = 10;
+const INITIAL_ALL_PATTERNS_VISIBLE = 20;
+const ALL_PATTERNS_INCREMENT = 20;
 
-// Helper for trend indicator
+type TabType = 'master' | 'all';
+
+// ========== Helper Components (unchanged) ==========
+
 const TrendIndicator: React.FC<{ improvementRate: number }> = ({ improvementRate }) => {
   const formattedRate = Math.abs(improvementRate).toFixed(1);
   if (improvementRate > 0) {
@@ -57,18 +64,15 @@ const TrendIndicator: React.FC<{ improvementRate: number }> = ({ improvementRate
   );
 };
 
-// Helper to format percentage to one decimal place
 const formatPercentage = (value: number): string => {
   if (value === undefined || value === null) return '0';
   return value.toFixed(1);
 };
 
-// Helper to pluralize "question"
 const formatSolvedText = (count: number): string => {
   return `${count} question${count !== 1 ? 's' : ''} solved`;
 };
 
-// Stat card component with rotation hover
 const StatCard: React.FC<{
   icon: React.ReactNode;
   value: number;
@@ -82,7 +86,6 @@ const StatCard: React.FC<{
   </div>
 );
 
-// Difficulty Dot component
 const DifficultyDot: React.FC<{ difficulty: 'Easy' | 'Medium' | 'Hard' }> = ({ difficulty }) => {
   const color = {
     Easy: '#2e7d32',
@@ -92,7 +95,6 @@ const DifficultyDot: React.FC<{ difficulty: 'Easy' | 'Medium' | 'Hard' }> = ({ d
   return <span className={styles.difficultyDot} style={{ backgroundColor: color }} title={difficulty} />;
 };
 
-// Hero card for strongest pattern
 const StrongestCard: React.FC<{ pattern: PatternMastery }> = ({ pattern }) => {
   const recent = pattern.recentQuestions?.slice(0, 3) || [];
   const patternSlug = slugify(pattern.patternName);
@@ -148,7 +150,6 @@ const StrongestCard: React.FC<{ pattern: PatternMastery }> = ({ pattern }) => {
   );
 };
 
-// Hero card for weakest pattern
 const WeakestCard: React.FC<{ pattern: PatternMastery }> = ({ pattern }) => {
   const recent = pattern.recentQuestions?.slice(0, 2) || [];
   const patternSlug = slugify(pattern.patternName);
@@ -199,7 +200,6 @@ const WeakestCard: React.FC<{ pattern: PatternMastery }> = ({ pattern }) => {
   );
 };
 
-// Single row in the pattern list
 const PatternRow: React.FC<{ pattern: PatternMastery }> = ({ pattern }) => {
   const patternSlug = slugify(pattern.patternName);
   return (
@@ -227,6 +227,18 @@ const PatternRow: React.FC<{ pattern: PatternMastery }> = ({ pattern }) => {
   );
 };
 
+// ========== All Patterns Card ==========
+const AllPatternCard: React.FC<{ patternName: string }> = ({ patternName }) => {
+  const patternSlug = slugify(patternName);
+  return (
+    <Link href={`/patterns/${patternSlug}`} className={styles.allPatternCardLink}>
+      <div className={styles.allPatternCard}>
+        <span className={styles.allPatternName}>{patternName}</span>
+      </div>
+    </Link>
+  );
+};
+
 interface PatternsDashboardClientProps {
   initialData?: {
     stats: any;
@@ -240,8 +252,11 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
   const router = useRouter();
   const isDesktop = useMediaQuery('(min-width: 940px)');
   const [currentPage, setCurrentPage] = useState(1);
+  const [activeTab, setActiveTab] = useState<TabType>('master');
+  const [allPatternsVisible, setAllPatternsVisible] = useState(INITIAL_ALL_PATTERNS_VISIBLE);
   const listHeaderRef = useRef<HTMLDivElement>(null);
 
+  // Master tab data
   const { data: statsData, isLoading: statsLoading } = usePatternStats();
   const { data: strongestData, isLoading: strongestLoading } = useStrongestPatterns(1);
   const { data: weakestData, isLoading: weakestLoading } = useWeakestPatterns(1);
@@ -249,6 +264,7 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
     data: patternsData,
     isLoading: patternsLoading,
     error: patternsError,
+    refetch: refetchMaster,
   } = usePatternMastery({
     page: currentPage,
     limit: ITEMS_PER_PAGE,
@@ -256,26 +272,37 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
     sortOrder: 'desc',
   });
 
+  // All patterns data from /api/v1/questions/patterns
+  const {
+    data: allPatternsList,
+    isLoading: allPatternsLoading,
+    error: allPatternsError,
+    refetch: refetchAllPatterns,
+  } = usePatterns();
+
   const stats = statsData ?? initialData?.stats;
   const strongest = strongestData?.[0] ?? initialData?.strongest?.[0];
   const weakest = weakestData?.[0] ?? initialData?.weakest?.[0];
-  const patterns = patternsData?.patterns ?? initialData?.patterns?.patterns ?? [];
+  const allPatterns = allPatternsList ?? [];
+  const totalPatternsCount = allPatterns.length;
 
-  const totalPatternsCount = stats?.totalPatterns ?? patternsData?.pagination?.total ?? 0;
-  const totalPages = Math.ceil(totalPatternsCount / ITEMS_PER_PAGE);
+  // Filter master patterns (only those with solvedCount > 0 for "Your Pattern Master" tab)
+  const masterPatterns = patternsData?.patterns ?? initialData?.patterns?.patterns ?? [];
+  const filteredMasterPatterns = masterPatterns.filter(p => p.solvedCount > 0);
+  const totalMasterCount = patternsData?.pagination?.total ?? initialData?.patterns?.pagination?.total ?? 0;
+  const totalFilteredMasterCount = filteredMasterPatterns.length;
+  const totalMasterPages = Math.ceil(totalFilteredMasterCount / ITEMS_PER_PAGE);
+
   const totalSolvedCount = stats?.totalSolved ?? 0;
   const totalMasteredCount = stats?.totalMastered ?? 0;
   const avgConfidence = stats?.averageConfidence ?? 0;
+  const totalPatternsStat = stats?.totalPatterns ?? 0;
 
   const isLoading =
-    statsLoading &&
-    !stats &&
-    strongestLoading &&
-    !strongest &&
-    weakestLoading &&
-    !weakest &&
-    patternsLoading &&
-    !patternsData;
+    (statsLoading && !stats) ||
+    (strongestLoading && !strongest) ||
+    (weakestLoading && !weakest) ||
+    (patternsLoading && !patternsData);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -289,7 +316,116 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
     }, 100);
   };
 
-  if (isLoading) {
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    setCurrentPage(1);
+    setAllPatternsVisible(INITIAL_ALL_PATTERNS_VISIBLE);
+  };
+
+  const handleLoadMore = () => {
+    setAllPatternsVisible(prev => Math.min(prev + ALL_PATTERNS_INCREMENT, totalPatternsCount));
+  };
+
+  // Determine what to show in list header
+  const renderListHeader = () => {
+    if (activeTab === 'master') {
+      return (
+        <div className={styles.listHeader}>
+          <h2 className={styles.listTitle}>
+            Your Pattern Master · {totalFilteredMasterCount}
+          </h2>
+          <span className={styles.trendHeaderLabel}>Improvement Rate</span>
+        </div>
+      );
+    } else {
+      return (
+        <div className={styles.listHeader}>
+          <h2 className={styles.listTitle}>All Patterns · {totalPatternsCount}</h2>
+        </div>
+      );
+    }
+  };
+
+  const renderContent = () => {
+    if (activeTab === 'master') {
+      // Master tab content
+      if (patternsError) {
+        return (
+          <NoRecordFound
+            message="Could not load pattern mastery data. Please try again later."
+            icon={<FiBarChart2 />}
+          />
+        );
+      }
+
+      if (filteredMasterPatterns.length === 0) {
+        return (
+          <NoRecordFound
+            message="You haven't solved any pattern questions yet. Start solving to see your mastered patterns!"
+            icon={<FiGrid />}
+          />
+        );
+      }
+
+      return (
+        <>
+          <div className={styles.patternList}>
+            {filteredMasterPatterns.map((pattern) => (
+              <PatternRow key={pattern._id} pattern={pattern} />
+            ))}
+          </div>
+          {totalMasterPages > 1 && (
+            <div className={styles.paginationWrapper}>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalMasterPages}
+                siblingCount={isDesktop ? 2 : 1}
+                size={isDesktop ? 'md' : 'sm'}
+                onPageChange={handlePageChange}
+              />
+            </div>
+          )}
+        </>
+      );
+    } else {
+      // All patterns tab content
+      if (allPatternsError) {
+        return (
+          <div className={styles.errorContainer}>
+            <NoRecordFound
+              message="Unable to load all patterns. Please try again."
+              icon={<FiBarChart2 />}
+            />
+            <button onClick={() => refetchAllPatterns()} className={styles.retryButton}>
+              Retry
+            </button>
+          </div>
+        );
+      }
+
+      const visiblePatterns = allPatterns.slice(0, allPatternsVisible);
+      const hasMore = allPatternsVisible < totalPatternsCount;
+
+      return (
+        <>
+          <div className={styles.allPatternsGrid}>
+            {visiblePatterns.map((patternName) => (
+              <AllPatternCard key={patternName} patternName={patternName} />
+            ))}
+          </div>
+          {hasMore && (
+            <div className={styles.loadMoreWrapper}>
+              <button onClick={handleLoadMore} className={styles.loadMoreButton}>
+                Show more <FiChevronDown />
+              </button>
+            </div>
+          )}
+        </>
+      );
+    }
+  };
+
+  if (isLoading && activeTab === 'master') {
     return (
       <div className={styles.container}>
         <div className={styles.statsGrid}>
@@ -313,28 +449,17 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
     );
   }
 
-  if (patternsError) {
-    return (
-      <div className={styles.container}>
-        <NoRecordFound
-          message="Could not load pattern mastery data. Please try again later."
-          icon={<FiBarChart2 />}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className={styles.container}>
-      {/* Stats grid */}
+      {/* Stats Grid */}
       <div className={styles.statsGrid}>
-        <StatCard icon={<FiGrid />} value={totalPatternsCount} label="patterns" rotation="-0.5deg" />
+        <StatCard icon={<FiGrid />} value={totalPatternsStat} label="patterns" rotation="-0.5deg" />
         <StatCard icon={<FiCheckCircle />} value={totalSolvedCount} label="solved question" rotation="0.5deg" />
         <StatCard icon={<FiStar />} value={totalMasteredCount} label="mastered" rotation="-0.3deg" />
         <StatCard icon={<FiBarChart2 />} value={parseFloat(avgConfidence.toFixed(1))} label="avg confidence" rotation="0.3deg" />
       </div>
 
-      {/* Hero area */}
+      {/* Hero Area (strongest/weakest – always visible) */}
       <div className={styles.heroArea}>
         {strongest ? (
           <StrongestCard pattern={strongest} />
@@ -358,36 +483,34 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
         )}
       </div>
 
-      {/* All patterns list header with ref for scrolling */}
-      <div className={styles.listHeader} ref={listHeaderRef}>
-        <h2 className={styles.listTitle}>All Patterns · {totalPatternsCount}</h2>
-        <span className={styles.trendHeaderLabel}>Improvement Rate</span>
+      {/* Tabs */}
+      <div className={styles.tabsContainer}>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'master' ? styles.activeTab : ''}`}
+          onClick={() => handleTabChange('master')}
+        >
+          Your Pattern Master
+        </button>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'all' ? styles.activeTab : ''}`}
+          onClick={() => handleTabChange('all')}
+        >
+          All Patterns
+        </button>
       </div>
 
-      {patterns.length === 0 ? (
-        <NoRecordFound
-          message="No patterns found. Start solving problems to build your pattern mastery!"
-          icon={<FiGrid />}
-        />
+      {/* List Header (depends on tab) */}
+      {renderListHeader()}
+
+      {/* Content */}
+      {allPatternsLoading && activeTab === 'all' ? (
+        <div className={styles.allPatternsGrid}>
+          {Array.from({ length: 12 }).map((_, i) => (
+            <SkeletonLoader key={i} variant="custom" className={styles.allPatternSkeleton} />
+          ))}
+        </div>
       ) : (
-        <>
-          <div className={styles.patternList}>
-            {patterns.map((pattern) => (
-              <PatternRow key={pattern._id} pattern={pattern} />
-            ))}
-          </div>
-          {totalPages > 1 && (
-            <div className={styles.paginationWrapper}>
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                siblingCount={isDesktop ? 2 : 1}
-                size={isDesktop ? 'md' : 'sm'}
-                onPageChange={handlePageChange}
-              />
-            </div>
-          )}
-        </>
+        renderContent()
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const questionController = require('../../controllers/question.controller');
+const { getQuestionsByPattern } = require('../../controllers/question.controller');
 const { auth } = require('../../middleware/auth');
 const { attachUserTimeZone } = require('../../middleware/timezone'); 
 const validate = require('../../middleware/validator');
@@ -64,5 +65,19 @@ router.put('/:id', auth, rateLimiters.questionUpdateLimiter, validate(questionVa
 router.delete('/:id', auth, rateLimiters.questionDeleteLimiter, validate(questionValidator.deleteQuestion, 'params'), questionController.deleteQuestion);
 router.post('/:id/restore', auth, rateLimiters.questionUpdateLimiter, validate(questionValidator.restoreQuestion, 'params'), questionController.restoreQuestion);
 router.delete('/:id/permanent', auth, rateLimiters.questionDeleteLimiter, validate(questionValidator.permanentDeleteQuestion, 'params'), questionController.permanentDeleteQuestion);
+
+// NEW ROUTE: Get questions by pattern/tag slug
+router.get('/pattern/:patternSlug',
+  auth,  // require authentication (user must be logged in)
+  rateLimiters.userLimiter,
+  validate(Joi.object({
+    patternSlug: Joi.string().pattern(/^[a-z0-9-]+$/).required()
+  }), 'params'),
+  validate(Joi.object({
+    page: Joi.number().integer().min(1).default(1),
+    limit: Joi.number().integer().min(1).max(100).default(20)
+  }), 'query'),
+  getQuestionsByPattern
+);
 
 module.exports = router;

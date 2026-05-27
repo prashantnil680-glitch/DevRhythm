@@ -98,6 +98,87 @@
   margin-top: 0.5rem;
 }
 
+
+.totalCount {
+  font-size: 0.8rem;
+  font-weight: normal;
+  color: var(--text-muted);
+  margin-left: 0.5rem;
+}
+
+.skeletonCard {
+  height: 120px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.cardLink {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.suggestedCard {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.suggestedCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+.platformName {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.solvedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--accent-moss);
+  color: white;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 12px;
+  line-height: 1;
+}
+
+.solvedDate {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.tag {
+  font-size: 0.7rem;
+  color: var(--accent-moss);
+  background: var(--bg-elevated);
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+}
+
+.paginationWrapper {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 /* Responsive */
 @media (max-width: 767px) {
   .title {

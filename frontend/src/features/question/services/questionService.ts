@@ -126,4 +126,54 @@ export const questionService = {
   async permanentDeleteQuestion(id: string) {
     await apiClient.delete(`/questions/${id}/permanent`);
   },
+
+    /**
+   * Get paginated questions for a pattern slug (e.g., "hash-table")
+   * GET /questions/pattern/:patternSlug
+   */
+  async getQuestionsByPattern(patternSlug: string, page: number = 1, limit: number = 15): Promise<{
+    pattern: { name: string; slug: string; totalQuestions: number };
+    questions: Array<{
+      _id: string;
+      title: string;
+      problemLink: string;
+      platform: string;
+      platformQuestionId: string;
+      difficulty: 'Easy' | 'Medium' | 'Hard';
+      tags: string[];
+      pattern: string[];
+      userStatus?: 'Not Started' | 'Attempted' | 'Solved' | 'Mastered' | null;
+      solvedAt?: string;
+    }>;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
+    const query = buildQueryString({ page, limit });
+    const response = await apiClient.get<{
+      pattern: { name: string; slug: string; totalQuestions: number };
+      questions: any[];
+    }>(`/questions/pattern/${patternSlug}${query}`);
+    
+    // Extract pagination from meta (Vercel/backend convention)
+    const pagination = (response as any).meta?.pagination || {
+      page,
+      limit,
+      total: response.data.questions.length,
+      pages: 1,
+      hasNext: false,
+      hasPrev: false,
+    };
+    
+    return {
+      pattern: response.data.pattern,
+      questions: response.data.questions,
+      pagination,
+    };
+  },
 };

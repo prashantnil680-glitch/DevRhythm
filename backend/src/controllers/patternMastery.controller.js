@@ -9,6 +9,55 @@ const { slugify } = require('../utils/helpers/string');
 const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 
+/**
+ * Generate a default pattern mastery object for a user who has no progress in that pattern.
+ * This object is NOT saved to the database – only returned in responses.
+ */
+const getDefaultPatternMastery = (userId, patternName) => {
+  const patternSlug = slugify(patternName);
+  const now = new Date();
+  return {
+    _id: null,
+    userId: userId,
+    patternName: patternName,
+    patternSlug: patternSlug,
+    solvedCount: 0,
+    masteredCount: 0,
+    totalAttempts: 0,
+    successfulAttempts: 0,
+    successRate: 0,
+    masteryRate: 0,
+    confidenceLevel: 1,
+    totalTimeSpent: 0,
+    averageTimePerQuestion: 0,
+    lastPracticed: null,
+    lastUpdated: now,
+    recentQuestions: [],
+    difficultyBreakdown: {
+      easy: { solved: 0, mastered: 0, totalTime: 0 },
+      medium: { solved: 0, mastered: 0, totalTime: 0 },
+      hard: { solved: 0, mastered: 0, totalTime: 0 }
+    },
+    platformDistribution: {
+      LeetCode: 0,
+      HackerRank: 0,
+      CodeForces: 0,
+      Other: 0
+    },
+    trend: {
+      last7Days: { solved: 0, mastered: 0, successRate: 0 },
+      last30Days: { solved: 0, mastered: 0, successRate: 0 },
+      improvementRate: 0
+    },
+    createdAt: now,
+    updatedAt: now,
+    visibility: 'public',
+    description: `Problems using the ${patternName} pattern`,
+    title: patternName,
+    tags: []
+  };
+};
+
 const getPatternMasteryList = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPaginationParams(req);
@@ -52,27 +101,29 @@ const getPatternMastery = async (req, res, next) => {
       }).lean();
     }
     
-    if (!pattern) throw new AppError('Pattern mastery not found', 404);
+    // If still not found, return a default object (all zeros) instead of 404
+    if (!pattern) {
+      pattern = getDefaultPatternMastery(req.user._id, rawPatternName);
+      // For default object, no need to populate recentQuestions (empty array)
+      return res.json(formatResponse('Pattern mastery retrieved', { pattern }));
+    }
 
+    // For existing pattern, populate platformQuestionId for recentQuestions if missing
     if (pattern.recentQuestions && pattern.recentQuestions.length > 0) {
-      // Collect question IDs where platformQuestionId is missing
       const missingIds = pattern.recentQuestions
         .filter(rq => !rq.platformQuestionId && rq.questionId)
         .map(rq => rq.questionId);
       
       if (missingIds.length > 0) {
-        // Fetch platformQuestionId for those questions
         const questions = await Question.find(
           { _id: { $in: missingIds } },
           { _id: 1, platformQuestionId: 1 }
         ).lean();
         
-        // Build a map of questionId -> platformQuestionId
         const platformIdMap = new Map(
           questions.map(q => [q._id.toString(), q.platformQuestionId])
         );
         
-        // Fill missing platformQuestionId in recentQuestions
         pattern.recentQuestions = pattern.recentQuestions.map(rq => {
           if (!rq.platformQuestionId && rq.questionId) {
             const qid = rq.questionId.toString();
@@ -88,7 +139,6 @@ const getPatternMastery = async (req, res, next) => {
     res.json(formatResponse('Pattern mastery retrieved', { pattern }));
   } catch (error) { next(error); }
 };
-
 
 const getPatternStats = async (req, res, next) => {
   try {
@@ -148,7 +198,7 @@ const getWeakestPatterns = async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 5;
     const metric = req.query.metric || 'confidence';
     
-    const patterns = await PatternMastery.find({ userId: req.user._id }).lean();
+    let patterns = await PatternMastery.find({ userId: req.user._id }).lean();
     
     let weakest = [];
     if (metric === 'confidence') {
@@ -160,6 +210,36 @@ const getWeakestPatterns = async (req, res, next) => {
         .sort((a, b) => new Date(a.lastPracticed || 0) - new Date(b.lastPracticed || 0))
         .slice(0, limit);
     }
+
+    // Ensure platformQuestionId is present in recentQuestions
+    for (const pattern of weakest) {
+      if (pattern.recentQuestions && pattern.recentQuestions.length > 0) {
+        const missingIds = pattern.recentQuestions
+          .filter(rq => !rq.platformQuestionId && rq.questionId)
+          .map(rq => rq.questionId);
+        
+        if (missingIds.length > 0) {
+          const questions = await Question.find(
+            { _id: { $in: missingIds } },
+            { _id: 1, platformQuestionId: 1 }
+          ).lean();
+          
+          const platformIdMap = new Map(
+            questions.map(q => [q._id.toString(), q.platformQuestionId])
+          );
+          
+          pattern.recentQuestions = pattern.recentQuestions.map(rq => {
+            if (!rq.platformQuestionId && rq.questionId) {
+              const qid = rq.questionId.toString();
+              if (platformIdMap.has(qid)) {
+                rq.platformQuestionId = platformIdMap.get(qid);
+              }
+            }
+            return rq;
+          });
+        }
+      }
+    }
     
     res.json(formatResponse('Weakest patterns retrieved', { weakest }));
   } catch (error) { next(error); }
@@ -170,7 +250,7 @@ const getStrongestPatterns = async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 5;
     const metric = req.query.metric || 'confidence';
     
-    const patterns = await PatternMastery.find({ userId: req.user._id }).lean();
+    let patterns = await PatternMastery.find({ userId: req.user._id }).lean();
     
     let strongest = [];
     if (metric === 'confidence') {
@@ -182,6 +262,36 @@ const getStrongestPatterns = async (req, res, next) => {
         .filter(p => p.lastPracticed)
         .sort((a, b) => new Date(b.lastPracticed) - new Date(a.lastPracticed))
         .slice(0, limit);
+    }
+
+    // Ensure platformQuestionId is present in recentQuestions
+    for (const pattern of strongest) {
+      if (pattern.recentQuestions && pattern.recentQuestions.length > 0) {
+        const missingIds = pattern.recentQuestions
+          .filter(rq => !rq.platformQuestionId && rq.questionId)
+          .map(rq => rq.questionId);
+        
+        if (missingIds.length > 0) {
+          const questions = await Question.find(
+            { _id: { $in: missingIds } },
+            { _id: 1, platformQuestionId: 1 }
+          ).lean();
+          
+          const platformIdMap = new Map(
+            questions.map(q => [q._id.toString(), q.platformQuestionId])
+          );
+          
+          pattern.recentQuestions = pattern.recentQuestions.map(rq => {
+            if (!rq.platformQuestionId && rq.questionId) {
+              const qid = rq.questionId.toString();
+              if (platformIdMap.has(qid)) {
+                rq.platformQuestionId = platformIdMap.get(qid);
+              }
+            }
+            return rq;
+          });
+        }
+      }
     }
     
     res.json(formatResponse('Strongest patterns retrieved', { strongest }));

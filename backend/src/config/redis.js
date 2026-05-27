@@ -1,6 +1,8 @@
 const redis = require('redis');
 const config = require('./index');
 
+let redisErrorLogged = false;
+
 const createRedisClient = () => {
   try {
     const client = redis.createClient({
@@ -9,17 +11,27 @@ const createRedisClient = () => {
       database: config.redis.db,
       socket: {
         reconnectStrategy: (retries) => {
-          if (retries > 10) {
-            console.log('Too many retries on Redis. Connection terminated');
+          // Increased max retries to 50, exponential backoff up to 10 seconds
+          if (retries > 50) {
+            console.error('Redis: Too many retries, stopping.');
             return new Error('Too many retries');
           }
-          return Math.min(retries * 100, 3000);
+          const delay = Math.min(Math.pow(2, retries) * 100, 10000);
+          console.log(`Redis reconnect attempt ${retries}, waiting ${delay}ms`);
+          return delay;
         },
-        keepAlive: 30000,
+        keepAlive: 30000,              // Send keep-alive every 30 seconds
+        keepAliveInitialDelay: 5000,   // First keep-alive after 5 seconds
       }
     });
 
-    client.on('error', (err) => console.error('Redis Client Error:', err));
+    client.on('error', (err) => {
+      if (!redisErrorLogged) {
+        console.error('Redis Client Error:', err.message);
+        redisErrorLogged = true;
+      }
+    });
+    
     client.on('connect', () => console.log('Redis client connected'));
     client.on('ready', () => console.log('Redis client ready'));
     client.on('reconnecting', () => console.log('Redis client reconnecting'));
@@ -34,7 +46,6 @@ const createRedisClient = () => {
 
 const client = createRedisClient();
 
-// Wait for Redis to be ready
 const waitForRedis = async () => {
   if (!client) throw new Error('Redis client not created');
   try {

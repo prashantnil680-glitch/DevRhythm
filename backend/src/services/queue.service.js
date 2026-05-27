@@ -25,8 +25,15 @@ if (!redisOptions) {
   console.error('Redis configuration missing, queues will not work');
 }
 
-// Create a single queue for all job types
-const jobQueue = new Bull('devrhythm-jobs', { redis: redisOptions });
+// Create a single queue for all job types with better settings
+const jobQueue = new Bull('devrhythm-jobs', {
+  redis: redisOptions,
+  settings: {
+    retryProcessDelay: 5000,     // Wait 5 seconds between retries
+    maxStalledCount: 3,          // Max stalled jobs before failing
+    guardInterval: 5000,         // Check stalled jobs every 5 seconds
+  }
+});
 
 jobQueue.on('error', (error) => {
   console.error('Queue error:', error);

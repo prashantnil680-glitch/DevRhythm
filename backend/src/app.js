@@ -13,6 +13,9 @@ const { attachUserTimeZone } = require('./middleware/timezone');
 
 const app = express();
 
+// Trust first proxy (required for Render's load balancer)
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(compression());
 app.use(cors({
@@ -23,7 +26,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 const redisClient = require('./config/redis');
-const sessionStore = new RedisStore({ client: redisClient });
+const sessionStore = new RedisStore({ client: redisClient.client });
 app.use(session({
   store: sessionStore,
   secret: config.session.secret,

@@ -27,11 +27,15 @@ if (!redisOptions) {
 
 // Create a single queue for all job types with better settings
 const jobQueue = new Bull('devrhythm-jobs', {
-  redis: redisOptions,
+  redis: {
+    ...redisOptions,
+    maxRetriesPerRequest: 50,      // increase from default 20
+    enableReadyCheck: false,       // avoid ECONNRESET during reconnect
+  },
   settings: {
-    retryProcessDelay: 5000,     // Wait 5 seconds between retries
-    maxStalledCount: 3,          // Max stalled jobs before failing
-    guardInterval: 5000,         // Check stalled jobs every 5 seconds
+    retryProcessDelay: 5000,       // Wait 5 seconds between retries
+    maxStalledCount: 3,            // Max stalled jobs before failing
+    guardInterval: 5000,           // Check stalled jobs every 5 seconds
   }
 });
 
@@ -62,8 +66,8 @@ const { handleTestCaseExecuted } = require('./queueHandlers/testCaseExecuted.han
 const { handleTimeThresholdReached } = require('./queueHandlers/timeThresholdReached.handler');
 const { handleConfidenceIncrement } = require('./queueHandlers/confidenceIncrement.handler');
 const { handlePodAvailable } = require('./queueHandlers/podAvailable.handler');
-// NEW HANDLER
 const { handleFetchLeetcodeDetails } = require('./queueHandlers/fetchLeetcodeDetails.handler');
+const { handleCodeExecution } = require('./queueHandlers/codeExecution.handler');
 
 // Register processors
 jobQueue.process('question.solved', handleQuestionSolved);
@@ -84,8 +88,8 @@ jobQueue.process('test_case.executed', handleTestCaseExecuted);
 jobQueue.process('time.threshold_reached', handleTimeThresholdReached);
 jobQueue.process('confidence.increment', handleConfidenceIncrement);
 jobQueue.process('pod.available', handlePodAvailable);
-// NEW PROCESSOR
 jobQueue.process('leetcode.fetch_details', handleFetchLeetcodeDetails);
+jobQueue.process('code.execution', handleCodeExecution);
 
 const startQueueWorkers = async () => {
   if (!jobQueue) {

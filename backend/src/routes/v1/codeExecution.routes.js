@@ -6,7 +6,9 @@ const validate = require('../../middleware/validator');
 const Joi = require('joi');
 const CodeExecutionHistory = require('../../models/CodeExecutionHistory');
 const { formatResponse } = require('../../utils/helpers/response');
+const rateLimiters = require('../../middleware/rateLimiter');
 
+// Validation schemas
 const testCaseSchema = Joi.object({
   stdin: Joi.string().allow('').default(''),
   expected: Joi.string().allow('').optional(),
@@ -20,14 +22,44 @@ const executeSchema = Joi.object({
   expected: Joi.string().allow('').optional(),
   testCases: Joi.array().items(testCaseSchema).optional(),
 })
-.with('expected', 'stdin'); 
+.with('expected', 'stdin');
 
+// Async execution schema (same validation)
+const executeAsyncSchema = executeSchema; // reuse
+
+// ==============================
+// SYNC ENDPOINT (original)
+// ==============================
 router.post('/execute',
   auth,
+  rateLimiters.createRedisLimiter(60 * 1000, 10, 'code:execute'), // stricter rate limit
   validate(executeSchema),
   codeExecutionController.runCode
 );
 
+// ==============================
+// ASYNC ENDPOINTS (new)
+// ==============================
+
+// Submit code for async execution
+router.post('/execute-async',
+  auth,
+  rateLimiters.createRedisLimiter(60 * 1000, 10, 'code:execute-async'),
+  validate(executeAsyncSchema),
+  codeExecutionController.executeCodeAsync
+);
+
+// Poll for result
+router.get('/result/:jobId',
+  auth,
+  rateLimiters.createRedisLimiter(60 * 1000, 30, 'code:result'),
+  validate(Joi.object({ jobId: Joi.string().required() }), 'params'),
+  codeExecutionController.getCodeResult
+);
+
+// ==============================
+// History endpoint (unchanged)
+// ==============================
 router.get('/history', auth, async (req, res, next) => {
   try {
     const { questionId, limit = 20, page = 1 } = req.query;

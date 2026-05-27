@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { DateTime } = require('luxon');
 const { executeBatch } = require('../services/codeExecution.service');
 const metadataService = require('../services/codeExecution/metadata.service');
@@ -12,6 +13,7 @@ const AppError = require('../utils/errors/AppError');
 const Question = require('../models/Question');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const CodeExecutionHistory = require('../models/CodeExecutionHistory');
+const CodeExecutionJob = require('../models/CodeExecutionJob');
 const RevisionSchedule = require('../models/RevisionSchedule');
 const { invalidateCache, invalidateProgressCache } = require('../middleware/cache');
 const revisionActivityService = require('../services/revisionActivity.service');
@@ -115,134 +117,139 @@ const cleanupExecutionHistory = async (userId, questionId, language) => {
   if (toDelete.length) await CodeExecutionHistory.deleteMany({ _id: { $in: toDelete } });
 };
 
-const runCode = async (req, res, next) => {
+/**
+ * Core execution logic – shared between sync and async endpoints.
+ * Returns result object (same as original response data).
+ * Does NOT send HTTP response.
+ */
+const executeCodeCore = async (userId, body, timeZone = 'UTC') => {
+  let { language, code, stdin, expected, testCases, questionId } = body;
+  language = normalizeLanguage(language);
+
+  if (!SUPPORTED_LANGUAGES.includes(language)) {
+    throw new AppError(`Unsupported language. Supported: ${SUPPORTED_LANGUAGES.join(', ')}`, 400);
+  }
+  if (!code || typeof code !== 'string' || code.trim().length === 0) {
+    throw new AppError('Code cannot be empty', 400);
+  }
+  if (!questionId) throw new AppError('questionId is required', 400);
+
+  const [question, userProgress] = await Promise.all([
+    Question.findById(questionId).lean(),
+    UserQuestionProgress.findOne({ userId, questionId }),
+  ]);
+  if (!question) throw new AppError('Question not found', 404);
+
+  let metadata;
   try {
-    let { language, code, stdin, expected, testCases, questionId } = req.body;
-    language = normalizeLanguage(language);
+    metadata = await metadataService.getExecutionMetadata(questionId, language);
+  } catch (err) {
+    console.error(`[CodeExecution] Metadata extraction failed for question ${questionId}, language ${language}:`, err);
+    throw new AppError(`Failed to extract problem metadata: ${err.message}. Please ensure the starter code is valid.`, 400);
+  }
 
-    if (!SUPPORTED_LANGUAGES.includes(language)) {
-      throw new AppError(`Unsupported language. Supported: ${SUPPORTED_LANGUAGES.join(', ')}`, 400);
-    }
-    if (!code || typeof code !== 'string' || code.trim().length === 0) {
-      throw new AppError('Code cannot be empty', 400);
-    }
-    if (!questionId) throw new AppError('questionId is required', 400);
+  const defaultTestCases = (question.testCases || []).map(tc => ({
+    stdin: tc.stdin || '',
+    expected: tc.expected,
+  }));
+  const finalTestCases = buildTestCases(question, userProgress, testCases, stdin, expected);
+  if (finalTestCases.length === 0) throw new AppError('No test cases available for this question', 400);
 
-    const [question, userProgress] = await Promise.all([
-      Question.findById(questionId).lean(),
-      UserQuestionProgress.findOne({ userId: req.user._id, questionId }),
-    ]);
-    if (!question) throw new AppError('Question not found', 404);
+  const generator = GENERATORS[language];
+  if (!generator) throw new AppError(`No wrapper generator for language: ${language}`, 500);
+  let fullCode;
+  try {
+    fullCode = generator.generateWrapper(code, metadata, finalTestCases);
+  } catch (err) {
+    console.error(`[CodeExecution] Wrapper generation failed for language ${language}:`, err);
+    throw new AppError(`Wrapper generation failed: ${err.message}`, 400);
+  }
 
-    let metadata;
-    try {
-      metadata = await metadataService.getExecutionMetadata(questionId, language);
-    } catch (err) {
-      console.error(`[CodeExecution] Metadata extraction failed for question ${questionId}, language ${language}:`, err);
-      throw new AppError(`Failed to extract problem metadata: ${err.message}. Please ensure the starter code is valid.`, 400);
-    }
+  if (process.env.NODE_ENV === 'development' && language === 'python') {
+    console.log(`[CodeExecution] Generated Python code (first 500 chars):\n${fullCode.substring(0, 500)}`);
+  }
 
-    const defaultTestCases = (question.testCases || []).map(tc => ({
-      stdin: tc.stdin || '',
-      expected: tc.expected,
-    }));
-    const finalTestCases = buildTestCases(question, userProgress, testCases, stdin, expected);
-    if (finalTestCases.length === 0) throw new AppError('No test cases available for this question', 400);
-
-    const generator = GENERATORS[language];
-    if (!generator) throw new AppError(`No wrapper generator for language: ${language}`, 500);
-    let fullCode;
-    try {
-      fullCode = generator.generateWrapper(code, metadata, finalTestCases);
-    } catch (err) {
-      console.error(`[CodeExecution] Wrapper generation failed for language ${language}:`, err);
-      throw new AppError(`Wrapper generation failed: ${err.message}`, 400);
-    }
-
-    // Log a snippet of the generated code in development for debugging
-    if (process.env.NODE_ENV === 'development' && language === 'python') {
-      console.log(`[CodeExecution] Generated Python code (first 500 chars):\n${fullCode.substring(0, 500)}`);
-    }
-
-    let batchResults;
-    try {
-      batchResults = await executeBatch({
-        language,
-        code: fullCode,
-        testCases: finalTestCases,
-      });
-    } catch (execError) {
-      console.error('Execution provider error:', execError);
-      const failedResults = finalTestCases.map(tc => ({
-        input: tc.stdin,
-        output: '',
-        expected: tc.expected,
-        error: `Code execution service error: ${execError.message}`,
-        exitCode: -1,
-        passed: false,
-      }));
-      return res.json(formatResponse('Code execution failed', {
-        questionId,
-        results: failedResults,
-        passedCount: 0,
-        totalCount: finalTestCases.length,
-        allPassed: false,
-        defaultTestCasesCount: defaultTestCases.length,
-        userCustomTestCasesCount: (userProgress?.customTestCases || []).length,
-        customTestCasesCount: 0,
-      }));
-    }
-
-    const isOrderIrrelevant = question.contentRef ? /any order/i.test(question.contentRef) : false;
-    const results = batchResults.map((res, idx) => {
-      const testCase = finalTestCases[idx];
-      const actualOutput = res.stdout || '';
-      const expectedOutput = testCase.expected || '';
-      const errorMessage = res.stderr || '';
-
-      let actualParsed = null;
-      let expectedParsed = null;
-      let passed = false;
-
-      try {
-        if (actualOutput.trim() !== '') {
-          actualParsed = JSON.parse(actualOutput);
-        }
-        if (expectedOutput.trim() !== '') {
-          expectedParsed = JSON.parse(expectedOutput);
-        }
-      } catch (e) {
-        // If JSON parsing fails, fall back to string comparison
-      }
-
-      if (actualParsed !== null && expectedParsed !== null) {
-        passed = OutputComparator.compare(actualParsed, expectedParsed, {
-          unordered: isOrderIrrelevant,
-          floatTolerance: 1e-9,
-        });
-      } else {
-        const normalizedActual = (actualOutput || '').replace(/\s/g, '');
-        const normalizedExpected = (expectedOutput || '').replace(/\s/g, '');
-        passed = normalizedActual === normalizedExpected;
-      }
-
-      return {
-        input: testCase.stdin,
-        output: actualOutput,
-        expected: expectedOutput,
-        error: errorMessage || (res.exitCode !== 0 ? `Execution failed with exit code ${res.exitCode}` : ''),
-        exitCode: res.exitCode ?? (errorMessage ? 1 : 0),
-        passed,
-      };
+  let batchResults;
+  try {
+    batchResults = await executeBatch({
+      language,
+      code: fullCode,
+      testCases: finalTestCases,
     });
+  } catch (execError) {
+    console.error('Execution provider error:', execError);
+    const failedResults = finalTestCases.map(tc => ({
+      input: tc.stdin,
+      output: '',
+      expected: tc.expected,
+      error: `Code execution service error: ${execError.message}`,
+      exitCode: -1,
+      passed: false,
+    }));
+    return {
+      questionId,
+      results: failedResults,
+      passedCount: 0,
+      totalCount: finalTestCases.length,
+      allPassed: false,
+      defaultTestCasesCount: defaultTestCases.length,
+      userCustomTestCasesCount: (userProgress?.customTestCases || []).length,
+      customTestCasesCount: 0,
+    };
+  }
 
-    const passedCount = results.filter(r => r.passed).length;
-    const totalCount = finalTestCases.length;
-    const allPassed = passedCount === totalCount;
+  const isOrderIrrelevant = question.contentRef ? /any order/i.test(question.contentRef) : false;
+  const results = batchResults.map((res, idx) => {
+    const testCase = finalTestCases[idx];
+    const actualOutput = res.stdout || '';
+    const expectedOutput = testCase.expected || '';
+    const errorMessage = res.stderr || '';
 
-    if (jobQueue) {
+    let actualParsed = null;
+    let expectedParsed = null;
+    let passed = false;
+
+    try {
+      if (actualOutput.trim() !== '') {
+        actualParsed = JSON.parse(actualOutput);
+      }
+      if (expectedOutput.trim() !== '') {
+        expectedParsed = JSON.parse(expectedOutput);
+      }
+    } catch (e) {
+      // If JSON parsing fails, fall back to string comparison
+    }
+
+    if (actualParsed !== null && expectedParsed !== null) {
+      passed = OutputComparator.compare(actualParsed, expectedParsed, {
+        unordered: isOrderIrrelevant,
+        floatTolerance: 1e-9,
+      });
+    } else {
+      const normalizedActual = (actualOutput || '').replace(/\s/g, '');
+      const normalizedExpected = (expectedOutput || '').replace(/\s/g, '');
+      passed = normalizedActual === normalizedExpected;
+    }
+
+    return {
+      input: testCase.stdin,
+      output: actualOutput,
+      expected: expectedOutput,
+      error: errorMessage || (res.exitCode !== 0 ? `Execution failed with exit code ${res.exitCode}` : ''),
+      exitCode: res.exitCode ?? (errorMessage ? 1 : 0),
+      passed,
+    };
+  });
+
+  const passedCount = results.filter(r => r.passed).length;
+  const totalCount = finalTestCases.length;
+  const allPassed = passedCount === totalCount;
+
+  // Queue analytics job (non‑blocking, errors ignored)
+  if (jobQueue) {
+    try {
       await jobQueue.add('test_case.executed', {
-        userId: req.user._id,
+        userId,
         questionId,
         passedCount,
         failedCount: totalCount - passedCount,
@@ -251,120 +258,228 @@ const runCode = async (req, res, next) => {
         executedAt: new Date(),
         language,
       });
+    } catch (queueErr) {
+      console.error('Failed to queue test_case.executed job:', queueErr.message);
     }
+  }
 
-    let customToSave = [];
-    if (testCases && Array.isArray(testCases)) customToSave = testCases;
-    else if (stdin !== undefined) customToSave = [{ stdin: stdin || '', expected: expected || '' }];
-    await saveCustomTestCases(req.user._id, questionId, customToSave, defaultTestCases);
+  let customToSave = [];
+  if (testCases && Array.isArray(testCases)) customToSave = testCases;
+  else if (stdin !== undefined) customToSave = [{ stdin: stdin || '', expected: expected || '' }];
+  await saveCustomTestCases(userId, questionId, customToSave, defaultTestCases);
 
-    await CodeExecutionHistory.create({
-      userId: req.user._id,
-      questionId,
-      language,
-      code,
-      testCases: results.map(r => ({
-        stdin: r.input,
-        expected: r.expected,
-        output: r.output,
-        error: r.error,
-        exitCode: r.exitCode,
-        passed: r.passed,
-      })),
-      summary: {
-        passedCount,
-        totalCount,
-        allPassed,
-        defaultTestCasesCount: defaultTestCases.length,
-        userCustomTestCasesCount: (userProgress?.customTestCases || []).length,
-        customTestCasesCount: customToSave.length,
-      },
-    });
-
-    await cleanupExecutionHistory(req.user._id, questionId, language);
-
-    const existingRevision = await RevisionSchedule.findOne({ userId: req.user._id, questionId });
-    if (!existingRevision && allPassed) {
-      const timeZone = req.user.preferences?.timezone || 'UTC';
-      const solvedLocal = DateTime.fromJSDate(new Date(), { zone: timeZone });
-      const scheduleDays = constants.REVISION_SCHEDULE;
-      const scheduleUTC = scheduleDays.map(days => solvedLocal.startOf('day').plus({ days }).toUTC().toJSDate());
-      await RevisionSchedule.create({
-        userId: req.user._id,
-        questionId,
-        schedule: scheduleUTC,
-        baseDate: new Date(),
-        status: 'active',
-        currentRevisionIndex: 0,
-        completedRevisions: [],
-      });
-      await invalidateCache(`revisions:*:user:${req.user._id}:*`);
-      await invalidateCache(`question-details:*:${questionId}:*`);
-    }
-
-    const responseData = {
-      questionId,
-      results,
+  await CodeExecutionHistory.create({
+    userId,
+    questionId,
+    language,
+    code,
+    testCases: results.map(r => ({
+      stdin: r.input,
+      expected: r.expected,
+      output: r.output,
+      error: r.error,
+      exitCode: r.exitCode,
+      passed: r.passed,
+    })),
+    summary: {
       passedCount,
       totalCount,
       allPassed,
       defaultTestCasesCount: defaultTestCases.length,
       userCustomTestCasesCount: (userProgress?.customTestCases || []).length,
       customTestCasesCount: customToSave.length,
-    };
+    },
+  });
 
-    if (allPassed) {
-      let progress = await UserQuestionProgress.findOne({ userId: req.user._id, questionId });
-      if (!progress) {
-        progress = new UserQuestionProgress({
-          userId: req.user._id,
-          questionId,
-          status: 'Solved',
-          attempts: { count: 1, solvedAt: new Date(), lastAttemptAt: new Date(), firstAttemptAt: new Date() },
-          totalTimeSpent: 0,
-        });
-      } else if (progress.status !== 'Solved') {
-        progress.status = 'Solved';
-        progress.attempts.solvedAt = new Date();
-        progress.attempts.lastAttemptAt = new Date();
-        progress.attempts.count = (progress.attempts.count || 0) + 1;
-      }
-      await progress.save();
-      await invalidateProgressCache(req.user._id);
+  await cleanupExecutionHistory(userId, questionId, language);
 
-      if (jobQueue) {
+  const existingRevision = await RevisionSchedule.findOne({ userId, questionId });
+  if (!existingRevision && allPassed) {
+    const solvedLocal = DateTime.fromJSDate(new Date(), { zone: timeZone });
+    const scheduleDays = constants.REVISION_SCHEDULE;
+    const scheduleUTC = scheduleDays.map(days => solvedLocal.startOf('day').plus({ days }).toUTC().toJSDate());
+    await RevisionSchedule.create({
+      userId,
+      questionId,
+      schedule: scheduleUTC,
+      baseDate: new Date(),
+      status: 'active',
+      currentRevisionIndex: 0,
+      completedRevisions: [],
+    });
+    await invalidateCache(`revisions:*:user:${userId}:*`);
+    await invalidateCache(`question-details:*:${questionId}:*`);
+  }
+
+  const responseData = {
+    questionId,
+    results,
+    passedCount,
+    totalCount,
+    allPassed,
+    defaultTestCasesCount: defaultTestCases.length,
+    userCustomTestCasesCount: (userProgress?.customTestCases || []).length,
+    customTestCasesCount: customToSave.length,
+  };
+
+  if (allPassed) {
+    let progress = await UserQuestionProgress.findOne({ userId, questionId });
+    if (!progress) {
+      progress = new UserQuestionProgress({
+        userId,
+        questionId,
+        status: 'Solved',
+        attempts: { count: 1, solvedAt: new Date(), lastAttemptAt: new Date(), firstAttemptAt: new Date() },
+        totalTimeSpent: 0,
+      });
+    } else if (progress.status !== 'Solved') {
+      progress.status = 'Solved';
+      progress.attempts.solvedAt = new Date();
+      progress.attempts.lastAttemptAt = new Date();
+      progress.attempts.count = (progress.attempts.count || 0) + 1;
+    }
+    await progress.save();
+    await invalidateProgressCache(userId);
+
+    if (jobQueue) {
+      try {
         await jobQueue.add('question.solved', {
-          userId: req.user._id,
+          userId,
           questionId,
           progressId: progress._id,
           timeSpent: 0,
           solvedAt: new Date(),
           source: 'test_case',
         });
-      }
-
-      await revisionActivityService.recordCodeSubmission(req.user._id, questionId, new Date());
-
-      const revisionResult = await revisionActivityService.checkAndCompleteRevision(
-        req.user._id,
-        questionId,
-        new Date(),
-        'auto',
-        { targetDate: new Date() }
-      );
-      if (revisionResult.completed) {
-        responseData.revisionCompleted = true;
-        responseData.revisionMessage = revisionResult.message;
-        responseData.revisionOutOfOrder = revisionResult.outOfOrder || false;
-        responseData.revisionOverdueCompleted = revisionResult.overdueCompleted || false;
+      } catch (queueErr) {
+        console.error('Failed to queue question.solved job:', queueErr.message);
       }
     }
 
-    return res.json(formatResponse('Code executed successfully', responseData));
+    await revisionActivityService.recordCodeSubmission(userId, questionId, new Date());
+
+    const revisionResult = await revisionActivityService.checkAndCompleteRevision(
+      userId,
+      questionId,
+      new Date(),
+      'auto',
+      { targetDate: new Date() }
+    );
+    if (revisionResult.completed) {
+      responseData.revisionCompleted = true;
+      responseData.revisionMessage = revisionResult.message;
+      responseData.revisionOutOfOrder = revisionResult.outOfOrder || false;
+      responseData.revisionOverdueCompleted = revisionResult.overdueCompleted || false;
+    }
+  }
+
+  return responseData;
+};
+
+// ==============================
+// SYNC ENDPOINT (original, kept for backward compatibility)
+// ==============================
+const runCode = async (req, res, next) => {
+  try {
+    const result = await executeCodeCore(req.user._id, req.body, req.userTimeZone);
+    return res.json(formatResponse('Code executed successfully', result));
   } catch (error) {
-    console.error('Code execution error:', error);
     next(error);
   }
 };
 
-module.exports = { runCode };
+// ==============================
+// ASYNC ENDPOINTS
+// ==============================
+
+/**
+ * POST /api/v1/code/execute-async
+ * Creates a job and returns jobId immediately.
+ */
+const executeCodeAsync = async (req, res, next) => {
+  try {
+    const { language, code, testCases, questionId, stdin, expected } = req.body;
+    // Basic validation (same as sync)
+    const normalizedLang = normalizeLanguage(language);
+    if (!SUPPORTED_LANGUAGES.includes(normalizedLang)) {
+      throw new AppError(`Unsupported language. Supported: ${SUPPORTED_LANGUAGES.join(', ')}`, 400);
+    }
+    if (!code || typeof code !== 'string' || code.trim().length === 0) {
+      throw new AppError('Code cannot be empty', 400);
+    }
+    if (!questionId) throw new AppError('questionId is required', 400);
+
+    // Check if question exists
+    const question = await Question.findById(questionId).select('_id');
+    if (!question) throw new AppError('Question not found', 404);
+
+    const jobId = crypto.randomUUID();
+
+    const jobDoc = new CodeExecutionJob({
+      jobId,
+      userId: req.user._id,
+      questionId,
+      language: normalizedLang,
+      code,
+      testCases: testCases || (stdin !== undefined ? [{ stdin: stdin || '', expected: expected || '' }] : []),
+      status: 'pending',
+      timezone: req.user.preferences?.timezone || 'UTC',
+    });
+    await jobDoc.save();
+
+    // Add to Bull queue
+    if (!jobQueue) {
+      throw new AppError('Job queue not available', 500);
+    }
+    const bullJob = await jobQueue.add('code.execution', { jobId }, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 2000 },
+    });
+    jobDoc.bullJobId = bullJob.id;
+    await jobDoc.save();
+
+    res.status(202).json(formatResponse('Code execution queued', { jobId, status: 'pending' }));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/v1/code/result/:jobId
+ * Polls for completion.
+ */
+const getCodeResult = async (req, res, next) => {
+  try {
+    const { jobId } = req.params;
+    const jobDoc = await CodeExecutionJob.findOne({ jobId, userId: req.user._id });
+    if (!jobDoc) {
+      throw new AppError('Job not found', 404);
+    }
+
+    if (jobDoc.status === 'completed') {
+      return res.json(formatResponse('Code execution completed', {
+        status: 'completed',
+        result: jobDoc.result,
+      }));
+    } else if (jobDoc.status === 'failed') {
+      return res.json(formatResponse('Code execution failed', {
+        status: 'failed',
+        error: jobDoc.errorMessage,
+      }));
+    } else {
+      // pending or processing
+      return res.json(formatResponse('Code execution in progress', {
+        status: jobDoc.status,
+        progress: jobDoc.progress,
+      }));
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = {
+  runCode,               // sync (existing)
+  executeCodeAsync,      // async submit
+  getCodeResult,         // async poll
+};

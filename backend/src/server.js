@@ -4,6 +4,7 @@ const mongoose = require('./config/database');
 const { client: redis, waitForRedis } = require('./config/redis');
 const { startAllJobs } = require('./jobs');
 const { startQueueWorkers } = require('./services/queue.service');
+const { startInitialLeetcodeSync } = require('./services/leetcodeSync.service');
 
 const startServer = async () => {
   try {
@@ -17,6 +18,11 @@ const startServer = async () => {
 
     // Start cron jobs
     startAllJobs();
+
+    // Trigger one‑time initial LeetCode sync (non‑blocking)
+    startInitialLeetcodeSync().catch(err => {
+      console.error('Initial LeetCode sync failed to start:', err);
+    });
 
     const server = app.listen(config.port, () => {
       console.log(`Server running on port ${config.port}, Instance: ${process.env.RAILWAY_INSTANCE_ID || 'local'}`);

@@ -66,9 +66,9 @@ export default function WeeklyStudyTime({ data, isLoading }: WeeklyStudyTimeProp
       <Card className={styles.container} noHover>
         <div className={styles.header}>
           <h3 className={styles.title}>Weekly Study Time</h3>
-          <Link href={ROUTES.HEATMAP.ROOT} className={styles.viewAllLink}>
+          {/* <Link href={ROUTES.HEATMAP.ROOT} className={styles.viewAllLink}>
             View All →
-          </Link>
+          </Link> */}
         </div>
         <div className={styles.skeletonContent}>
           <div className={styles.skeletonTime} />
@@ -82,9 +82,9 @@ export default function WeeklyStudyTime({ data, isLoading }: WeeklyStudyTimeProp
     <Card className={styles.container} noHover>
       <div className={styles.header}>
         <h3 className={styles.title}>Weekly Study Time</h3>
-        <Link href={ROUTES.HEATMAP.ROOT} className={styles.viewAllLink}>
+        {/* <Link href={ROUTES.HEATMAP.ROOT} className={styles.viewAllLink}>
           View All →
-        </Link>
+        </Link> */}
       </div>
       <div className={styles.content}>
         <div className={styles.timeWrapper}>

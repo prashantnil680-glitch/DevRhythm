@@ -43,7 +43,7 @@ jobQueue.on('failed', (job, err) => {
   console.error(`Job ${job.id} (${job.data.type}) failed:`, err);
 });
 
-// Import handlers directly from their files
+// Import handlers
 const { handleQuestionSolved } = require('./queueHandlers/questionSolved.handler');
 const { handleQuestionMastered } = require('./queueHandlers/questionMastered.handler');
 const { handleQuestionAttempted } = require('./queueHandlers/questionAttempted.handler');
@@ -62,8 +62,10 @@ const { handleTestCaseExecuted } = require('./queueHandlers/testCaseExecuted.han
 const { handleTimeThresholdReached } = require('./queueHandlers/timeThresholdReached.handler');
 const { handleConfidenceIncrement } = require('./queueHandlers/confidenceIncrement.handler');
 const { handlePodAvailable } = require('./queueHandlers/podAvailable.handler');
+// NEW HANDLER
+const { handleFetchLeetcodeDetails } = require('./queueHandlers/fetchLeetcodeDetails.handler');
 
-// Register each job type with its dedicated processor
+// Register processors
 jobQueue.process('question.solved', handleQuestionSolved);
 jobQueue.process('question.mastered', handleQuestionMastered);
 jobQueue.process('question.attempted', handleQuestionAttempted);
@@ -82,6 +84,8 @@ jobQueue.process('test_case.executed', handleTestCaseExecuted);
 jobQueue.process('time.threshold_reached', handleTimeThresholdReached);
 jobQueue.process('confidence.increment', handleConfidenceIncrement);
 jobQueue.process('pod.available', handlePodAvailable);
+// NEW PROCESSOR
+jobQueue.process('leetcode.fetch_details', handleFetchLeetcodeDetails);
 
 const startQueueWorkers = async () => {
   if (!jobQueue) {

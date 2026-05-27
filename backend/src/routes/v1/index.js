@@ -20,6 +20,7 @@ const codeExecutionRoutes = require('./codeExecution.routes');
 const dashboardRoutes = require('./dashboard.routes');
 const trendsRoutes = require('./trends.routes');
 const activityDayRoutes = require('./activityDay.routes');
+const adminRoutes = require('./admin.routes');
 
 router.get('/health', (req, res) => {
   res.json({
@@ -61,6 +62,7 @@ router.use('/user-stats', userStatsRoutes);
 router.use('/code', codeExecutionRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/trends', trendsRoutes);
-router.use('/activity', activityDayRoutes);  // Note: activity/day routes, separate from activity/ (activityRoutes)
+router.use('/activity', activityDayRoutes);
+router.use('/admin', adminRoutes);
 
 module.exports = router;

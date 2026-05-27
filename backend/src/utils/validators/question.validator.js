@@ -97,6 +97,12 @@ const getDeletedQuestions = Joi.object({
   search: Joi.string().trim().min(1).max(100),
 });
 
+const getQuestionsByPattern = Joi.object({
+  patternSlug: Joi.string().pattern(/^[a-z0-9-]+$/).required(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20)
+});
+
 module.exports = {
   getQuestions,
   getQuestionById,
@@ -108,4 +114,5 @@ module.exports = {
   restoreQuestion,
   permanentDeleteQuestion,
   getDeletedQuestions,
+  getQuestionsByPattern,
 };

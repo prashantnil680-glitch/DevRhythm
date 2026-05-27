@@ -17,6 +17,7 @@ const { jobQueue } = require('../services/queue.service');
 const revisionService = require('../services/revision.service');
 const dashboardService = require('../services/dashboard.service');
 const leetcodeService = require('../services/leetcode.service');
+const patternQuestionService = require('../services/patternQuestion.service');
 
 const toLocalISOString = (utcDate, timeZone) => {
   if (!utcDate) return null;
@@ -746,6 +747,72 @@ const getDailyProblemAndGoal = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/v1/questions/pattern/:patternSlug
+ * Returns paginated questions for a pattern, with user status and pagination in meta.
+ */
+const getQuestionsByPattern = async (req, res, next) => {
+  try {
+    const { patternSlug } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+
+    const slugRegex = /^[a-z0-9-]+$/;
+    if (!slugRegex.test(patternSlug)) {
+      throw new AppError('Invalid pattern slug format', 400);
+    }
+
+    const patternName = await patternQuestionService.getPatternNameBySlug(patternSlug);
+    if (!patternName) {
+      throw new AppError('Pattern not found', 404);
+    }
+
+    const userId = req.user ? req.user._id : null;
+    const { total, questions } = await patternQuestionService.getQuestionsByPattern(
+      userId,
+      patternName,
+      page,
+      limit
+    );
+
+    const patternDisplaySlug = patternName
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    // Response with pattern info in data, pagination in meta
+    res.json({
+      success: true,
+      statusCode: 200,
+      message: 'Questions retrieved by pattern successfully',
+      data: {
+        pattern: {
+          name: patternName,
+          slug: patternDisplaySlug,
+          totalQuestions: total
+        },
+        questions
+      },
+      meta: {
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+          hasNext: page < Math.ceil(total / limit),
+          hasPrev: page > 1
+        },
+        timestamp: new Date().toISOString()
+      },
+      error: null
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 module.exports = {
   getQuestions,
   getQuestionById,
@@ -765,4 +832,5 @@ module.exports = {
   fetchLeetCodeQuestion,
   searchLeetCodeQuestions,
   getDailyProblemAndGoal,
+  getQuestionsByPattern, 
 };

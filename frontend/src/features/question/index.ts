@@ -24,3 +24,4 @@ export * from './hooks/useStatistics';
 export * from './hooks/useQuestionSearch';
 export { questionService } from './services/questionService';
 export * from './utils/questionHelpers';
+export * from './hooks/usePatternQuestions';

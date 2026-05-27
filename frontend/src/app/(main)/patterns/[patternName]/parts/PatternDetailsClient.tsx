@@ -1,10 +1,10 @@
 'use client';
 
 import { usePatternByName } from '@/features/patternMastery';
-import { useQuestions } from '@/features/question';
 import { usePatternMastery } from '@/features/patternMastery';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import NotFoundPage from '@/shared/components/NotFoundPage/NotFoundPage';
+import { slugify } from '@/shared/lib/stringUtils';
 import MetricsCard from './MetricsCard';
 import PatternHeader from './PatternHeader';
 import RecentQuestionsList from './RecentQuestionsList';
@@ -23,18 +23,15 @@ export default function PatternDetailsClient({ patternName }: PatternDetailsClie
     error: patternError,
   } = usePatternByName(patternName);
 
-  const { data: questionsData, isLoading: questionsLoading } = useQuestions({
-    pattern: patternName,
-    limit: 20,
-  });
-
   const { data: otherPatternsData, isLoading: otherLoading } = usePatternMastery({
     limit: 20,
     sortBy: 'masteryRate',
     sortOrder: 'desc',
   });
 
-  if (patternLoading || questionsLoading || otherLoading) {
+  const isLoading = patternLoading || otherLoading;
+
+  if (isLoading) {
     return <PatternDetailsSkeleton />;
   }
 
@@ -51,14 +48,9 @@ export default function PatternDetailsClient({ patternName }: PatternDetailsClie
     );
   }
 
-  const unsolvedQuestions =
-    questionsData?.questions?.filter((q) => !q.isSolved).slice(0, 5) || [];
-
   const otherPatterns =
     otherPatternsData?.patterns?.filter((p) => p.patternName !== patternName).slice(0, 10) || [];
 
-
-    // console.log("===========pattern ", pattern);
   return (
     <div className={styles.container}>
       {/* Hero section: 60% metrics / 40% name */}
@@ -73,10 +65,7 @@ export default function PatternDetailsClient({ patternName }: PatternDetailsClie
 
       <RecentQuestionsList questions={pattern.recentQuestions || []} />
 
-      <SuggestedQuestionsList
-        questions={unsolvedQuestions}
-        patternName={patternName}
-      />
+      <SuggestedQuestionsList patternSlug={slugify(patternName)} />
 
       <OtherPatternsList patterns={otherPatterns} currentPatternName={patternName} />
     </div>

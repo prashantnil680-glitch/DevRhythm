@@ -432,6 +432,160 @@
   font-size: 0.85rem;
 }
 
+
+/* ===== Tabs ===== */
+.tabsContainer {
+  display: flex;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.5rem;
+  padding: 0 0.5rem;
+}
+
+.tabButton {
+  background: none;
+  border: none;
+  padding: 0.5rem 0;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.tabButton:hover {
+  color: var(--text-primary);
+}
+
+.activeTab {
+  color: var(--accent-moss);
+  border-bottom-color: var(--accent-moss);
+}
+
+/* ===== All Patterns Grid ===== */
+.allPatternsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.allPatternCardLink {
+  text-decoration: none;
+  color: inherit;
+}
+
+.allPatternCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  text-align: center;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+.allPatternCard:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-moss);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+.allPatternName {
+  font-family: var(--font-heading);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* Skeleton for all patterns */
+.allPatternSkeleton {
+  height: 60px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Load More Button */
+.loadMoreWrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.loadMoreButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 40px;
+  padding: 0.6rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.loadMoreButton:hover {
+  border-color: var(--accent-moss);
+  color: var(--accent-moss);
+  transform: translateY(-1px);
+}
+
+/* Error container for retry button */
+.errorContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.retryButton {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retryButton:hover {
+  border-color: var(--accent-moss);
+  color: var(--accent-moss);
+}
+
+/* Responsive adjustments for all patterns grid */
+@media (max-width: 939px) {
+  .allPatternsGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .tabsContainer {
+    gap: 1rem;
+  }
+  .allPatternsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .allPatternsGrid {
+    grid-template-columns: 1fr;
+  }
+  .allPatternCard {
+    padding: 0.6rem;
+  }
+  .loadMoreButton {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 /* ===== Pagination ===== */
 .paginationWrapper {
   margin-top: 2rem;

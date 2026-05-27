@@ -13,14 +13,15 @@ passport.use(new GoogleStrategy({
   try {
     const email = profile.emails[0].value;
     const existingUser = await User.findOne({ email });
+    
     if (existingUser) {
-      if (existingUser.authProvider !== 'google') {
-        return done(null, false, { message: 'Account exists with different provider' });
-      }
+      // ✅ Allow login regardless of provider – same email = same account
       existingUser.lastOnline = new Date();
       await existingUser.save();
       return done(null, existingUser);
     }
+    
+    // No existing user – create a new one
     const newUser = new User({
       authProvider: 'google',
       providerId: profile.id,
@@ -46,14 +47,14 @@ passport.use(new GitHubStrategy({
   try {
     const email = profile.emails[0].value;
     const existingUser = await User.findOne({ email });
+    
     if (existingUser) {
-      if (existingUser.authProvider !== 'github') {
-        return done(null, false, { message: 'Account exists with different provider' });
-      }
+      // ✅ Allow login regardless of provider – same email = same account
       existingUser.lastOnline = new Date();
       await existingUser.save();
       return done(null, existingUser);
     }
+    
     const newUser = new User({
       authProvider: 'github',
       providerId: profile.id,

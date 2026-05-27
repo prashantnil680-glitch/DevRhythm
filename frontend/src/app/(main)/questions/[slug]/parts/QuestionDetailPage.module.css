@@ -466,6 +466,15 @@
   background-color: var(--primary-action-hover);
 }
 
+.noSimilarMessage {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+}
+
 
 /* Full‑window mode */
 .fullWindow {

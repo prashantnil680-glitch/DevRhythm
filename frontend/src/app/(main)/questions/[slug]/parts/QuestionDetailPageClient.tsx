@@ -412,10 +412,16 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
 
       {/* Similar Questions */}
       <div className={styles.similarSection}>
-        <SimilarQuestionsGrid
-          questions={initialSimilarQuestions}
-          onViewAll={() => router.push('/questions')}
-        />
+        {initialSimilarQuestions.length > 0 ? (
+          <SimilarQuestionsGrid
+            questions={initialSimilarQuestions}
+            onViewAll={() => router.push('/questions')}
+          />
+        ) : (
+          <div className={styles.noSimilarMessage}>
+            <p>No similar questions found.</p>
+          </div>
+        )}
       </div>
 
       {/* Delete Modal */}

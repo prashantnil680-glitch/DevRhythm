@@ -86,22 +86,57 @@ const searchLeetCodeQuestions = async (req, res, next) => {
 
 const getQuestions = async (req, res, next) => {
   try {
-    const { page, limit, skip } = getPaginationParams(req);
-    const { platform, difficulty, pattern, tags, search, status } = req.query;
-    let query = { isActive: true };
-    if (platform) query.platform = platform;
-    if (difficulty) query.difficulty = difficulty;
-    if (pattern) query.pattern = { $in: Array.isArray(tags) ? tags : [tags] };
-    if (tags) query.tags = { $in: Array.isArray(tags) ? tags : [tags] };
-    if (search) query.$text = { $search: search };
+    // Parse and validate query parameters (with defaults)
+    let { page, limit, platform, difficulty, pattern, tags, qtitle, sortBy, sortOrder, status } = req.query;
+    page = parseInt(page) || 1;
+    limit = Math.min(parseInt(limit) || 20, 100);
+    const skip = (page - 1) * limit;
 
+    // Base query: active questions only
+    let query = { isActive: true };
+
+    // Platform filter (default is 'LeetCode' from validator)
+    if (platform && platform !== 'all') {
+      query.platform = platform;
+    }
+
+    // Difficulty filter
+    if (difficulty && difficulty !== 'all') {
+      query.difficulty = difficulty;
+    }
+
+    // Pattern filter: resolve slug to pattern name
+    if (pattern && pattern !== 'all') {
+      const patternName = await patternQuestionService.getPatternNameBySlug(pattern);
+      if (!patternName) {
+        // Invalid pattern slug – return empty result
+        return res.json(formatResponse('Questions retrieved successfully', { questions: [] }, {
+          pagination: paginate(0, page, limit)
+        }));
+      }
+      query.pattern = patternName;
+    }
+
+    // Tags filter
+    if (tags && Array.isArray(tags) && tags.length) {
+      query.tags = { $in: tags };
+    }
+
+    // Exact title search via slugified platformQuestionId
+    if (qtitle) {
+      query.platformQuestionId = qtitle;
+    }
+
+    // Status filter (solved only)
+    let solvedIds = [];
     if (status === 'solved' && req.user) {
       const solvedProgress = await UserQuestionProgress.find({
         userId: req.user._id,
         status: { $in: ['Solved', 'Mastered'] }
       }).select('questionId').lean();
-      const solvedIds = solvedProgress.map(p => p.questionId);
+      solvedIds = solvedProgress.map(p => p.questionId);
       if (solvedIds.length === 0) {
+        // User has solved zero questions
         return res.json(formatResponse('Questions retrieved successfully', { questions: [] }, {
           pagination: paginate(0, page, limit)
         }));
@@ -109,25 +144,25 @@ const getQuestions = async (req, res, next) => {
       query._id = { $in: solvedIds };
     }
 
-    let dbQuery = Question.find(query).skip(skip).limit(limit).select('-__v');
-    dbQuery = applySorting(dbQuery, req.query, { createdAt: -1 });
+    // Build the database query
+    let dbQuery = Question.find(query).skip(skip).limit(limit);
+    dbQuery = applySorting(dbQuery, { sortBy, sortOrder }, { createdAt: -1 });
 
     const [questions, total] = await Promise.all([
       dbQuery.lean(),
       Question.countDocuments(query)
     ]);
 
+    // Add user solved status (if logged in)
     let solvedMap = new Map();
-    if (questions.length > 0 && req.user && status !== 'solved') {
+    if (req.user && questions.length > 0 && status !== 'solved') {
       const questionIds = questions.map(q => q._id);
       const solvedProgress = await UserQuestionProgress.find({
         userId: req.user._id,
         questionId: { $in: questionIds },
         status: { $in: ['Solved', 'Mastered'] }
       }).select('questionId status').lean();
-      solvedMap = new Map(
-        solvedProgress.map(p => [p.questionId.toString(), p.status])
-      );
+      solvedMap = new Map(solvedProgress.map(p => [p.questionId.toString(), p.status]));
     }
 
     const enrichedQuestions = questions.map(q => ({

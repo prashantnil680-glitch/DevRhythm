@@ -3,14 +3,14 @@ const Joi = require('joi');
 const getQuestions = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(20),
-  platform: Joi.string().valid('LeetCode', 'Codeforces', 'HackerRank', 'AtCoder', 'CodeChef', 'Other'),
-  difficulty: Joi.string().valid('Easy', 'Medium', 'Hard'),
-  pattern: Joi.string().trim(),
+  platform: Joi.string().valid('LeetCode', 'Codeforces', 'HackerRank', 'AtCoder', 'CodeChef', 'Other').default('LeetCode'),
+  difficulty: Joi.string().valid('Easy', 'Medium', 'Hard', 'all').default('all'),
+  pattern: Joi.string().trim().default('all'),
   tags: Joi.array().items(Joi.string().trim()).single(),
-  search: Joi.string().trim().min(1).max(100),
+  qtitle: Joi.string().trim().min(1).max(100).optional(),
   sortBy: Joi.string().valid('createdAt', 'updatedAt', 'title', 'difficulty', 'platform').default('createdAt'),
   sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
-  status: Joi.string().valid('solved')
+  status: Joi.string().valid('solved', 'all').default('all')
 });
 
 const getQuestionById = Joi.object({

@@ -2,6 +2,7 @@ const redis = require('redis');
 const config = require('./index');
 
 let redisErrorLogged = false;
+let heartbeatInterval = null;
 
 const createRedisClient = () => {
   try {
@@ -11,7 +12,6 @@ const createRedisClient = () => {
       database: config.redis.db,
       socket: {
         reconnectStrategy: (retries) => {
-          // Increased max retries to 50, exponential backoff up to 10 seconds
           if (retries > 50) {
             console.error('Redis: Too many retries, stopping.');
             return new Error('Too many retries');
@@ -20,8 +20,8 @@ const createRedisClient = () => {
           console.log(`Redis reconnect attempt ${retries}, waiting ${delay}ms`);
           return delay;
         },
-        keepAlive: 30000,              // Send keep-alive every 30 seconds
-        keepAliveInitialDelay: 5000,   // First keep-alive after 5 seconds
+        keepAlive: 30000,
+        keepAliveInitialDelay: 5000,
       }
     });
 
@@ -33,9 +33,28 @@ const createRedisClient = () => {
     });
     
     client.on('connect', () => console.log('Redis client connected'));
-    client.on('ready', () => console.log('Redis client ready'));
+    client.on('ready', () => {
+      console.log('Redis client ready');
+      // Start heartbeat if not already running
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      heartbeatInterval = setInterval(async () => {
+        try {
+          if (client.isReady) {
+            await client.ping();
+            // Optional: log once per hour to confirm heartbeat
+            // console.log('[Redis] Heartbeat PING');
+          }
+        } catch (err) {
+          console.warn('[Redis] Heartbeat ping failed:', err.message);
+        }
+      }, 30000); // every 30 seconds
+    });
     client.on('reconnecting', () => console.log('Redis client reconnecting'));
-    client.on('end', () => console.log('Redis client disconnected'));
+    client.on('end', () => {
+      console.log('Redis client disconnected');
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      heartbeatInterval = null;
+    });
 
     return client;
   } catch (error) {
@@ -62,6 +81,7 @@ const waitForRedis = async () => {
 };
 
 process.on('SIGINT', async () => {
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
   if (client) await client.quit();
   process.exit(0);
 });

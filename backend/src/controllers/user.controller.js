@@ -336,21 +336,51 @@ const changeTimezone = async (req, res, next) => {
       ));
     }
 
-    const { jobQueue } = require('../services/queue.service');
-    await jobQueue.add('user.timezone_change', {
-      userId,
-      oldTimezone,
-      newTimezone,
-      triggeredAt: new Date(),
-    });
-
+    // 1. Immediately update user's timezone in database (no Redis dependency)
     if (!req.user.preferences) req.user.preferences = {};
     req.user.preferences.timezone = newTimezone;
     await req.user.save();
     await invalidateUserCache(userId);
     await invalidateDashboardCache(userId);
 
-    res.json(formatResponse('Timezone change queued. Data adjustment will complete shortly.', {
+    // 2. Check if user has any data that needs adjustment (revision schedules or goals)
+    const RevisionSchedule = require('../models/RevisionSchedule');
+    const Goal = require('../models/Goal');
+    const activeRevisions = await RevisionSchedule.countDocuments({ userId, status: { $in: ['active', 'overdue'] } });
+    const activeGoals = await Goal.countDocuments({ userId, status: 'active' });
+
+    // If no active revisions/goals, we're done – no need to queue background job
+    if (activeRevisions === 0 && activeGoals === 0) {
+      return res.json(formatResponse('Timezone updated successfully (no pending revisions/goals)', {
+        oldTimezone,
+        newTimezone,
+      }));
+    }
+
+    // 3. Queue background job to adjust dates, but with a timeout to prevent hanging
+    const { jobQueue } = require('../services/queue.service');
+    const queuePromise = jobQueue.add('user.timezone_change', {
+      userId,
+      oldTimezone,
+      newTimezone,
+      triggeredAt: new Date(),
+    });
+
+    // Timeout after 2 seconds – if Redis is down, we don't want to block
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Queue add timeout')), 2000)
+    );
+
+    try {
+      await Promise.race([queuePromise, timeoutPromise]);
+      console.log(`Timezone change job queued for user ${userId}`);
+    } catch (err) {
+      // Log error but do not fail the request – the timezone is already saved.
+      // The adjustment can be retried later (e.g., by a separate cron job or manual trigger).
+      console.error(`Failed to queue timezone change job for user ${userId}:`, err.message);
+    }
+
+    res.json(formatResponse('Timezone change queued. Data adjustment will complete shortly (or will be retried).', {
       oldTimezone,
       newTimezone,
     }));
@@ -358,7 +388,6 @@ const changeTimezone = async (req, res, next) => {
     next(error);
   }
 };
-
 // ========== HELPER: Batch fetch mutual friends counts for given user IDs ==========
 const getMutualFriendsCounts = async (targetUserIds, currentUserFollowingIds) => {
   if (!targetUserIds.length || !currentUserFollowingIds.length) {

@@ -14,7 +14,23 @@ const redisOptions = (() => {
     const port = parseInt(url.port) || 6379;
     const db = config.redis.db || 0;
     const password = config.redis.password || (url.password ? decodeURIComponent(url.password) : undefined);
-    return { host, port, password, db };
+    return {
+      host,
+      port,
+      password,
+      db,
+      maxRetriesPerRequest: 100,        // Increased to handle intermittent ECONNRESET
+      enableOfflineQueue: true,         // Queue commands when Redis is down
+      retryStrategy: (times) => {
+        // Exponential backoff with max 30 seconds
+        const delay = Math.min(times * 100, 30000);
+        // Log only first attempt and every 50th attempt to avoid spam
+        if (times === 1 || times % 50 === 0) {
+          console.log(`Redis retry attempt ${times}, waiting ${delay}ms`);
+        }
+        return delay;
+      },
+    };
   } catch (err) {
     console.error('Invalid Redis URL:', err);
     return null;
@@ -25,18 +41,44 @@ if (!redisOptions) {
   console.error('Redis configuration missing, queues will not work');
 }
 
-// Create a single queue for all job types with better settings
+// Create a single queue for all job types
 const jobQueue = new Bull('devrhythm-jobs', {
-  redis: {
-    ...redisOptions,
-    maxRetriesPerRequest: 50,      // increase from default 20
-    enableReadyCheck: false,       // avoid ECONNRESET during reconnect
-  },
+  redis: redisOptions,
   settings: {
-    retryProcessDelay: 5000,       // Wait 5 seconds between retries
-    maxStalledCount: 3,            // Max stalled jobs before failing
-    guardInterval: 5000,           // Check stalled jobs every 5 seconds
+    retryProcessDelay: 5000,   // Wait 5 seconds between retries
+    maxStalledCount: 3,        // Max stalled jobs before failing
+    guardInterval: 5000,       // Check stalled jobs every 5 seconds
   }
+});
+
+// ========== HEARTBEAT: keep Redis connection alive ==========
+let heartbeatInterval = null;
+const startHeartbeat = () => {
+  if (heartbeatInterval) return;
+  heartbeatInterval = setInterval(async () => {
+    try {
+      const client = await jobQueue.client;
+      if (client && client.status === 'ready') {
+        await client.ping();
+        // Optional: log once per hour to confirm heartbeat
+        // console.log('[Redis] Heartbeat PING sent');
+      }
+    } catch (err) {
+      // Silently fail – the queue will handle reconnection
+    }
+  }, 60000); // every 60 seconds
+};
+
+const stopHeartbeat = () => {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+  }
+};
+
+jobQueue.on('ready', () => {
+  console.log('Bull queue ready, starting heartbeat');
+  startHeartbeat();
 });
 
 jobQueue.on('error', (error) => {
@@ -47,7 +89,7 @@ jobQueue.on('failed', (job, err) => {
   console.error(`Job ${job.id} (${job.data.type}) failed:`, err);
 });
 
-// Import handlers
+// ========== IMPORT HANDLERS ==========
 const { handleQuestionSolved } = require('./queueHandlers/questionSolved.handler');
 const { handleQuestionMastered } = require('./queueHandlers/questionMastered.handler');
 const { handleQuestionAttempted } = require('./queueHandlers/questionAttempted.handler');
@@ -69,7 +111,7 @@ const { handlePodAvailable } = require('./queueHandlers/podAvailable.handler');
 const { handleFetchLeetcodeDetails } = require('./queueHandlers/fetchLeetcodeDetails.handler');
 const { handleCodeExecution } = require('./queueHandlers/codeExecution.handler');
 
-// Register processors
+// ========== REGISTER PROCESSORS ==========
 jobQueue.process('question.solved', handleQuestionSolved);
 jobQueue.process('question.mastered', handleQuestionMastered);
 jobQueue.process('question.attempted', handleQuestionAttempted);
@@ -100,6 +142,7 @@ const startQueueWorkers = async () => {
 };
 
 const stopQueueWorkers = async () => {
+  stopHeartbeat();
   if (jobQueue) await jobQueue.close();
   console.log('Queue workers stopped');
 };

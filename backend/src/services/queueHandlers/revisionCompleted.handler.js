@@ -26,13 +26,17 @@ const handleRevisionCompleted = async (job) => {
     await user.save();
     await invalidateCache(`user:${userId}:profile`);
 
-    const progress = await UserQuestionProgress.findOne({ userId, questionId });
-    if (progress) {
-      progress.revisionCount += 1;
-      progress.lastRevisedAt = revisionDate;
-      await progress.save();
-      await invalidateCache(`progress:*:user:${userId}:*`);
-    }
+    // NOTE: revisionCount is now incremented synchronously in revisionActivity.service.js
+    // No longer increment here to avoid double counting.
+    // The following line has been removed:
+    // if (progress) { progress.revisionCount += 1; ... }
+    // const progress = await UserQuestionProgress.findOne({ userId, questionId });
+    // if (progress) {
+    //   progress.revisionCount += 1;
+    //   progress.lastRevisedAt = revisionDate;
+    //   await progress.save();
+    //   await invalidateCache(`progress:*:user:${userId}:*`);
+    // }
 
     const year = revisionDate.getUTCFullYear();
     let heatmap = await HeatmapData.findOne({ userId, year });
@@ -120,7 +124,7 @@ const handleRevisionCompleted = async (job) => {
       }
     }
 
-    // Queue confidence increment (fixed: two arguments)
+    // Queue confidence increment
     await jobQueue.add('confidence.increment', {
       userId,
       questionId,

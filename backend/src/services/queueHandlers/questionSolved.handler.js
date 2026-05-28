@@ -18,7 +18,7 @@ const heatmapService = require("../heatmap.service");
 const { updateUserActivity } = require("../user.service");
 const { client: redisClient } = require("../../config/redis");
 const constants = require("../../config/constants");
-const leetcodeService = require("../leetcode.service"); // NEW
+const leetcodeService = require("../leetcode.service");
 
 const getGoalDailySolveKey = (userId, dateStr) => `goal:solved:daily:${userId}:${dateStr}`;
 
@@ -33,7 +33,7 @@ const handleQuestionSolved = async (job) => {
     const question = await Question.findById(questionId);
     if (!question) throw new Error("Question not found");
 
-    // ========== NEW: Check if this is the Problem of the Day (POD) ==========
+    // Check if this is the Problem of the Day (POD)
     let isPod = false;
     let dailyProblem = null;
     try {
@@ -47,7 +47,6 @@ const handleQuestionSolved = async (job) => {
 
     const user = await User.findById(userId);
     if (!user) throw new Error("User not found");
-
     const userTimeZone = user.preferences?.timezone || "UTC";
 
     let progress = await UserQuestionProgress.findOne({ userId, questionId });
@@ -65,15 +64,9 @@ const handleQuestionSolved = async (job) => {
 
     const isFirstSolve = !progress || progress.status !== "Solved";
 
-    if (isFirstSolve) {
-      user.stats.totalSolved += 1;
-    }
+    // Stats increment removed – now handled synchronously in controllers
+    // Only update totalTimeSpent and activity
     user.stats.totalTimeSpent += timeSpent;
-
-    const totalQuestions = await Question.countDocuments();
-    let rawMasteryRate = totalQuestions > 0 ? (user.stats.totalSolved / totalQuestions) * 100 : 0;
-    if (rawMasteryRate > 100) rawMasteryRate = 100;
-    user.stats.masteryRate = rawMasteryRate;
 
     await updateUserActivity(userId, solvedDate, userTimeZone);
     await user.save();
@@ -102,6 +95,7 @@ const handleQuestionSolved = async (job) => {
       { upsert: true, new: true }
     );
 
+    // Pattern mastery update (unchanged)
     if (question.pattern && Array.isArray(question.pattern) && question.pattern.length > 0) {
       for (const patternName of question.pattern) {
         let pattern = await PatternMastery.findOne({ userId, patternName });
@@ -160,6 +154,7 @@ const handleQuestionSolved = async (job) => {
     const startUTC = solvedLocalMidnight.toUTC().toJSDate();
     const endUTC = solvedLocalEnd.toUTC().toJSDate();
 
+    // Planned goals update (unchanged)
     const activePlannedGoals = await Goal.find({
       userId,
       goalType: "planned",
@@ -201,7 +196,7 @@ const handleQuestionSolved = async (job) => {
       }
     }
 
-    // ========== REVISION SCHEDULE HANDLING ==========
+    // Revision schedule (unchanged)
     const existingRevision = await RevisionSchedule.findOne({ userId, questionId });
 
     if (!existingRevision) {
@@ -229,8 +224,9 @@ const handleQuestionSolved = async (job) => {
     }
     await invalidateCache(`revisions:*:user:${userId}:*`);
     await invalidateCache(`question-details:*:${questionId}:*`);
+
+    // POD notification (unchanged)
     if (isPod) {
-      // Check if a pod_solved notification already exists for this user and question within the last 24 hours
       const oneDayAgo = new Date();
       oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
@@ -264,6 +260,8 @@ const handleQuestionSolved = async (job) => {
         console.log(`[question.solved] Skipping duplicate pod_solved notification for user ${userId}, question ${questionId}`);
       }
     }
+
+    // Daily/weekly goals update (unchanged)
     if (!wasSolvedToday) {
       let isGoalRelated = false;
 
@@ -326,6 +324,7 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`goals:*:user:${userId}:*`);
     }
 
+    // Activity log (unchanged)
     await ActivityLog.create({
       userId,
       action: "question_solved",
@@ -343,6 +342,7 @@ const handleQuestionSolved = async (job) => {
       timestamp: solvedDate,
     });
 
+    // Heatmap update (unchanged)
     const year = solvedDate.getUTCFullYear();
     let heatmap = await HeatmapData.findOne({ userId, year });
     if (!heatmap) {
@@ -363,6 +363,7 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`heatmap:*:user:${userId}:*`);
     }
 
+    // First solve notification (unchanged)
     if (isFirstSolve) {
       await Notification.create({
         userId,
@@ -398,7 +399,7 @@ const handleQuestionSolved = async (job) => {
       }
     }
 
-    // Queue confidence increment
+    // Confidence increment job (unchanged)
     const { jobQueue } = require("../queue.service");
     await jobQueue.add('confidence.increment', {
       userId,

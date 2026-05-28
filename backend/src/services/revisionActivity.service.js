@@ -184,6 +184,48 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
   revision.updatedAt = new Date();
   await revision.save();
 
+  // ========== SYNC UPDATES ==========
+  // 1. Increment totalRevisions in User stats
+  await User.updateOne(
+    { _id: userId },
+    { $inc: { 'stats.totalRevisions': 1 } }
+  );
+
+  // 2. Increment revisionCount in UserQuestionProgress and update lastRevisedAt
+  await UserQuestionProgress.updateOne(
+    { userId, questionId },
+    {
+      $inc: { revisionCount: 1 },
+      $set: { lastRevisedAt: new Date() }
+    },
+    { upsert: true }
+  );
+
+  // 3. Increment confidence in UserQuestionProgress (+0.25, max 5)
+  const currentConfidence = progress?.confidenceLevel || 0;
+  let newConfidence = currentConfidence + 0.25;
+  if (newConfidence > 5) newConfidence = 5;
+  await UserQuestionProgress.updateOne(
+    { userId, questionId },
+    { $set: { confidenceLevel: newConfidence } }
+  );
+
+  // 4. Update heatmap for revision (no difficulty/platform, not a first solve)
+  await heatmapService.incrementDailyActivityDirect(
+    userId,
+    new Date(),
+    timeZone,
+    {
+      totalActivities: 1,
+      totalSubmissions: 1,
+      revisionProblems: 1,
+    },
+    false, // isFirstSolve
+    null,  // difficulty
+    null   // platform
+  );
+  // ========== END SYNC UPDATES ==========
+
   await invalidateCache(`revisions:*:user:${userId}:*`);
 
   return {
@@ -205,7 +247,6 @@ const getRevisionSessionKey = (userId, questionId, targetDate) => {
 };
 
 const startRevisionSession = async (userId, questionId, targetDate) => {
-  // Prevent multiple active sessions for the same user
   const hasActive = await userHasActiveSession(userId);
   if (hasActive) {
     throw new Error('You already have an active revision session for another question. Please complete or cancel it first.');
@@ -341,6 +382,49 @@ const completePastRevision = async (userId, questionId, targetDate, confidence =
   updateRevisionState(revision, timeZone);
   revision.updatedAt = new Date();
   await revision.save();
+
+  // ========== SYNC UPDATES ==========
+  // 1. Increment totalRevisions in User stats
+  await User.updateOne(
+    { _id: userId },
+    { $inc: { 'stats.totalRevisions': 1 } }
+  );
+
+  // 2. Increment revisionCount in UserQuestionProgress and update lastRevisedAt
+  await UserQuestionProgress.updateOne(
+    { userId, questionId },
+    {
+      $inc: { revisionCount: 1 },
+      $set: { lastRevisedAt: new Date() }
+    },
+    { upsert: true }
+  );
+
+  // 3. Increment confidence in UserQuestionProgress (+0.25, max 5)
+  const progress = await UserQuestionProgress.findOne({ userId, questionId });
+  const currentConfidence = progress?.confidenceLevel || 0;
+  let newConfidence = currentConfidence + 0.25;
+  if (newConfidence > 5) newConfidence = 5;
+  await UserQuestionProgress.updateOne(
+    { userId, questionId },
+    { $set: { confidenceLevel: newConfidence } }
+  );
+
+  // 4. Update heatmap for revision
+  await heatmapService.incrementDailyActivityDirect(
+    userId,
+    new Date(),
+    timeZone,
+    {
+      totalActivities: 1,
+      totalSubmissions: 1,
+      revisionProblems: 1,
+    },
+    false, // isFirstSolve
+    null,  // difficulty
+    null   // platform
+  );
+  // ========== END SYNC UPDATES ==========
 
   const completionDate = new Date();
   await heatmapService.incrementDailyActivity({

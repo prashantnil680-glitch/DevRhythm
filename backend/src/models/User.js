@@ -93,15 +93,15 @@ const UserSchema = new mongoose.Schema({
     },
     dailyGoal: {
       type: Number,
-      default: 3,
       min: 1,
-      max: 50
+      max: 50,
+      default: null
     },
     weeklyGoal: {
       type: Number,
-      default: 15,
       min: 5,
-      max: 100
+      max: 100,
+      default: null
     }
   },
   lastOnline: {

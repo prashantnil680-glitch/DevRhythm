@@ -7,7 +7,10 @@ const { getPaginationParams, paginate } = require('../utils/helpers/pagination')
 const { getStartOfDay, getEndOfDay } = require('../utils/helpers/date');
 const AppError = require('../utils/errors/AppError');
 const { invalidateProgressCache, invalidateCache, invalidateDashboardCache } = require('../middleware/cache');
-const { jobQueue } = require('../services/queue.service'); 
+const { jobQueue } = require('../services/queue.service');
+const { incrementDailyActivityDirect } = require('../services/heatmap.service');
+const { updateUserActivity } = require('../services/user.service');
+const { incrementUserStats } = require('../services/user.service');
 
 const updateProgressPatternMastery = async (userId, questionId) => {
   try {
@@ -136,9 +139,7 @@ const createOrUpdateProgress = async (req, res, next) => {
 
     if (newProgress) {
       if (status === 'Solved' && oldStatus !== 'Solved') {
-        if (!jobQueue) {
-          console.error('jobQueue is not available, cannot add job');
-        } else {
+        if (jobQueue) {
           await jobQueue.add('question.solved', {
             userId,
             questionId,
@@ -152,7 +153,7 @@ const createOrUpdateProgress = async (req, res, next) => {
 
     await invalidateProgressCache(userId);
     await invalidateQuestionDetailsCache(userId, questionId);
-    await invalidateDashboardCache(userId);  // NEW: dashboard cache invalidation
+    await invalidateDashboardCache(userId);
     await updateProgressPatternMastery(userId, questionId);
 
     const statusCode = newProgress.createdAt === newProgress.updatedAt ? 201 : 200;
@@ -176,24 +177,27 @@ const updateStatus = async (req, res, next) => {
     const userId = req.user._id;
     const questionId = req.params.questionId;
 
-    const oldProgress = await UserQuestionProgress.findOne({ userId, questionId });
-    const oldStatus = oldProgress ? oldProgress.status : null;
+    let progress = await UserQuestionProgress.findOne({ userId, questionId });
+    const oldStatus = progress ? progress.status : 'Not Started';
 
-    const progress = await UserQuestionProgress.findOneAndUpdate(
+    progress = await UserQuestionProgress.findOneAndUpdate(
       { userId, questionId },
       {
         $set: {
           status: req.body.status,
-          updatedAt: new Date()
+          updatedAt: new Date(),
+          lastActivityDate: new Date()
         }
       },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
+    if (req.body.status === 'Solved' && oldStatus !== 'Solved' && oldStatus !== 'Mastered') {
+      await incrementUserStats(userId, 1, 0);
+    }
+
     if (req.body.status === 'Solved' && oldStatus !== 'Solved') {
-      if (!jobQueue) {
-        console.error('jobQueue is not available, cannot add job');
-      } else {
+      if (jobQueue) {
         await jobQueue.add('question.solved', {
           userId,
           questionId,
@@ -206,7 +210,7 @@ const updateStatus = async (req, res, next) => {
 
     await invalidateProgressCache(userId);
     await invalidateQuestionDetailsCache(userId, questionId);
-    await invalidateDashboardCache(userId);  // NEW
+    await invalidateDashboardCache(userId);
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Status updated successfully', { progress }));
@@ -234,7 +238,7 @@ const updateCode = async (req, res, next) => {
 
     await invalidateProgressCache(userId);
     await invalidateQuestionDetailsCache(userId, questionId);
-    await invalidateDashboardCache(userId);  // NEW (code update doesn't affect dashboard directly, but safe)
+    await invalidateDashboardCache(userId);
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Code updated successfully', { progress }));
@@ -259,7 +263,6 @@ const updateNotes = async (req, res, next) => {
 
     await invalidateProgressCache(userId);
     await invalidateQuestionDetailsCache(userId, questionId);
-    // Notes don't affect dashboard, but invalidate anyway for consistency
     await invalidateDashboardCache(userId);
     await updateProgressPatternMastery(userId, questionId);
 
@@ -268,7 +271,6 @@ const updateNotes = async (req, res, next) => {
 };
 
 const updateConfidence = async (req, res, next) => {
-  // This endpoint is disabled – confidence is auto-calculated
   next(new AppError('Confidence level is automatically calculated and cannot be set manually', 400));
 };
 
@@ -277,31 +279,52 @@ const recordAttempt = async (req, res, next) => {
     const { timeSpent, successful } = req.body;
     const userId = req.user._id;
     const questionId = req.params.questionId;
+    const timeZone = req.userTimeZone || 'UTC';
+    const now = new Date();
+
+    let progress = await UserQuestionProgress.findOne({ userId, questionId });
+    const oldStatus = progress ? progress.status : 'Not Started';
 
     const update = {
       $inc: { 'attempts.count': 1, totalTimeSpent: timeSpent },
       $set: { 
-        'attempts.lastAttemptAt': new Date(),
-        updatedAt: new Date()
+        'attempts.lastAttemptAt': now,
+        updatedAt: now,
+        lastActivityDate: now
       }
     };
 
     if (successful) {
       update.$set.status = 'Solved';
-      update.$set['attempts.solvedAt'] = new Date();
+      update.$set['attempts.solvedAt'] = now;
     } else {
       update.$set.status = 'Attempted';
     }
 
-    const progress = await UserQuestionProgress.findOneAndUpdate(
+    progress = await UserQuestionProgress.findOneAndUpdate(
       { userId, questionId },
       update,
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
     if (!progress.attempts.firstAttemptAt) {
-      progress.attempts.firstAttemptAt = new Date();
+      progress.attempts.firstAttemptAt = now;
       await progress.save();
+    }
+
+    // Update heatmap directly
+    await incrementDailyActivityDirect(userId, now, timeZone, {
+      totalActivities: 1,
+      totalSubmissions: 1,
+      totalTimeSpentMinutes: timeSpent,
+    });
+
+    // Update streak and active days
+    await updateUserActivity(userId, now, timeZone);
+
+    // Increment user stats ONLY if this is a successful solve AND it was not already solved/mastered
+    if (successful && oldStatus !== 'Solved' && oldStatus !== 'Mastered') {
+      await incrementUserStats(userId, 1, 0);
     }
 
     if (jobQueue) {
@@ -311,7 +334,7 @@ const recordAttempt = async (req, res, next) => {
           questionId,
           progressId: progress._id,
           timeSpent,
-          solvedAt: new Date(),
+          solvedAt: now,
         });
       } else {
          await jobQueue.add('question.attempted', {
@@ -319,14 +342,14 @@ const recordAttempt = async (req, res, next) => {
           questionId,
           progressId: progress._id,
           timeSpent,
-          attemptedAt: new Date(),
+          attemptedAt: now,
         });
       }
     }
 
     await invalidateProgressCache(userId);
     await invalidateQuestionDetailsCache(userId, questionId);
-    await invalidateDashboardCache(userId);  // NEW
+    await invalidateDashboardCache(userId);
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Attempt recorded successfully', { progress }));
@@ -340,12 +363,15 @@ const recordRevision = async (req, res, next) => {
     const { timeSpent } = req.body;
     const userId = req.user._id;
     const questionId = req.params.questionId;
+    const timeZone = req.userTimeZone || 'UTC';
+    const now = new Date();
     
     const update = {
       $inc: { revisionCount: 1, totalTimeSpent: timeSpent },
       $set: { 
-        lastRevisedAt: new Date(),
-        updatedAt: new Date()
+        lastRevisedAt: now,
+        updatedAt: now,
+        lastActivityDate: now
       }
     };
 
@@ -355,9 +381,20 @@ const recordRevision = async (req, res, next) => {
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
+    // Update heatmap directly
+    await incrementDailyActivityDirect(userId, now, timeZone, {
+      totalActivities: 1,
+      totalSubmissions: 1,
+      revisionProblems: 1,
+      totalTimeSpentMinutes: timeSpent,
+    });
+
+    // Update streak and active days
+    await updateUserActivity(userId, now, timeZone);
+
     await invalidateProgressCache(userId);
     await invalidateQuestionDetailsCache(userId, questionId);
-    await invalidateDashboardCache(userId);  // NEW
+    await invalidateDashboardCache(userId);
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Revision recorded successfully', { progress }));
@@ -375,7 +412,7 @@ const deleteProgress = async (req, res, next) => {
 
     await invalidateProgressCache(req.user._id);
     await invalidateQuestionDetailsCache(req.user._id, req.params.questionId);
-    await invalidateDashboardCache(req.user._id);  // NEW
+    await invalidateDashboardCache(req.user._id);
     await patternMasteryService.updatePatternMasteryFromProgress(req.user._id, progress._id);
 
     res.json(formatResponse('Progress deleted successfully'));

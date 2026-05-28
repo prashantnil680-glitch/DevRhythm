@@ -1,6 +1,7 @@
 const { DateTime } = require('luxon');
 const RevisionSchedule = require('../models/RevisionSchedule');
 const Question = require('../models/Question');
+const User = require('../models/User');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const { formatResponse, paginate, getPaginationParams, getStartOfDay, getEndOfDay, formatDate, isToday } = require("../utils/helpers");
 const AppError = require('../utils/errors/AppError');
@@ -8,6 +9,8 @@ const { invalidateCache } = require('../middleware/cache');
 const revisionService = require('../services/revision.service');
 const heatmapService = require('../services/heatmap.service');
 const revisionActivityService = require('../services/revisionActivity.service');
+const { updateUserActivity } = require('../services/user.service');
+const { incrementDailyActivityDirect } = require('../services/heatmap.service');
 const { jobQueue } = require('../services/queue.service');
 const { client: redisClient } = require('../config/redis');
 const constants = require('../config/constants');
@@ -237,7 +240,6 @@ const getUpcomingRevisions = async (req, res, next) => {
       { $sort: { date: 1 } }
     ]);
     
-    // Compute today's boundaries in the user's timezone
     const now = new Date();
     const todayStart = getStartOfDay(now, timeZone);
     const todayEnd = getEndOfDay(now, timeZone);
@@ -570,22 +572,20 @@ const recordTimeSpent = async (req, res, next) => {
     const today = new Date();
     const timeZone = req.userTimeZone || 'UTC';
 
+    // Update revision activity (Redis)
     await revisionActivityService.recordTimeSpent(req.user._id, questionId, today, minutes);
 
+    // Update heatmap directly (time spent)
     try {
-      await heatmapService.incrementDailyActivity({
-        userId: req.user._id,
-        date: today,
-        timeZone: timeZone,
-        increments: {
-          totalTimeSpentMinutes: minutes
-        }
+      await incrementDailyActivityDirect(req.user._id, today, timeZone, {
+        totalTimeSpentMinutes: minutes
       });
     } catch (heatmapErr) {
       console.error('Failed to update heatmap time:', heatmapErr);
       // Don't fail the request – time already recorded in revision service
     }
 
+    // Update UserQuestionProgress totalTimeSpent
     let progress = await UserQuestionProgress.findOne({
       userId: req.user._id,
       questionId
@@ -610,6 +610,19 @@ const recordTimeSpent = async (req, res, next) => {
 
     await progress.save();
 
+    // ========== NEW SYNC UPDATES ==========
+    // 1. Update User.stats.totalTimeSpent
+    await User.updateOne(
+      { _id: req.user._id },
+      { $inc: { 'stats.totalTimeSpent': minutes } }
+    );
+
+    // 2. Update streak and active days
+    await updateUserActivity(req.user._id, today, timeZone);
+
+    // ========== END NEW SYNC UPDATES ==========
+
+    // Check any pending revision sessions (existing logic)
     const pattern = `revision:session:${req.user._id}:${questionId}:*`;
     let cursor = 0;
     let keys = [];
@@ -907,7 +920,6 @@ const getOverdueRevisions = async (req, res, next) => {
       { $sort: { pendingDue: 1 } },
       { $skip: skip },
       { $limit: limit },
-      // Lookup question details
       {
         $lookup: {
           from: 'questions',

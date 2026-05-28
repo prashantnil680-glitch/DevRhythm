@@ -29,12 +29,14 @@ if (!redisOptions) {
 const jobQueue = new Bull('devrhythm-jobs', {
   redis: {
     ...redisOptions,
-    maxRetriesPerRequest: 100,        // Increased from 50 to handle intermittent ECONNRESET
-    enableOfflineQueue: true,         // Queue commands when Redis is down (reconnect)
+    maxRetriesPerRequest: 100,        // High retry limit
+    enableOfflineQueue: true,         // Queue commands when Redis is down
     retryStrategy: (times) => {
-      // Exponential backoff with max 30 seconds
+      // Exponential backoff with max 30 seconds, but stop logging after 10 attempts
       const delay = Math.min(times * 100, 30000);
-      console.log(`Redis retry attempt ${times}, waiting ${delay}ms`);
+      if (times <= 10 || times % 10 === 0) {
+        console.log(`Redis retry attempt ${times}, waiting ${delay}ms`);
+      }
       return delay;
     },
   },
@@ -45,6 +47,37 @@ const jobQueue = new Bull('devrhythm-jobs', {
   }
 });
 
+// Heartbeat: send PING every 60 seconds to keep connection alive
+let heartbeatInterval = null;
+const startHeartbeat = () => {
+  if (heartbeatInterval) return;
+  heartbeatInterval = setInterval(async () => {
+    try {
+      const client = await jobQueue.client;
+      if (client && client.status === 'ready') {
+        await client.ping();
+        // Optional: log only once per hour to avoid noise
+        // console.log('Redis heartbeat PING successful');
+      }
+    } catch (err) {
+      // Silently fail – the queue will handle reconnection
+    }
+  }, 60000); // 60 seconds
+};
+
+const stopHeartbeat = () => {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+  }
+};
+
+// Start heartbeat when queue is ready
+jobQueue.on('ready', () => {
+  console.log('Bull queue ready, starting heartbeat');
+  startHeartbeat();
+});
+
 jobQueue.on('error', (error) => {
   console.error('Queue error:', error);
 });
@@ -53,7 +86,7 @@ jobQueue.on('failed', (job, err) => {
   console.error(`Job ${job.id} (${job.data.type}) failed:`, err);
 });
 
-// Import handlers
+// Import handlers (unchanged)
 const { handleQuestionSolved } = require('./queueHandlers/questionSolved.handler');
 const { handleQuestionMastered } = require('./queueHandlers/questionMastered.handler');
 const { handleQuestionAttempted } = require('./queueHandlers/questionAttempted.handler');
@@ -106,6 +139,7 @@ const startQueueWorkers = async () => {
 };
 
 const stopQueueWorkers = async () => {
+  stopHeartbeat();
   if (jobQueue) await jobQueue.close();
   console.log('Queue workers stopped');
 };

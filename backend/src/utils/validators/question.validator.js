@@ -8,6 +8,7 @@ const getQuestions = Joi.object({
   pattern: Joi.string().trim().default('all'),
   tags: Joi.array().items(Joi.string().trim()).single(),
   qtitle: Joi.string().trim().min(1).max(100).optional(),
+  search: Joi.string().trim().min(1).max(100).optional(),
   sortBy: Joi.string().valid('createdAt', 'updatedAt', 'title', 'difficulty', 'platform').default('createdAt'),
   sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
   status: Joi.string().valid('solved', 'all').default('all')

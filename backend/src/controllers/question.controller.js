@@ -86,16 +86,14 @@ const searchLeetCodeQuestions = async (req, res, next) => {
 
 const getQuestions = async (req, res, next) => {
   try {
-    // Parse and validate query parameters (with defaults)
-    let { page, limit, platform, difficulty, pattern, tags, qtitle, sortBy, sortOrder, status } = req.query;
+    let { page, limit, platform, difficulty, pattern, tags, qtitle, search, sortBy, sortOrder, status } = req.query;
     page = parseInt(page) || 1;
     limit = Math.min(parseInt(limit) || 20, 100);
     const skip = (page - 1) * limit;
 
-    // Base query: active questions only
     let query = { isActive: true };
 
-    // Platform filter (default is 'LeetCode' from validator)
+    // Platform filter
     if (platform && platform !== 'all') {
       query.platform = platform;
     }
@@ -109,7 +107,6 @@ const getQuestions = async (req, res, next) => {
     if (pattern && pattern !== 'all') {
       const patternName = await patternQuestionService.getPatternNameBySlug(pattern);
       if (!patternName) {
-        // Invalid pattern slug – return empty result
         return res.json(formatResponse('Questions retrieved successfully', { questions: [] }, {
           pagination: paginate(0, page, limit)
         }));
@@ -122,11 +119,6 @@ const getQuestions = async (req, res, next) => {
       query.tags = { $in: tags };
     }
 
-    // Exact title search via slugified platformQuestionId
-    if (qtitle) {
-      query.platformQuestionId = qtitle;
-    }
-
     // Status filter (solved only)
     let solvedIds = [];
     if (status === 'solved' && req.user) {
@@ -136,7 +128,6 @@ const getQuestions = async (req, res, next) => {
       }).select('questionId').lean();
       solvedIds = solvedProgress.map(p => p.questionId);
       if (solvedIds.length === 0) {
-        // User has solved zero questions
         return res.json(formatResponse('Questions retrieved successfully', { questions: [] }, {
           pagination: paginate(0, page, limit)
         }));
@@ -144,14 +135,97 @@ const getQuestions = async (req, res, next) => {
       query._id = { $in: solvedIds };
     }
 
-    // Build the database query
-    let dbQuery = Question.find(query).skip(skip).limit(limit);
-    dbQuery = applySorting(dbQuery, { sortBy, sortOrder }, { createdAt: -1 });
+    let questions = [];
+    let total = 0;
 
-    const [questions, total] = await Promise.all([
-      dbQuery.lean(),
-      Question.countDocuments(query)
-    ]);
+    // ---- UNIFIED qtitle HANDLING ----
+    if (qtitle && qtitle.trim()) {
+      const exactSlug = qtitle.trim().toLowerCase().replace(/[^\w\s-]/g, '').replace(/[\s_]+/g, '-').replace(/^-+|-+$/g, '');
+      
+      // Try exact match first
+      const exactQuery = { ...query, platformQuestionId: exactSlug };
+      const exactCount = await Question.countDocuments(exactQuery);
+      
+      if (exactCount > 0) {
+        // Exact match found – return those questions (normally one)
+        let dbQuery = Question.find(exactQuery).skip(skip).limit(limit);
+        dbQuery = applySorting(dbQuery, { sortBy, sortOrder }, { createdAt: -1 });
+        const [fetchedQuestions, totalCount] = await Promise.all([
+          dbQuery.lean(),
+          Promise.resolve(exactCount)
+        ]);
+        questions = fetchedQuestions;
+        total = totalCount;
+      } else {
+        // No exact match – fallback to partial text search using the original qtitle string
+        const searchTerm = qtitle.trim();
+        const andConditions = [
+          { $text: { $search: searchTerm } }
+        ];
+        for (const [key, value] of Object.entries(query)) {
+          if (key !== '_id') andConditions.push({ [key]: value });
+        }
+        if (query._id) andConditions.push({ _id: { $in: query._id } });
+
+        const pipeline = [
+          { $match: { $and: andConditions } },
+          { $addFields: { textScore: { $meta: 'textScore' } } },
+          { $sort: { textScore: -1 } },
+          { $skip: skip },
+          { $limit: limit }
+        ];
+        const countPipeline = [
+          { $match: { $and: andConditions } },
+          { $count: 'total' }
+        ];
+        const [results, countResult] = await Promise.all([
+          Question.aggregate(pipeline),
+          Question.aggregate(countPipeline)
+        ]);
+        questions = results;
+        total = countResult[0]?.total || 0;
+      }
+    }
+    // ---- EXISTING search PARAMETER (unchanged, for backward compatibility) ----
+    else if (search && search.trim()) {
+      const searchTerm = search.trim();
+      const andConditions = [
+        { $text: { $search: searchTerm } }
+      ];
+      for (const [key, value] of Object.entries(query)) {
+        if (key !== '_id') andConditions.push({ [key]: value });
+      }
+      if (query._id) andConditions.push({ _id: { $in: query._id } });
+
+      const pipeline = [
+        { $match: { $and: andConditions } },
+        { $addFields: { textScore: { $meta: 'textScore' } } },
+        { $sort: { textScore: -1 } },
+        { $skip: skip },
+        { $limit: limit }
+      ];
+      const countPipeline = [
+        { $match: { $and: andConditions } },
+        { $count: 'total' }
+      ];
+      const [results, countResult] = await Promise.all([
+        Question.aggregate(pipeline),
+        Question.aggregate(countPipeline)
+      ]);
+      questions = results;
+      total = countResult[0]?.total || 0;
+    }
+    else {
+      // No search – simple find()
+      let dbQuery = Question.find(query).skip(skip).limit(limit);
+      dbQuery = applySorting(dbQuery, { sortBy, sortOrder }, { createdAt: -1 });
+      const [fetchedQuestions, totalCount] = await Promise.all([
+        dbQuery.lean(),
+        Question.countDocuments(query)
+      ]);
+      questions = fetchedQuestions;
+      total = totalCount;
+    }
 
     // Add user solved status (if logged in)
     let solvedMap = new Map();

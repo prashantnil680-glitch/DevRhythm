@@ -14,7 +14,23 @@ const redisOptions = (() => {
     const port = parseInt(url.port) || 6379;
     const db = config.redis.db || 0;
     const password = config.redis.password || (url.password ? decodeURIComponent(url.password) : undefined);
-    return { host, port, password, db };
+    return {
+      host,
+      port,
+      password,
+      db,
+      maxRetriesPerRequest: 100,        // Increased to handle intermittent ECONNRESET
+      enableOfflineQueue: true,         // Queue commands when Redis is down
+      retryStrategy: (times) => {
+        // Exponential backoff with max 30 seconds
+        const delay = Math.min(times * 100, 30000);
+        // Log only first attempt and every 50th attempt to avoid spam
+        if (times === 1 || times % 50 === 0) {
+          console.log(`Redis retry attempt ${times}, waiting ${delay}ms`);
+        }
+        return delay;
+      },
+    };
   } catch (err) {
     console.error('Invalid Redis URL:', err);
     return null;
@@ -25,29 +41,17 @@ if (!redisOptions) {
   console.error('Redis configuration missing, queues will not work');
 }
 
-// Create a single queue for all job types with better resilience
+// Create a single queue for all job types
 const jobQueue = new Bull('devrhythm-jobs', {
-  redis: {
-    ...redisOptions,
-    maxRetriesPerRequest: 100,        // High retry limit
-    enableOfflineQueue: true,         // Queue commands when Redis is down
-    retryStrategy: (times) => {
-      // Exponential backoff with max 30 seconds, but stop logging after 10 attempts
-      const delay = Math.min(times * 100, 30000);
-      if (times <= 10 || times % 10 === 0) {
-        console.log(`Redis retry attempt ${times}, waiting ${delay}ms`);
-      }
-      return delay;
-    },
-  },
+  redis: redisOptions,
   settings: {
-    retryProcessDelay: 5000,          // Wait 5 seconds between retries
-    maxStalledCount: 3,               // Max stalled jobs before failing
-    guardInterval: 5000,              // Check stalled jobs every 5 seconds
+    retryProcessDelay: 5000,   // Wait 5 seconds between retries
+    maxStalledCount: 3,        // Max stalled jobs before failing
+    guardInterval: 5000,       // Check stalled jobs every 5 seconds
   }
 });
 
-// Heartbeat: send PING every 60 seconds to keep connection alive
+// ========== HEARTBEAT: keep Redis connection alive ==========
 let heartbeatInterval = null;
 const startHeartbeat = () => {
   if (heartbeatInterval) return;
@@ -56,13 +60,13 @@ const startHeartbeat = () => {
       const client = await jobQueue.client;
       if (client && client.status === 'ready') {
         await client.ping();
-        // Optional: log only once per hour to avoid noise
-        // console.log('Redis heartbeat PING successful');
+        // Optional: log once per hour to confirm heartbeat
+        // console.log('[Redis] Heartbeat PING sent');
       }
     } catch (err) {
       // Silently fail – the queue will handle reconnection
     }
-  }, 60000); // 60 seconds
+  }, 60000); // every 60 seconds
 };
 
 const stopHeartbeat = () => {
@@ -72,7 +76,6 @@ const stopHeartbeat = () => {
   }
 };
 
-// Start heartbeat when queue is ready
 jobQueue.on('ready', () => {
   console.log('Bull queue ready, starting heartbeat');
   startHeartbeat();
@@ -86,7 +89,7 @@ jobQueue.on('failed', (job, err) => {
   console.error(`Job ${job.id} (${job.data.type}) failed:`, err);
 });
 
-// Import handlers (unchanged)
+// ========== IMPORT HANDLERS ==========
 const { handleQuestionSolved } = require('./queueHandlers/questionSolved.handler');
 const { handleQuestionMastered } = require('./queueHandlers/questionMastered.handler');
 const { handleQuestionAttempted } = require('./queueHandlers/questionAttempted.handler');
@@ -108,7 +111,7 @@ const { handlePodAvailable } = require('./queueHandlers/podAvailable.handler');
 const { handleFetchLeetcodeDetails } = require('./queueHandlers/fetchLeetcodeDetails.handler');
 const { handleCodeExecution } = require('./queueHandlers/codeExecution.handler');
 
-// Register processors
+// ========== REGISTER PROCESSORS ==========
 jobQueue.process('question.solved', handleQuestionSolved);
 jobQueue.process('question.mastered', handleQuestionMastered);
 jobQueue.process('question.attempted', handleQuestionAttempted);

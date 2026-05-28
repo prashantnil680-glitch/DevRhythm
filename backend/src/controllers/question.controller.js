@@ -1,6 +1,6 @@
 const { DateTime } = require('luxon');
 const Question = require('../models/Question');
-const Goal = require('../models/Goal');  
+const Goal = require('../models/Goal');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const RevisionSchedule = require('../models/RevisionSchedule');
 const CodeExecutionHistory = require('../models/CodeExecutionHistory');
@@ -61,7 +61,6 @@ const fetchLeetCodeQuestion = async (req, res, next) => {
   try {
     const { url } = req.body;
     if (!url) throw new AppError('URL is required', 400);
-
     const details = await fetchProblemDetails(url);
     res.json(formatResponse('Problem fetched from LeetCode', details));
   } catch (error) {
@@ -78,7 +77,6 @@ const searchLeetCodeQuestions = async (req, res, next) => {
     if (!q || q.length < 2) {
       throw new AppError('Search query must be at least 2 characters', 400);
     }
-
     const results = await searchProblems(q, type);
     res.json(formatResponse('LeetCode search results', { results }));
   } catch (error) {
@@ -90,7 +88,6 @@ const getQuestions = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPaginationParams(req);
     const { platform, difficulty, pattern, tags, search, status } = req.query;
-    
     let query = { isActive: true };
     if (platform) query.platform = platform;
     if (difficulty) query.difficulty = difficulty;
@@ -103,7 +100,6 @@ const getQuestions = async (req, res, next) => {
         userId: req.user._id,
         status: { $in: ['Solved', 'Mastered'] }
       }).select('questionId').lean();
-      
       const solvedIds = solvedProgress.map(p => p.questionId);
       if (solvedIds.length === 0) {
         return res.json(formatResponse('Questions retrieved successfully', { questions: [] }, {
@@ -129,7 +125,6 @@ const getQuestions = async (req, res, next) => {
         questionId: { $in: questionIds },
         status: { $in: ['Solved', 'Mastered'] }
       }).select('questionId status').lean();
-
       solvedMap = new Map(
         solvedProgress.map(p => [p.questionId.toString(), p.status])
       );
@@ -188,6 +183,21 @@ const fetchQuestionDetails = async (userId, questionId, timeZone) => {
 
   if (!question) return null;
 
+  // Compute revision count from the revision schedule (source of truth)
+  const computedRevisionCount = revision ? revision.completedRevisions.length : 0;
+
+  // If progress exists, override its revisionCount with the computed value
+  let updatedProgress = progress ? { ...progress } : null;
+  if (updatedProgress) {
+    updatedProgress.revisionCount = computedRevisionCount;
+  } else if (computedRevisionCount > 0) {
+    // If no progress document exists but the user has revisions, create a minimal progress object
+    updatedProgress = {
+      revisionCount: computedRevisionCount,
+      // other fields will be undefined, but the frontend can handle them
+    };
+  }
+
   let revisionWithLocalDates = null;
   if (revision) {
     const revObj = {
@@ -203,7 +213,7 @@ const fetchQuestionDetails = async (userId, questionId, timeZone) => {
 
   return {
     question,
-    progress: progress || null,
+    progress: updatedProgress || null,
     revision: revisionWithLocalDates,
     codeExecutionHistory: codeHistory || [],
     activityLogs: activityLogs || []
@@ -301,43 +311,33 @@ const createQuestion = async (req, res, next) => {
       try {
         const problemUrl = req.body.problemLink;
         if (problemUrl) {
-          // console.log(`[createQuestion] Fetching details for ${problemUrl}`);
           const details = await fetchProblemDetails(problemUrl);
-          // console.log(`[createQuestion] Fetched codeSnippets keys:`, Object.keys(details.codeSnippets));
-
           const allowedLanguages = ['cpp', 'c++', 'javascript', 'java', 'python', 'python3'];
           const finalSnippets = {};
 
-          // Process fetched snippets
           for (const [lang, code] of Object.entries(details.codeSnippets)) {
             const normalizedLang = lang.toLowerCase();
             if (allowedLanguages.includes(normalizedLang)) {
               const targetLang = normalizedLang === 'c++' ? 'cpp' : normalizedLang;
               finalSnippets[targetLang] = code;
-              // console.log(`[createQuestion] Added snippet for ${targetLang}`);
             }
           }
 
-          // Override with user‑provided starterCode (if any)
           if (starterCode && typeof starterCode === 'object') {
             for (const [lang, code] of Object.entries(starterCode)) {
               const normalizedLang = lang.toLowerCase();
               if (allowedLanguages.includes(normalizedLang)) {
                 const targetLang = normalizedLang === 'c++' ? 'cpp' : normalizedLang;
                 finalSnippets[targetLang] = code;
-                // console.log(`[createQuestion] Overridden snippet for ${targetLang} with user code`);
               }
             }
           }
 
-          // console.log(`[createQuestion] Final snippets languages:`, Object.keys(finalSnippets));
           question.starterCode = finalSnippets;
           await question.save();
-          // console.log(`[createQuestion] Successfully saved starterCode for question ${question._id}`);
         }
       } catch (fetchErr) {
         console.error(`[createQuestion] Failed to fetch starter code:`, fetchErr.message);
-        // Fallback to user‑provided starterCode
         if (starterCode && typeof starterCode === 'object') {
           const allowedLanguages = ['cpp', 'c++', 'javascript', 'java', 'python', 'python3'];
           const filteredSnippets = {};
@@ -353,7 +353,6 @@ const createQuestion = async (req, res, next) => {
         }
       }
     } else {
-      // Manual question: use provided starterCode as is
       if (starterCode && typeof starterCode === 'object') {
         const allowedLanguages = ['cpp', 'c++', 'javascript', 'java', 'python', 'python3'];
         const filteredSnippets = {};
@@ -369,7 +368,6 @@ const createQuestion = async (req, res, next) => {
       }
     }
 
-    // Extract test cases if contentRef exists and no test cases provided
     if (question.contentRef && (!question.testCases || question.testCases.length === 0)) {
       await jobQueue.add('question.extract_testcases', {
         questionId: question._id
@@ -747,10 +745,6 @@ const getDailyProblemAndGoal = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/v1/questions/pattern/:patternSlug
- * Returns paginated questions for a pattern, with user status and pagination in meta.
- */
 const getQuestionsByPattern = async (req, res, next) => {
   try {
     const { patternSlug } = req.params;
@@ -781,7 +775,6 @@ const getQuestionsByPattern = async (req, res, next) => {
       .replace(/[\s_-]+/g, '-')
       .replace(/^-+|-+$/g, '');
 
-    // Response with pattern info in data, pagination in meta
     res.json({
       success: true,
       statusCode: 200,
@@ -812,7 +805,6 @@ const getQuestionsByPattern = async (req, res, next) => {
   }
 };
 
-
 module.exports = {
   getQuestions,
   getQuestionById,
@@ -832,5 +824,5 @@ module.exports = {
   fetchLeetCodeQuestion,
   searchLeetCodeQuestions,
   getDailyProblemAndGoal,
-  getQuestionsByPattern, 
+  getQuestionsByPattern,
 };

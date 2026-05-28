@@ -15,12 +15,14 @@ const UserQuestionProgress = require('../models/UserQuestionProgress');
 const CodeExecutionHistory = require('../models/CodeExecutionHistory');
 const CodeExecutionJob = require('../models/CodeExecutionJob');
 const RevisionSchedule = require('../models/RevisionSchedule');
+const ActivityLog = require('../models/ActivityLog');
 const { invalidateCache, invalidateProgressCache } = require('../middleware/cache');
 const revisionActivityService = require('../services/revisionActivity.service');
 const { jobQueue } = require('../services/queue.service');
 const constants = require('../config/constants');
 const { incrementUserStats } = require('../services/user.service');
 const { incrementDailyActivityDirect } = require('../services/heatmap.service');
+const { updateUserActivity } = require('../services/user.service');
 
 const SUPPORTED_LANGUAGES = ['cpp', 'python', 'java', 'javascript'];
 const GENERATORS = {
@@ -123,7 +125,6 @@ const cleanupExecutionHistory = async (userId, questionId, language) => {
  * Core execution logic – shared between sync and async endpoints.
  * Returns result object (same as original response data).
  * Does NOT send HTTP response.
- * Now also updates user stats and heatmap directly on success.
  */
 const executeCodeCore = async (userId, body, timeZone = 'UTC') => {
   let { language, code, stdin, expected, testCases, questionId } = body;
@@ -325,38 +326,97 @@ const executeCodeCore = async (userId, body, timeZone = 'UTC') => {
     customTestCasesCount: customToSave.length,
   };
 
-  // ----- SYNC STATS AND HEATMAP UPDATE ON SOLVE -----
+  // ----- SYNC STATS, HEATMAP, ACTIVE DAYS, ACTIVITY LOG, CONFIDENCE -----
   if (allPassed) {
-    // Update user progress document (status, attempts, solvedAt)
+    // Capture old status before updating
     let progress = await UserQuestionProgress.findOne({ userId, questionId });
+    const oldStatus = progress ? progress.status : 'Not Started';
+    const now = new Date();
+
+    // Determine if this is the first solve
+    const isFirstSolve = (oldStatus !== 'Solved' && oldStatus !== 'Mastered');
+
+    // Update or create progress document
     if (!progress) {
       progress = new UserQuestionProgress({
         userId,
         questionId,
         status: 'Solved',
-        attempts: { count: 1, solvedAt: new Date(), lastAttemptAt: new Date(), firstAttemptAt: new Date() },
+        attempts: { count: 1, solvedAt: now, lastAttemptAt: now, firstAttemptAt: now },
         totalTimeSpent: 0,
+        lastActivityDate: now,
       });
-    } else if (progress.status !== 'Solved') {
-      progress.status = 'Solved';
-      progress.attempts.solvedAt = new Date();
-      progress.attempts.lastAttemptAt = new Date();
+    } else {
       progress.attempts.count = (progress.attempts.count || 0) + 1;
+      progress.attempts.lastAttemptAt = now;
+      if (progress.status !== 'Solved') {
+        progress.status = 'Solved';
+        progress.attempts.solvedAt = now;
+      }
+      progress.lastActivityDate = now;
     }
     await progress.save();
 
-    // Increment user stats synchronously (timeSpent is handled separately by /time-spent endpoint)
-    await incrementUserStats(userId, 1, 0);
+    // Increment user stats only if this is the first time solving this question
+    if (isFirstSolve) {
+      await incrementUserStats(userId, 1, 0);
+    }
 
-    // Increment heatmap directly for the solve event (timeSpent not included here)
-    await incrementDailyActivityDirect(userId, new Date(), timeZone, {
-      totalActivities: 1,
-      totalSubmissions: 1,
-      newProblemsSolved: 1,
+    // Update streak and active days
+    await updateUserActivity(userId, now, timeZone);
+
+    // Increment heatmap directly with metadata
+    await incrementDailyActivityDirect(
+      userId,
+      now,
+      timeZone,
+      {
+        totalActivities: 1,
+        totalSubmissions: 1,
+        newProblemsSolved: 1,
+        testCaseExecutions: totalCount,
+        passedCount: passedCount,
+        failedCount: totalCount - passedCount,
+      },
+      isFirstSolve,
+      question.difficulty,
+      question.platform
+    );
+
+    // Increment confidence synchronously (+0.25, max 5)
+    let newConfidence = (progress.confidenceLevel || 0) + 0.25;
+    if (newConfidence > 5) newConfidence = 5;
+    await UserQuestionProgress.updateOne(
+      { userId, questionId },
+      { $set: { confidenceLevel: newConfidence } }
+    );
+
+    // Create activity log for this solve (every solve)
+    await ActivityLog.create({
+      userId,
+      action: 'question_solved',
+      targetId: questionId,
+      targetModel: 'Question',
+      metadata: {
+        title: question.title,
+        platformQuestionId: question.platformQuestionId,
+        difficulty: question.difficulty,
+        platform: question.platform,
+        pattern: question.pattern,
+        timeSpent: 0,
+        isFirstSolve: isFirstSolve,
+      },
+      timestamp: now,
     });
 
     // Invalidate caches
     await invalidateProgressCache(userId);
+
+    // 🚀 NEW: Invalidate cache for the activity day endpoint
+    const dateStr = DateTime.fromJSDate(now, { zone: timeZone }).toFormat('yyyy-MM-dd');
+    await invalidateCache(`activity:day:user:${userId}:*/activity/day/${dateStr}*`);
+    // Also invalidate the 'today' endpoint cache (if any)
+    await invalidateCache(`activity:today:user:${userId}:*`);
 
     // Queue optional background job for other effects (non‑critical)
     if (jobQueue) {
@@ -366,7 +426,7 @@ const executeCodeCore = async (userId, body, timeZone = 'UTC') => {
           questionId,
           progressId: progress._id,
           timeSpent: 0,
-          solvedAt: new Date(),
+          solvedAt: now,
           source: 'test_case',
         });
       } catch (queueErr) {
@@ -374,14 +434,14 @@ const executeCodeCore = async (userId, body, timeZone = 'UTC') => {
       }
     }
 
-    await revisionActivityService.recordCodeSubmission(userId, questionId, new Date());
+    await revisionActivityService.recordCodeSubmission(userId, questionId, now);
 
     const revisionResult = await revisionActivityService.checkAndCompleteRevision(
       userId,
       questionId,
-      new Date(),
+      now,
       'auto',
-      { targetDate: new Date() }
+      { targetDate: now }
     );
     if (revisionResult.completed) {
       responseData.revisionCompleted = true;
@@ -395,7 +455,7 @@ const executeCodeCore = async (userId, body, timeZone = 'UTC') => {
 };
 
 // ==============================
-// SYNC ENDPOINT (original, kept for backward compatibility)
+// SYNC ENDPOINT (original)
 // ==============================
 const runCode = async (req, res, next) => {
   try {
@@ -409,11 +469,6 @@ const runCode = async (req, res, next) => {
 // ==============================
 // ASYNC ENDPOINTS
 // ==============================
-
-/**
- * POST /api/v1/code/execute-async
- * Creates a job and returns jobId immediately.
- */
 const executeCodeAsync = async (req, res, next) => {
   try {
     const { language, code, testCases, questionId, stdin, expected } = req.body;
@@ -439,7 +494,6 @@ const executeCodeAsync = async (req, res, next) => {
       code,
       testCases: testCases || (stdin !== undefined ? [{ stdin: stdin || '', expected: expected || '' }] : []),
       status: 'pending',
-      timezone: req.user.preferences?.timezone || 'UTC',
     });
     await jobDoc.save();
 
@@ -459,10 +513,6 @@ const executeCodeAsync = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/v1/code/result/:jobId
- * Polls for completion.
- */
 const getCodeResult = async (req, res, next) => {
   try {
     const { jobId } = req.params;

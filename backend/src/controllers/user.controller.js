@@ -8,6 +8,7 @@ const { invalidateUserCache, invalidateDashboardCache, invalidateCache } = requi
 const { paginate } = require('../utils/helpers/pagination');
 const { formatResponse } = require('../utils/helpers/response');
 const config = require('../config');
+const { computeUserStats } = require('../services/userStats.service');
 
 const getCurrentUser = async (req, res, next) => {
   try {
@@ -15,6 +16,19 @@ const getCurrentUser = async (req, res, next) => {
     delete user.__v;
     // Online if last activity within 1 minutes
     user.isOnline = (Date.now() - new Date(user.lastOnline).getTime()) < 1 * 60 * 1000;
+    
+    // Compute accurate stats from source collections
+    const timeZone = user.preferences?.timezone || 'UTC';
+    const computedStats = await computeUserStats(user._id, timeZone);
+    
+    // Override the stats field with computed values
+    user.stats = {
+      totalSolved: computedStats.totalSolved,
+      masteryRate: computedStats.masteryRate,
+      totalRevisions: computedStats.totalRevisions,
+      totalTimeSpent: computedStats.totalTimeSpent,
+      activeDays: computedStats.activeDays
+    };
     
     // Round masteryRate to 2 decimal places
     if (user.stats && user.stats.masteryRate) {
@@ -57,19 +71,13 @@ const updateCurrentUser = async (req, res, next) => {
       await invalidateDashboardCache(req.user._id);
     }
     
-    // ========== NEW: Invalidate user list caches if privacy changed ==========
+    // Invalidate user list caches if privacy changed
     if (privacyChanged) {
-      // Invalidate all authenticated user lists (because visibility of this user for others may change)
-      // We cannot invalidate all patterns easily, but we can invalidate the public list cache as well.
-      // Since privacy change affects who can see this user, we need to purge all caches that include this user.
-      // The safest approach: invalidate all user list caches (both public and any authenticated).
       await invalidateCache('users:public:*');
-      await invalidateCache('users:auth:*'); // careful: this removes all authenticated user caches (could be many)
-      // A more granular approach would iterate over all users who might have this user in their list,
-      // but that's too expensive. Given that privacy changes are relatively rare, the cache purge is acceptable.
+      await invalidateCache('users:auth:*');
     }
     
-    // Round masteryRate for response
+    // Round masteryRate for response (but we don't return stats here, just the user object)
     if (user.stats && user.stats.masteryRate) {
       user.stats.masteryRate = Math.round(user.stats.masteryRate * 100) / 100;
     }
@@ -356,13 +364,11 @@ const getMutualFriendsCounts = async (targetUserIds, currentUserFollowingIds) =>
   if (!targetUserIds.length || !currentUserFollowingIds.length) {
     return new Map();
   }
-  // Fetch all follow relationships where followerId is in targetUserIds
   const follows = await Follow.find({
     followerId: { $in: targetUserIds },
     isActive: true
   }).select('followerId followedId').lean();
   
-  // Group followed IDs by followerId
   const userFollowingMap = new Map();
   follows.forEach(f => {
     const followerStr = f.followerId.toString();
@@ -370,7 +376,6 @@ const getMutualFriendsCounts = async (targetUserIds, currentUserFollowingIds) =>
     userFollowingMap.get(followerStr).push(f.followedId.toString());
   });
   
-  // For each target user, compute intersection with currentUserFollowingIds
   const mutualCounts = new Map();
   const currentFollowingSet = new Set(currentUserFollowingIds);
   for (const userId of targetUserIds) {
@@ -387,7 +392,6 @@ const getMutualFriendsCounts = async (targetUserIds, currentUserFollowingIds) =>
 // ========== GET /users - OPTIMIZED VERSION ==========
 const getAllUsers = async (req, res, next) => {
   try {
-    // 1. Pagination
     let page = parseInt(req.query.page) || 1;
     let limit = parseInt(req.query.limit) || config.userList?.defaultLimit || 20;
     const maxPage = config.userList?.maxPage || 100;
@@ -397,7 +401,6 @@ const getAllUsers = async (req, res, next) => {
     const skip = (page - 1) * limit;
     const searchTerm = req.query.search ? req.query.search.trim() : null;
 
-    // 2. Multi‑field sort parsing
     let sortByFields = ['totalSolved'];
     let sortOrders = ['desc'];
     if (req.query.sortBy) {
@@ -424,7 +427,6 @@ const getAllUsers = async (req, res, next) => {
       sortObj[dbField] = order;
     }
 
-    // 3. Get authenticated user info (following/followers sets)
     let currentUserId = null;
     let currentUserFollowingIds = [];
     let currentUserFollowersSet = null;
@@ -432,8 +434,6 @@ const getAllUsers = async (req, res, next) => {
 
     if (req.user) {
       currentUserId = req.user._id;
-      const Follow = require('../models/Follow');
-      
       const following = await Follow.find({ followerId: currentUserId, isActive: true })
         .select('followedId').lean();
       currentUserFollowingIds = following.map(f => f.followedId.toString());
@@ -448,7 +448,6 @@ const getAllUsers = async (req, res, next) => {
       );
     }
 
-    // 4. Visibility match (public/link‑only OR private + mutual)
     const visibilityMatch = {
       $or: [
         { privacy: { $in: ['public', 'link-only'] }, isActive: true },
@@ -460,7 +459,6 @@ const getAllUsers = async (req, res, next) => {
       ]
     };
 
-    // Helper: build base pipeline (visibility, exclude self, search, projection)
     const getBasePipeline = () => {
       const pipeline = [
         { $match: visibilityMatch },
@@ -493,7 +491,6 @@ const getAllUsers = async (req, res, next) => {
       return pipeline;
     };
 
-    // Determine if we need aggregation (dynamic sort fields)
     const dynamicFields = ['mutualFriends', 'iFollow', 'followsMe'];
     const hasDynamicSort = sortByFields.some(f => dynamicFields.includes(f));
     const needsAggregation = (req.user && hasDynamicSort);
@@ -502,9 +499,7 @@ const getAllUsers = async (req, res, next) => {
     let total = 0;
 
     if (needsAggregation) {
-      // ---------- Strategy A: full aggregation with $lookup ----------
       const pipeline = getBasePipeline();
-      
       pipeline.push({
         $lookup: {
           from: 'follows',
@@ -535,7 +530,6 @@ const getAllUsers = async (req, res, next) => {
       });
       pipeline.push({ $project: { targetFollowing: 0 } });
       
-      // Apply filter when the first sort field is a dynamic one (same as original)
       const firstSortField = sortByFields[0];
       if (firstSortField === 'mutualFriends') {
         pipeline.push({ $match: { mutualFriendsCount: { $gt: 0 } } });
@@ -551,7 +545,6 @@ const getAllUsers = async (req, res, next) => {
       
       users = await User.aggregate(pipeline);
       
-      // Count total (with same filters)
       const countPipeline = getBasePipeline();
       countPipeline.push({
         $lookup: {
@@ -593,9 +586,7 @@ const getAllUsers = async (req, res, next) => {
       total = countResult.length ? countResult[0].total : 0;
       
     } else {
-      // ---------- Strategy B: fetch paginated users, compute follow fields after ----------
       const pipeline = getBasePipeline();
-      
       pipeline.push({ $sort: sortObj });
       pipeline.push({ $skip: skip });
       pipeline.push({ $limit: limit });
@@ -621,14 +612,12 @@ const getAllUsers = async (req, res, next) => {
         users = users.map(u => ({ ...u }));
       }
       
-      // Count total (without dynamic filters)
       const countPipeline = getBasePipeline();
       countPipeline.push({ $count: 'total' });
       const countResult = await User.aggregate(countPipeline);
       total = countResult.length ? countResult[0].total : 0;
     }
 
-    // 5. Compute `isOnline` (based on lastOnline, threshold 5 minutes)
     const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
     const now = Date.now();
     users = users.map(user => {
@@ -640,7 +629,6 @@ const getAllUsers = async (req, res, next) => {
       return { ...user, isOnline };
     });
 
-    // 6. Format response
     users.forEach(user => {
       if (user.masteryRate) user.masteryRate = Math.round(user.masteryRate * 100) / 100;
       if (user.totalTimeSpent === undefined) user.totalTimeSpent = 0;

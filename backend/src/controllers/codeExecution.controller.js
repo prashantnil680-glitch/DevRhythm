@@ -19,6 +19,8 @@ const { invalidateCache, invalidateProgressCache } = require('../middleware/cach
 const revisionActivityService = require('../services/revisionActivity.service');
 const { jobQueue } = require('../services/queue.service');
 const constants = require('../config/constants');
+const { incrementUserStats } = require('../services/user.service');
+const { incrementDailyActivityDirect } = require('../services/heatmap.service');
 
 const SUPPORTED_LANGUAGES = ['cpp', 'python', 'java', 'javascript'];
 const GENERATORS = {
@@ -121,6 +123,7 @@ const cleanupExecutionHistory = async (userId, questionId, language) => {
  * Core execution logic – shared between sync and async endpoints.
  * Returns result object (same as original response data).
  * Does NOT send HTTP response.
+ * Now also updates user stats and heatmap directly on success.
  */
 const executeCodeCore = async (userId, body, timeZone = 'UTC') => {
   let { language, code, stdin, expected, testCases, questionId } = body;
@@ -322,7 +325,9 @@ const executeCodeCore = async (userId, body, timeZone = 'UTC') => {
     customTestCasesCount: customToSave.length,
   };
 
+  // ----- SYNC STATS AND HEATMAP UPDATE ON SOLVE -----
   if (allPassed) {
+    // Update user progress document (status, attempts, solvedAt)
     let progress = await UserQuestionProgress.findOne({ userId, questionId });
     if (!progress) {
       progress = new UserQuestionProgress({
@@ -339,8 +344,21 @@ const executeCodeCore = async (userId, body, timeZone = 'UTC') => {
       progress.attempts.count = (progress.attempts.count || 0) + 1;
     }
     await progress.save();
+
+    // Increment user stats synchronously (timeSpent is handled separately by /time-spent endpoint)
+    await incrementUserStats(userId, 1, 0);
+
+    // Increment heatmap directly for the solve event (timeSpent not included here)
+    await incrementDailyActivityDirect(userId, new Date(), timeZone, {
+      totalActivities: 1,
+      totalSubmissions: 1,
+      newProblemsSolved: 1,
+    });
+
+    // Invalidate caches
     await invalidateProgressCache(userId);
 
+    // Queue optional background job for other effects (non‑critical)
     if (jobQueue) {
       try {
         await jobQueue.add('question.solved', {
@@ -399,7 +417,6 @@ const runCode = async (req, res, next) => {
 const executeCodeAsync = async (req, res, next) => {
   try {
     const { language, code, testCases, questionId, stdin, expected } = req.body;
-    // Basic validation (same as sync)
     const normalizedLang = normalizeLanguage(language);
     if (!SUPPORTED_LANGUAGES.includes(normalizedLang)) {
       throw new AppError(`Unsupported language. Supported: ${SUPPORTED_LANGUAGES.join(', ')}`, 400);
@@ -409,7 +426,6 @@ const executeCodeAsync = async (req, res, next) => {
     }
     if (!questionId) throw new AppError('questionId is required', 400);
 
-    // Check if question exists
     const question = await Question.findById(questionId).select('_id');
     if (!question) throw new AppError('Question not found', 404);
 
@@ -427,7 +443,6 @@ const executeCodeAsync = async (req, res, next) => {
     });
     await jobDoc.save();
 
-    // Add to Bull queue
     if (!jobQueue) {
       throw new AppError('Job queue not available', 500);
     }
@@ -467,7 +482,6 @@ const getCodeResult = async (req, res, next) => {
         error: jobDoc.errorMessage,
       }));
     } else {
-      // pending or processing
       return res.json(formatResponse('Code execution in progress', {
         status: jobDoc.status,
         progress: jobDoc.progress,
@@ -479,7 +493,7 @@ const getCodeResult = async (req, res, next) => {
 };
 
 module.exports = {
-  runCode,               // sync (existing)
-  executeCodeAsync,      // async submit
-  getCodeResult,         // async poll
+  runCode,
+  executeCodeAsync,
+  getCodeResult,
 };

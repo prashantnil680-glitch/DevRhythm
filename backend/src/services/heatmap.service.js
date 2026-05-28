@@ -471,18 +471,117 @@ const extractMinimalHeatmap = (heatmap) => {
 
 const getDailyRedisKey = (userId, dateStr) => `heatmap:daily:${userId}:${dateStr}`;
 
+/**
+ * DEPRECATED: Use incrementDailyActivityDirect instead.
+ * This method kept for backward compatibility but now calls the direct method.
+ */
 const incrementDailyActivity = async ({ userId, date, timeZone, increments }) => {
-  if (!redisClient) return;
-  const dateStr = DateTime.fromJSDate(date, { zone: timeZone }).toFormat('yyyy-MM-dd');
-  const key = getDailyRedisKey(userId, dateStr);
-  const multi = redisClient.multi();
+  return incrementDailyActivityDirect(userId, date, timeZone, increments);
+};
+
+/**
+ * NEW: Directly increment heatmap activity using MongoDB $inc.
+ * This eliminates dependency on Redis and cron jobs.
+ * 
+ * @param {string} userId - User ObjectId
+ * @param {Date} date - Date of activity (will be converted to UTC day start)
+ * @param {string} timeZone - User's timezone for day boundary calculation
+ * @param {object} increments - Object with fields to increment (e.g., { totalActivities: 1, newProblemsSolved: 1 })
+ * @returns {Promise<void>}
+ */
+const incrementDailyActivityDirect = async (userId, date, timeZone, increments) => {
+  const dayStart = getStartOfDay(date, timeZone);
+  const year = dayStart.getUTCFullYear();
+
+  const update = { $inc: {} };
+  const setFields = {};
+
+  // Map frontend increments to actual database field names
+  const fieldMapping = {
+    totalActivities: 'dailyData.$.totalActivities',
+    totalSubmissions: 'dailyData.$.totalSubmissions',
+    totalTimeSpentMinutes: 'dailyData.$.totalTimeSpent',
+    newProblemsSolved: 'dailyData.$.newProblemsSolved',
+    revisionProblems: 'dailyData.$.revisionProblems',
+    studyGroupActivity: 'dailyData.$.studyGroupActivity',
+    testCaseExecutions: 'dailyData.$.testCaseExecutions',
+    passedCount: 'dailyData.$.passedCount',
+    failedCount: 'dailyData.$.failedCount',
+    timeSpentEvents: 'dailyData.$.timeSpentEvents',
+  };
+
   for (const [field, delta] of Object.entries(increments)) {
-    if (delta && delta !== 0) {
-      multi.hIncrBy(key, field, delta);
+    const mongoField = fieldMapping[field];
+    if (mongoField && delta && delta !== 0) {
+      update.$inc[mongoField] = delta;
     }
   }
-  multi.expire(key, 7 * 86400);
-  await multi.exec();
+
+  if (Object.keys(update.$inc).length === 0) return;
+
+  // Ensure the day exists in the heatmap document
+  // First, try to update existing day
+  const result = await HeatmapData.updateOne(
+    { userId, year, 'dailyData.date': dayStart },
+    update
+  );
+
+  if (result.matchedCount === 0) {
+    // Day does not exist – need to create the daily entry
+    // Build a full dailyData object with default values
+    const newDay = {
+      date: dayStart,
+      dayOfWeek: dayStart.getUTCDay(),
+      totalActivities: 0,
+      newProblemsSolved: 0,
+      revisionProblems: 0,
+      totalSubmissions: 0,
+      totalTimeSpent: 0,
+      difficultyBreakdown: { easy: 0, medium: 0, hard: 0 },
+      platformBreakdown: { leetcode: 0, hackerrank: 0, codeforces: 0, other: 0 },
+      studyGroupActivity: 0,
+      dailyGoalAchieved: false,
+      goalTarget: 0,
+      goalCompletion: 0,
+      intensityLevel: 0,
+      streakCount: 0,
+      testCaseExecutions: 0,
+      passedCount: 0,
+      failedCount: 0,
+      timeSpentEvents: 0,
+    };
+
+    // Apply the increments to the new day
+    for (const [field, delta] of Object.entries(increments)) {
+      switch (field) {
+        case 'totalActivities': newDay.totalActivities += delta; break;
+        case 'totalSubmissions': newDay.totalSubmissions += delta; break;
+        case 'totalTimeSpentMinutes': newDay.totalTimeSpent += delta; break;
+        case 'newProblemsSolved': newDay.newProblemsSolved += delta; break;
+        case 'revisionProblems': newDay.revisionProblems += delta; break;
+        case 'studyGroupActivity': newDay.studyGroupActivity += delta; break;
+        case 'testCaseExecutions': newDay.testCaseExecutions += delta; break;
+        case 'passedCount': newDay.passedCount += delta; break;
+        case 'failedCount': newDay.failedCount += delta; break;
+        case 'timeSpentEvents': newDay.timeSpentEvents += delta; break;
+      }
+    }
+    newDay.intensityLevel = calculateIntensityLevel(newDay.totalActivities);
+
+    // Push new day or use $setOnInsert? Using $push with $position maybe, but simpler: upsert with $addToSet? Not safe.
+    // Instead, use findOneAndUpdate with array filter and $push if not exists, but that's complex.
+    // We'll use a different approach: try to upsert the whole day using $set + array filter.
+    // Since we already know the day doesn't exist, we can do a separate update that pushes the new day.
+    await HeatmapData.updateOne(
+      { userId, year },
+      { $push: { dailyData: newDay } },
+      { upsert: true }
+    );
+    // After pushing, apply the increments again (they were already applied to newDay, so no need)
+  }
+
+  // After updating, recalculate consistency and stats for this user/year (async, fire-and-forget)
+  recalculateConsistency(userId, year).catch(err => console.error('Error recalculating consistency:', err));
 };
 
 const recalculateConsistency = async (userId, year) => {
@@ -577,98 +676,9 @@ const ensureDayExists = async (userId, year, localDate, timeZone) => {
 };
 
 const flushDailyActivitiesToMongoDB = async () => {
-  if (!redisClient) return;
-
-  const pattern = 'heatmap:daily:*';
-  let cursor = 0;
-  let processed = 0;
-  const userCache = new Map();
-  const usersToRecalc = new Set();
-
-  do {
-    const reply = await redisClient.scan(cursor, { MATCH: pattern, COUNT: 100 });
-    cursor = reply.cursor;
-    const keys = reply.keys;
-
-    if (keys.length === 0) continue;
-
-    const keysByUser = new Map();
-    for (const key of keys) {
-      const parts = key.split(':');
-      if (parts.length !== 4) continue;
-      const userId = parts[2];
-      const dateStr = parts[3];
-      if (!userId || !dateStr) continue;
-      if (!keysByUser.has(userId)) keysByUser.set(userId, []);
-      keysByUser.get(userId).push({ key, dateStr });
-    }
-
-    const userIds = Array.from(keysByUser.keys());
-    const users = await User.find({ _id: { $in: userIds } }).select('preferences.timezone').lean();
-    for (const user of users) {
-      userCache.set(user._id.toString(), user.preferences?.timezone || 'UTC');
-    }
-
-    for (const [userId, entries] of keysByUser.entries()) {
-      const timeZone = userCache.get(userId) || 'UTC';
-      let yearUpdated = null;
-      for (const { key, dateStr } of entries) {
-        const increments = await redisClient.hGetAll(key);
-        if (Object.keys(increments).length === 0) {
-          await redisClient.del(key);
-          continue;
-        }
-
-        const numericIncrements = {};
-        for (const [field, val] of Object.entries(increments)) {
-          numericIncrements[field] = parseInt(val, 10) || 0;
-        }
-
-        const [year, month, day] = dateStr.split('-').map(Number);
-        const utcMidnight = new Date(Date.UTC(year, month - 1, day));
-        yearUpdated = year;
-
-        const update = { $inc: {} };
-        const fieldMapping = {
-          totalActivities: 'dailyData.$.totalActivities',
-          totalSubmissions: 'dailyData.$.totalSubmissions',
-          totalTimeSpentMinutes: 'dailyData.$.totalTimeSpent',
-          newProblemsSolved: 'dailyData.$.newProblemsSolved',
-          revisionProblems: 'dailyData.$.revisionProblems',
-          studyGroupActivity: 'dailyData.$.studyGroupActivity',
-          testCaseExecutions: 'dailyData.$.testCaseExecutions',
-          passedCount: 'dailyData.$.passedCount',
-          failedCount: 'dailyData.$.failedCount',
-          timeSpentEvents: 'dailyData.$.timeSpentEvents',
-        };
-
-        for (const [field, value] of Object.entries(numericIncrements)) {
-          const mongoField = fieldMapping[field];
-          if (mongoField) update.$inc[mongoField] = value;
-        }
-
-        if (Object.keys(update.$inc).length > 0) {
-          const filter = { userId, year, 'dailyData.date': utcMidnight };
-          const result = await HeatmapData.updateOne(filter, update);
-          if (result.matchedCount === 0) {
-            await ensureDayExists(userId, year, utcMidnight, timeZone);
-            await HeatmapData.updateOne(filter, update);
-          }
-        }
-
-        await redisClient.del(key);
-        processed++;
-      }
-      if (yearUpdated !== null) {
-        usersToRecalc.add(`${userId}:${yearUpdated}`);
-      }
-    }
-  } while (cursor !== 0);
-
-  for (const userKey of usersToRecalc) {
-    const [userId, year] = userKey.split(':');
-    await recalculateConsistency(userId, parseInt(year));
-  }
+  // This function is kept for backward compatibility but no longer used.
+  // Direct updates make Redis flush unnecessary.
+  console.log('[Heatmap] Redis flush is deprecated; using direct MongoDB $inc instead.');
 };
 
 /**
@@ -684,20 +694,14 @@ const getDayData = async (userId, date, timeZone = 'UTC') => {
   const targetDate = getStartOfDay(new Date(date), timeZone);
   const year = targetDate.getUTCFullYear();
 
-  // Ensure heatmap exists for the year
   let heatmap = await HeatmapData.findOne({ userId, year }).lean();
   if (!heatmap) {
     heatmap = await generateHeatmapData(userId, year, timeZone);
   }
 
-  // Find the daily entry
   const dayEntry = heatmap.dailyData.find((day) => isSameDay(day.date, targetDate, timeZone));
-  if (!dayEntry) {
-    // Day is out of range for the year (e.g., Dec 31 2025 but year is 2024) – return null
-    return null;
-  }
+  if (!dayEntry) return null;
 
-  // Compute date string and day of week
   const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][targetDate.getUTCDay()];
 
   return {
@@ -735,6 +739,7 @@ module.exports = {
   getOrCreateHeatmap,
   extractMinimalHeatmap,
   incrementDailyActivity,
+  incrementDailyActivityDirect,   // NEW: direct MongoDB increment
   flushDailyActivitiesToMongoDB,
-  getDayData, // newly exported
+  getDayData,
 };

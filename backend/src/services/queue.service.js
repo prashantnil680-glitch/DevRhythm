@@ -25,17 +25,23 @@ if (!redisOptions) {
   console.error('Redis configuration missing, queues will not work');
 }
 
-// Create a single queue for all job types with better settings
+// Create a single queue for all job types with better resilience
 const jobQueue = new Bull('devrhythm-jobs', {
   redis: {
     ...redisOptions,
-    maxRetriesPerRequest: 50,      // increase from default 20
-    enableReadyCheck: false,       // avoid ECONNRESET during reconnect
+    maxRetriesPerRequest: 100,        // Increased from 50 to handle intermittent ECONNRESET
+    enableOfflineQueue: true,         // Queue commands when Redis is down (reconnect)
+    retryStrategy: (times) => {
+      // Exponential backoff with max 30 seconds
+      const delay = Math.min(times * 100, 30000);
+      console.log(`Redis retry attempt ${times}, waiting ${delay}ms`);
+      return delay;
+    },
   },
   settings: {
-    retryProcessDelay: 5000,       // Wait 5 seconds between retries
-    maxStalledCount: 3,            // Max stalled jobs before failing
-    guardInterval: 5000,           // Check stalled jobs every 5 seconds
+    retryProcessDelay: 5000,          // Wait 5 seconds between retries
+    maxStalledCount: 3,               // Max stalled jobs before failing
+    guardInterval: 5000,              // Check stalled jobs every 5 seconds
   }
 });
 

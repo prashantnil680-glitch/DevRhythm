@@ -27,6 +27,7 @@
   font-size: 1.1rem;
   text-transform: capitalize;
   transition: var(--transition);
+   text-decoration: none;
 }
 .viewAll:hover {
   color: var(--accent-moss);

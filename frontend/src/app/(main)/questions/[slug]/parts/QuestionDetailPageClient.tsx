@@ -282,6 +282,16 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
   ];
 
   useTimeTracker(initialQuestion._id, isAuthenticated && mounted);
+
+  // Build URL for "View all questions" with current question's tags
+  const viewAllQuestionsUrl = useMemo(() => {
+    if (!initialQuestion.tags || initialQuestion.tags.length === 0) {
+      return '/questions?page=1';
+    }
+    const tagsParams = initialQuestion.tags.map(tag => `tags=${encodeURIComponent(tag)}`).join('&');
+    return `/questions?page=1&${tagsParams}`;
+  }, [initialQuestion.tags]);
+
   const isLoading = detailsLoading && !details;
 
   if (isLoading) return <QuestionDetailSkeleton />;
@@ -428,7 +438,7 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
         {similarQuestions.length > 0 ? (
           <SimilarQuestionsGrid
             questions={similarQuestions}
-            onViewAll={() => router.push('/questions')}
+            viewAllHref={viewAllQuestionsUrl}
           />
         ) : clientSimilarLoading ? (
           <div className={styles.similarLoadingGrid}>

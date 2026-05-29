@@ -10,12 +10,12 @@ import styles from './SimilarQuestionsGrid.module.css';
 
 interface SimilarQuestionsGridProps {
   questions: Question[];
-  onViewAll: () => void;
+  viewAllHref: string; 
 }
 
 export const SimilarQuestionsGrid: React.FC<SimilarQuestionsGridProps> = ({
   questions,
-  onViewAll,
+  viewAllHref,
 }) => {
   const isDesktop = useMediaQuery('(min-width: 940px)');
   const isTablet = useMediaQuery('(min-width: 768px)') && !isDesktop;
@@ -28,9 +28,9 @@ export const SimilarQuestionsGrid: React.FC<SimilarQuestionsGridProps> = ({
           <FiBookOpen className={styles.headerIcon} />
           Similar Questions
         </h3>
-        <button className={styles.viewAll} onClick={onViewAll}>
+        <Link href={viewAllHref} className={styles.viewAll}>
           View all questions →
-        </button>
+        </Link>
       </div>
       <div
         className={isDesktop ? styles.grid : styles.horizontalScroll}

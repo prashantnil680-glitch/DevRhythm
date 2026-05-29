@@ -227,9 +227,6 @@ export default function AboutPage() {
             </a>
           ))}
         </div>
-        <p className={styles.note}>
-          ✨ You can edit the projects array in the code – add your own images, titles, descriptions, and URLs.
-        </p>
       </Card>
 
       {/* Social Links */}

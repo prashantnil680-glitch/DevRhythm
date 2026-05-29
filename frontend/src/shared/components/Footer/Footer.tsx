@@ -46,6 +46,11 @@ const StatDisplay: React.FC<{
   return content;
 };
 
+// Helper to check if URL is external
+const isExternalUrl = (href: string): boolean => {
+  return href.startsWith('http://') || href.startsWith('https://');
+};
+
 const LinkGroup: React.FC<{
   title: string;
   links: Array<{ label: string; href: string }>;
@@ -53,13 +58,30 @@ const LinkGroup: React.FC<{
   <div className={styles.linkGroup}>
     <h4 className={styles.groupTitle}>{title}</h4>
     <ul className={styles.linkList}>
-      {links.map(({ label, href }) => (
-        <li key={label}>
-          <Link href={href} className={styles.link}>
-            {label}
-          </Link>
-        </li>
-      ))}
+      {links.map(({ label, href }) => {
+        const external = isExternalUrl(href);
+        if (external) {
+          return (
+            <li key={label}>
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.link}
+              >
+                {label}
+              </a>
+            </li>
+          );
+        }
+        return (
+          <li key={label}>
+            <Link href={href} className={styles.link}>
+              {label}
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   </div>
 );

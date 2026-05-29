@@ -9,6 +9,16 @@ interface MetricsCardProps {
   pattern: PatternMastery;
 }
 
+// Helper: convert minutes to "Xh Ym" or "Xh" or "Ym"
+const formatMinutes = (minutes: number): string => {
+  if (minutes <= 0) return '0m';
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours === 0) return `${mins}m`;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
+};
+
 export default function MetricsCard({ pattern }: MetricsCardProps) {
   const {
     solvedCount,
@@ -35,6 +45,9 @@ export default function MetricsCard({ pattern }: MetricsCardProps) {
     difficultyBreakdown.medium.solved,
     difficultyBreakdown.hard.solved
   );
+  
+  const formattedTotalTime = formatMinutes(Math.round(totalTimeSpent));
+  const formattedAvgTime = formatMinutes(Math.round(averageTimePerQuestion));
 
   return (
     <div className={styles.card}>
@@ -72,14 +85,14 @@ export default function MetricsCard({ pattern }: MetricsCardProps) {
           <FiClock className={styles.icon} />
           <div className={styles.metricContent}>
             <span className={styles.label}>total time spent</span>
-            <span className={styles.value}>{totalTimeSpent} min</span>
+            <span className={styles.value}>{formattedTotalTime}</span>
           </div>
         </div>
         <div className={styles.metricItem}>
           <FiClock className={styles.icon} />
           <div className={styles.metricContent}>
             <span className={styles.label}>average time per question</span>
-            <span className={styles.value}>{averageTimePerQuestion.toFixed(1)} min</span>
+            <span className={styles.value}>{formattedAvgTime}</span>
           </div>
         </div>
         <div className={styles.metricItem}>

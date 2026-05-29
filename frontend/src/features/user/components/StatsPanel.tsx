@@ -91,7 +91,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
 
   return (
     <div className={clsx(styles.container, className)}>
-      <div className={styles.header}>Echoes · Stats</div>
+      <div className={styles.header}>Progress Overview</div>
 
       <div className={styles.grid}>
         {/* Mastery block */}
@@ -101,7 +101,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
         >
           <div className={clsx(styles.block, styles.masteryBlock)}>
             <div className={styles.masteryValue}>{Math.round(masteryRate)}%</div>
-            <div className={styles.blockLabel}>mastery rate</div>
+            <div className={styles.blockLabel}>Mastery Score</div>
           </div>
         </Tooltip>
 
@@ -109,7 +109,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
         <Tooltip content="Total number of problems solved" placement={isMobile ? 'bottom' : 'top'}>
           <div className={clsx(styles.block, styles.solvedBlock)}>
             <div className={styles.solvedValue}>{formatNumber(totalSolved)}</div>
-            <div className={styles.blockLabel}>total solved</div>
+            <div className={styles.blockLabel}>Problems Solved</div>
             <div className={styles.difficultyRow}>
               <Tooltip content="Easy problems solved" placement={isMobile ? 'bottom' : 'top'}>
                 <div className={styles.difficultyPill}>
@@ -144,14 +144,14 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
             <div className={styles.streakItem}>
               <FaFire className={styles.streakIcon} />
               <span className={styles.streakValue}>{currentStreak}d</span>
-              <span className={styles.blockLabel}>current</span>
+              <span className={styles.blockLabel}>Current Streak</span>
             </div>
           </Tooltip>
           <Tooltip content="Longest streak ever achieved" placement={isMobile ? 'bottom' : 'top'}>
             <div className={styles.streakItem}>
               <FaFire className={styles.streakIcon} />
               <span className={styles.streakValue}>{longestStreak}d</span>
-              <span className={styles.blockLabel}>longest</span>
+              <span className={styles.blockLabel}>Longest Streak</span>
             </div>
           </Tooltip>
           <Tooltip
@@ -161,7 +161,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
             <div className={styles.streakItem}>
               <FiCalendar className={styles.streakIcon} />
               <span className={styles.streakValue}>{activeDays}d</span>
-              <span className={styles.blockLabel}>active</span>
+              <span className={styles.blockLabel}>Active Days</span>
             </div>
           </Tooltip>
         </div>
@@ -175,14 +175,14 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
             <div className={styles.effortItem}>
               <FiClock className={styles.effortIcon} />
               <span className={styles.effortValue}>{formatHours(totalTimeSpent)}</span>
-              <span className={styles.blockLabel}>total time</span>
+              <span className={styles.blockLabel}>Time Spent</span>
             </div>
           </Tooltip>
           <Tooltip content="Total revisions completed" placement={isMobile ? 'bottom' : 'top'}>
             <div className={styles.effortItem}>
               <FiRefreshCw className={styles.effortIcon} />
               <span className={styles.effortValue}>{formatNumber(totalRevisions)}</span>
-              <span className={styles.blockLabel}>revisions</span>
+              <span className={styles.blockLabel}>Revision Done</span>
             </div>
           </Tooltip>
         </div>
@@ -210,13 +210,13 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
         </div>
 
         {/* Goals block – only for own profile */}
-        {isOwnProfile && preferences && (
+        {isOwnProfile && preferences && preferences.dailyGoal &&  preferences.weeklyGoal && (
           <div className={clsx(styles.block, styles.goalsBlock)}>
             <Tooltip content="Your daily target" placement={isMobile ? 'bottom' : 'top'}>
               <div className={styles.goalItem}>
                 <FiTarget className={styles.goalIcon} />
                 <span className={styles.goalValue}>{preferences.dailyGoal}</span>
-                <span className={styles.goalLabel}>daily</span>
+                <span className={styles.goalLabel}>Daily Goal</span>
               </div>
             </Tooltip>
             <span className={styles.goalSeparator}>·</span>
@@ -224,7 +224,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
               <div className={styles.goalItem}>
                 <FiCalendar className={styles.goalIcon} />
                 <span className={styles.goalValue}>{preferences.weeklyGoal}</span>
-                <span className={styles.goalLabel}>weekly</span>
+                <span className={styles.goalLabel}>Weekly Goal</span>
               </div>
             </Tooltip>
           </div>

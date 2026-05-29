@@ -29,7 +29,17 @@ passport.use(new GoogleStrategy({
       username: profile.emails[0].value.split('@')[0] + '_' + profile.id.slice(0, 8),
       displayName: profile.displayName,
       avatarUrl: profile.photos[0]?.value,
-      lastOnline: new Date()
+      lastOnline: new Date(),
+      preferences: {
+        dailyGoal: null,
+        weeklyGoal: null,
+        notifications: {
+          revisionReminders: true,
+          goalTracking: true,
+          socialInteractions: true,
+          weeklyReports: true
+        }
+      }
     });
     await newUser.save();
     done(null, newUser);

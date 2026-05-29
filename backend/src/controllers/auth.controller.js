@@ -62,21 +62,16 @@ const handleOAuthCallback = (provider) => (req, res, next) => {
       const token = generateToken(user._id);
       const refreshToken = generateRefreshToken(user._id);
       
-      // Generate a one-time code
       const code = crypto.randomBytes(32).toString('hex');
       const codeKey = `devrhythm:auth:code:${code}`;
-      
-      // Store tokens in Redis with 5 minute TTL
       await redisClient.setEx(codeKey, 300, JSON.stringify({
         userId: user._id.toString(),
         token,
         refreshToken
       }));
       
-      // Redirect to frontend with only the code
       const redirectUrl = new URL(`${config.frontendUrl}/auth/callback`);
       redirectUrl.searchParams.set('code', code);
-      
       res.redirect(redirectUrl.toString());
     } catch (error) {
       console.error('OAuth callback error:', error);

@@ -14,6 +14,7 @@ import { usePendingRevisions } from '@/features/revision/hooks/usePendingRevisio
 import { useCurrentGoalProgress } from '@/features/goal/hooks/useCurrentGoalProgress';
 import { AddProgressModal } from '@/features/progress/components/AddProgressModal';
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -71,6 +72,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
         <ToastProvider position="top-center">
           <LayoutContent>{children}</LayoutContent>
           <Analytics />
+          <SpeedInsights />
         </ToastProvider>
       </ThemeProvider>
     </QueryClientProvider>

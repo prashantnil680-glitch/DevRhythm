@@ -71,11 +71,11 @@ const generateHowToSchema = () => ({
     { '@type': 'HowToTool', name: 'Code editor' },
   ],
   step: [
-    {
-      '@type': 'HowToStep',
-      name: 'Review your revision funnel',
-      text: 'Check the pillar graph to see how many questions are at each revision stage (1st to 5th review).',
-    },
+    // {
+    //   '@type': 'HowToStep',
+    //   name: 'Review your revision funnel',
+    //   text: 'Check the pillar graph to see how many questions are at each revision stage (1st to 5th review).',
+    // },
     {
       '@type': 'HowToStep',
       name: 'Monitor your rhythm',

@@ -80,9 +80,9 @@ export default function RevisionDashboardClient() {
     <div className={styles.container}>
       <HeroStats stats={data.summary} />
       <div className={styles.twoColumnCore}>
-        <div className={styles.leftColumn}>
+        {/* <div className={styles.leftColumn}>
           <RevisionFunnel data={byRevisionIndex} />
-        </div>
+        </div> */}
         {/* <div className={styles.rightColumn}>
           <QuickStats {...quickStats} />
         </div> */}

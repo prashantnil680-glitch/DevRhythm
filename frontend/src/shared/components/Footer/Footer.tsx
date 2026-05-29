@@ -3,15 +3,13 @@ import Link from 'next/link';
 import { FaGithub, FaLinkedin, FaArrowUp } from 'react-icons/fa';
 import { FiAward, FiCheckCircle, FiClock } from 'react-icons/fi';
 import clsx from 'clsx';
-
 import { ROUTES } from '@/shared/config';
 import Logo from '@/shared/components/Logo';
 import Button from '@/shared/components/Button';
-import OAuthButton from '@/shared/components/OAuthButton'; // ✅ Import OAuthButton
+import OAuthButton from '@/shared/components/OAuthButton';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { useTodayProgress } from '@/features/user/hooks/useTodayProgress';
 import { usePendingRevisions } from '@/features/revision/hooks/usePendingRevisions';
-
 import styles from './Footer.module.css';
 
 export interface FooterProps {
@@ -38,7 +36,6 @@ const StatDisplay: React.FC<{
       )}
     </div>
   );
-
   if (href) {
     return (
       <Link href={href} className={styles.statLink}>
@@ -46,7 +43,6 @@ const StatDisplay: React.FC<{
       </Link>
     );
   }
-
   return content;
 };
 
@@ -70,17 +66,13 @@ const LinkGroup: React.FC<{
 
 const BackToTop: React.FC = () => {
   const [visible, setVisible] = useState(false);
-
   useEffect(() => {
     const toggleVisible = () => setVisible(window.scrollY > 400);
     window.addEventListener('scroll', toggleVisible);
     return () => window.removeEventListener('scroll', toggleVisible);
   }, []);
-
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
-
   if (!visible) return null;
-
   return (
     <Button
       variant="primary"
@@ -92,14 +84,10 @@ const BackToTop: React.FC = () => {
   );
 };
 
-export const Footer: React.FC<FooterProps> = ({
-  version = '1.0.0',
-  className,
-}) => {
+export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) => {
   const { user } = useSession();
   const { solvedToday } = useTodayProgress();
   const { pendingCount } = usePendingRevisions();
-
   const isLoggedIn = !!user;
   const streak = user?.streak?.current ?? 0;
 
@@ -140,7 +128,6 @@ export const Footer: React.FC<FooterProps> = ({
           {statDisplays ? (
             statDisplays
           ) : (
-            // ✅ Direct Google OAuth – no intermediate login page
             <OAuthButton
               provider="google"
               variant="outline"
@@ -159,15 +146,19 @@ export const Footer: React.FC<FooterProps> = ({
             links={[
               { label: 'Questions', href: ROUTES.QUESTIONS.ROOT },
               { label: 'Patterns', href: ROUTES.QUESTIONS.PATTERNS },
+              { label: 'Visualizer Algo', href: 'https://sortopia.vercel.app/' },
             ]}
           />
+
           <LinkGroup
             title="Progress"
             links={[
+              { label: 'Activity', href: '/activity' },
               { label: 'Revisions', href: ROUTES.REVISIONS.ROOT },
               { label: 'Goals', href: ROUTES.GOALS.ROOT },
             ]}
           />
+
           <LinkGroup
             title="Community"
             links={[
@@ -175,16 +166,22 @@ export const Footer: React.FC<FooterProps> = ({
               { label: 'Create Group', href: ROUTES.GROUPS.CREATE },
             ]}
           />
+
           <LinkGroup
             title="Account"
             links={[
-              { label: 'Profile', href: user ? ROUTES.USER_PROFILE.OWN(user.username) : ROUTES.LOGIN },
+              {
+                label: 'Profile',
+                href: user ? ROUTES.USER_PROFILE.OWN(user.username) : ROUTES.LOGIN,
+              },
               { label: 'Shares', href: ROUTES.SHARES.ROOT },
             ]}
           />
+
           <LinkGroup
-            title="Legal"
+            title="Company & Legal"
             links={[
+              { label: 'About', href: '/about/me' },
               { label: 'Privacy', href: '/privacy' },
               { label: 'Terms', href: '/terms' },
             ]}
@@ -218,7 +215,6 @@ export const Footer: React.FC<FooterProps> = ({
           <div className={styles.version}>v{version}</div>
         </div>
       </div>
-
       <BackToTop />
     </footer>
   );

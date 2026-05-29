@@ -1,0 +1,167 @@
+.container {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 1rem;
+  animation: fadeInUp 0.4s ease-out both;
+}
+
+.privacyCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+
+.privacyCard:hover {
+  box-shadow: 0 8px 20px var(--shadow);
+}
+
+.header {
+  text-align: center;
+  padding: 2rem 1.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.iconWrapper {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 64px;
+  height: 64px;
+  background: var(--bg-elevated);
+  border-radius: 50%;
+  margin-bottom: 1rem;
+}
+
+.icon {
+  font-size: 2rem;
+  color: var(--accent-moss);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--text-primary);
+}
+
+.lastUpdated {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.content {
+  padding: 1.5rem;
+}
+
+.section {
+  margin-bottom: 2rem;
+}
+
+.section:last-child {
+  margin-bottom: 0;
+}
+
+.section h2 {
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sectionIcon {
+  color: var(--accent-moss);
+  font-size: 1.2rem;
+}
+
+.section p, .section li {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 0.5rem;
+}
+
+.section ul {
+  margin: 0.5rem 0 1rem 1.5rem;
+  padding-left: 0;
+}
+
+.section li {
+  margin-bottom: 0.25rem;
+}
+
+.emailLink {
+  color: var(--accent-moss);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.emailLink:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+.contactLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+}
+
+.contactLink:hover {
+  background: var(--hover-surface);
+  border-color: var(--accent-moss);
+  color: var(--accent-moss);
+  transform: translateY(-1px);
+}
+
+.contactIcon {
+  font-size: 1.2rem;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 767px) {
+  .container {
+    padding: 0.5rem;
+  }
+  .header {
+    padding: 1.5rem 1rem;
+  }
+  .title {
+    font-size: 1.5rem;
+  }
+  .section h2 {
+    font-size: 1.1rem;
+  }
+  .content {
+    padding: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .container {
+    animation: none;
+  }
+}

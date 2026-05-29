@@ -13,6 +13,7 @@ import { useSession } from '@/features/auth/hooks/useSession';
 import { usePendingRevisions } from '@/features/revision/hooks/usePendingRevisions';
 import { useCurrentGoalProgress } from '@/features/goal/hooks/useCurrentGoalProgress';
 import { AddProgressModal } from '@/features/progress/components/AddProgressModal';
+import { Analytics } from "@vercel/analytics/next";
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -69,6 +70,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
       >
         <ToastProvider position="top-center">
           <LayoutContent>{children}</LayoutContent>
+          <Analytics />
         </ToastProvider>
       </ThemeProvider>
     </QueryClientProvider>

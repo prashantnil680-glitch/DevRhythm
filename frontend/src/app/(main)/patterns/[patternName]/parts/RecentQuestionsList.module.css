@@ -83,7 +83,7 @@
 }
 
 .titleLink:hover {
-  text-decoration: underline;
+   /* text-decoration: underline; */
   color: var(--accent-moss);
 }
 

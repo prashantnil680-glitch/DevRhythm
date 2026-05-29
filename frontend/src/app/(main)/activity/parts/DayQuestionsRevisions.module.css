@@ -87,7 +87,7 @@
 
 .questionLink:hover .questionTitle {
   color: var(--accent-moss);
-  text-decoration: underline;
+   /* text-decoration: underline; */
 }
 
 .metaRow {
@@ -135,7 +135,7 @@
 }
 .dateLink:hover {
   color: var(--accent-moss);
-  text-decoration: underline;
+   /* text-decoration: underline; */
 }
 
 /* Skeleton styles */
@@ -193,5 +193,5 @@
 }
 .dateLink:hover {
   color: var(--accent-moss);
-  text-decoration: underline;
+   /* text-decoration: underline; */
 }

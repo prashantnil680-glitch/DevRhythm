@@ -71,11 +71,44 @@ const getPatternMasteryList = async (req, res, next) => {
     if (search) query.patternName = { $regex: search, $options: 'i' };
     
     const sort = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
-    const [patterns, total] = await Promise.all([
-      PatternMastery.find(query).sort(sort).skip(skip).limit(limit).lean(),
-      PatternMastery.countDocuments(query)
-    ]);
+    let patterns = await PatternMastery.find(query)
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .lean();
     
+    // --- FIX: Populate platformQuestionId in recentQuestions (similar to detail endpoint) ---
+    for (const pattern of patterns) {
+      if (pattern.recentQuestions && pattern.recentQuestions.length > 0) {
+        const missingIds = pattern.recentQuestions
+          .filter(rq => !rq.platformQuestionId && rq.questionId)
+          .map(rq => rq.questionId);
+        
+        if (missingIds.length > 0) {
+          const questions = await Question.find(
+            { _id: { $in: missingIds } },
+            { _id: 1, platformQuestionId: 1 }
+          ).lean();
+          
+          const platformIdMap = new Map(
+            questions.map(q => [q._id.toString(), q.platformQuestionId])
+          );
+          
+          pattern.recentQuestions = pattern.recentQuestions.map(rq => {
+            if (!rq.platformQuestionId && rq.questionId) {
+              const qid = rq.questionId.toString();
+              if (platformIdMap.has(qid)) {
+                rq.platformQuestionId = platformIdMap.get(qid);
+              }
+            }
+            return rq;
+          });
+        }
+      }
+    }
+    // --- END FIX ---
+    
+    const total = await PatternMastery.countDocuments(query);
     res.json(formatResponse('Pattern mastery list retrieved', { patterns }, { pagination: paginate(total, page, limit) }));
   } catch (error) { next(error); }
 };

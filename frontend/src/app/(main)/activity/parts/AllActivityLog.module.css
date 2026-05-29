@@ -259,7 +259,7 @@
 }
 .dateLink:hover {
   color: var(--accent-moss);
-  text-decoration: underline;
+   /* text-decoration: underline; */
 }
 
 /* ========== Revisions Tab: Two‑column grid ========== */

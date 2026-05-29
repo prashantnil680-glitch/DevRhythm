@@ -121,7 +121,7 @@
 
 .editButton:hover {
   color: var(--accent-moss);
-  text-decoration: underline;
+   /* text-decoration: underline; */
 }
 
 .editMode {

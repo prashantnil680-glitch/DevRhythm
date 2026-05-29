@@ -245,11 +245,11 @@ const QuestionItem: React.FC<{ item: ProgressItem; isOwnProfile: boolean }> = ({
       </div>
       <div className={styles.titleLine}>
         <span className={styles.connector}>╰─</span>
-        <Tooltip content={problemLink}>
+        {/* <Tooltip content={problemLink}> */}
           <Link href={href} className={styles.titleLink} target={target} rel={rel}>
             {title}
           </Link>
-        </Tooltip>
+        {/* </Tooltip> */}
         <span className={styles.status}>{status}</span>
       </div>
       <div className={styles.meta}>

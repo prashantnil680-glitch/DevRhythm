@@ -589,24 +589,23 @@ const getSimilarQuestions = async (req, res, next) => {
     let targetPatterns = target.pattern || [];
     if (!Array.isArray(targetPatterns)) targetPatterns = [targetPatterns];
 
-    const filterConditions = [
-      { $text: { $search: target.title } }
-    ];
-
-    if (targetPatterns.length > 0) {
-      filterConditions.push({ pattern: { $in: targetPatterns } });
-    }
-
-    if (target.tags && target.tags.length > 0) {
-      filterConditions.push({ tags: { $in: target.tags } });
-    }
-
-    const similar = await Question.aggregate([
+    // Build aggregation pipeline:
+    // 1. First $match with $text search (cannot be inside $or)
+    // 2. Then $match with $or on pattern and tags (applied to text search results)
+    const pipeline = [
       {
         $match: {
           _id: { $ne: target._id },
           isActive: true,
-          $or: filterConditions
+          $text: { $search: target.title }   // text search first, outside $or
+        }
+      },
+      {
+        $match: {
+          $or: [
+            { pattern: { $in: targetPatterns } },
+            { tags: { $in: target.tags } }
+          ]
         }
       },
       {
@@ -616,26 +615,14 @@ const getSimilarQuestions = async (req, res, next) => {
             $cond: {
               if: { $isArray: "$pattern" },
               then: "$pattern",
-              else: {
-                $cond: {
-                  if: { $eq: [{ $type: "$pattern" }, "string"] },
-                  then: ["$pattern"],
-                  else: []
-                }
-              }
+              else: { $cond: { if: { $eq: [{ $type: "$pattern" }, "string"] }, then: ["$pattern"], else: [] } }
             }
           },
           tagsArray: {
             $cond: {
               if: { $isArray: "$tags" },
               then: "$tags",
-              else: {
-                $cond: {
-                  if: { $eq: [{ $type: "$tags" }, "string"] },
-                  then: ["$tags"],
-                  else: []
-                }
-              }
+              else: { $cond: { if: { $eq: [{ $type: "$tags" }, "string"] }, then: ["$tags"], else: [] } }
             }
           }
         }
@@ -644,12 +631,7 @@ const getSimilarQuestions = async (req, res, next) => {
         $addFields: {
           patternScore: {
             $cond: {
-              if: {
-                $gt: [
-                  { $size: { $setIntersection: ["$patternArray", targetPatterns] } },
-                  0
-                ]
-              },
+              if: { $gt: [ { $size: { $setIntersection: ["$patternArray", targetPatterns] } }, 0 ] },
               then: 100,
               else: 0
             }
@@ -685,8 +667,9 @@ const getSimilarQuestions = async (req, res, next) => {
           totalScore: 1
         }
       }
-    ]);
+    ];
 
+    const similar = await Question.aggregate(pipeline);
     res.json(formatResponse('Similar questions retrieved successfully', { similarQuestions: similar }));
   } catch (error) {
     next(error);

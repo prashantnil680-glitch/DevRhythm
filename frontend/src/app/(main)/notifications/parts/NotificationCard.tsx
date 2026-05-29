@@ -25,7 +25,6 @@ export interface NotificationCardProps {
   index?: number;
 }
 
-// Helper to get icon and type-specific class for hover color
 const getNotificationIconAndType = (type: Notification['type']) => {
   switch (type) {
     case 'question_solved':
@@ -61,13 +60,25 @@ const getNotificationLink = (notification: Notification): string | null => {
     case 'question_mastered':
     case 'revision_completed':
     case 'pod_solved':
-    case 'pod_available':
+      // Use platformQuestionId if available
       if (data?.platformQuestionId) {
         return `/questions/${data.platformQuestionId}`;
       }
+      // Fallback to questionId (if stored as string)
       // if (data?.questionId && typeof data.questionId === 'string') {
       //   return `/questions/${data.questionId}`;
       // }
+      return null;
+
+    case 'pod_available':
+      // POD available notifications store the slug in titleSlug
+      if (data?.titleSlug) {
+        return `/questions/${data.titleSlug}`;
+      }
+      // Fallback to platformQuestionId if present
+      if (data?.platformQuestionId) {
+        return `/questions/${data.platformQuestionId}`;
+      }
       return null;
 
     case 'new_follower':

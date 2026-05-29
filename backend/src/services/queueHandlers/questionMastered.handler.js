@@ -29,7 +29,6 @@ const handleQuestionMastered = async (job) => {
             description: `Problems using the ${patternName} pattern`,
           });
         } else {
-          // Ensure existing documents have required fields
           if (!pattern.title) pattern.title = patternName;
           if (!pattern.description) pattern.description = `Problems using the ${patternName} pattern`;
         }
@@ -106,6 +105,7 @@ const handleQuestionMastered = async (job) => {
       message: `You mastered "${question.title}"`,
       data: {
         questionId,
+        platformQuestionId: question.platformQuestionId,
         title: question.title,
         difficulty: question.difficulty,
         platform: question.platform,

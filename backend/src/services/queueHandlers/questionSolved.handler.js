@@ -33,7 +33,6 @@ const handleQuestionSolved = async (job) => {
     const question = await Question.findById(questionId);
     if (!question) throw new Error("Question not found");
 
-    // Check if this is the Problem of the Day (POD)
     let isPod = false;
     let dailyProblem = null;
     try {
@@ -64,8 +63,6 @@ const handleQuestionSolved = async (job) => {
 
     const isFirstSolve = !progress || progress.status !== "Solved";
 
-    // Stats increment removed – now handled synchronously in controllers
-    // Only update totalTimeSpent and activity
     user.stats.totalTimeSpent += timeSpent;
 
     await updateUserActivity(userId, solvedDate, userTimeZone);
@@ -154,7 +151,6 @@ const handleQuestionSolved = async (job) => {
     const startUTC = solvedLocalMidnight.toUTC().toJSDate();
     const endUTC = solvedLocalEnd.toUTC().toJSDate();
 
-    // Planned goals update (unchanged)
     const activePlannedGoals = await Goal.find({
       userId,
       goalType: "planned",
@@ -196,7 +192,6 @@ const handleQuestionSolved = async (job) => {
       }
     }
 
-    // Revision schedule (unchanged)
     const existingRevision = await RevisionSchedule.findOne({ userId, questionId });
 
     if (!existingRevision) {
@@ -225,7 +220,6 @@ const handleQuestionSolved = async (job) => {
     await invalidateCache(`revisions:*:user:${userId}:*`);
     await invalidateCache(`question-details:*:${questionId}:*`);
 
-    // POD notification (unchanged)
     if (isPod) {
       const oneDayAgo = new Date();
       oneDayAgo.setDate(oneDayAgo.getDate() - 1);
@@ -324,7 +318,6 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`goals:*:user:${userId}:*`);
     }
 
-    // Activity log (unchanged)
     await ActivityLog.create({
       userId,
       action: "question_solved",
@@ -342,7 +335,6 @@ const handleQuestionSolved = async (job) => {
       timestamp: solvedDate,
     });
 
-    // Heatmap update (unchanged)
     const year = solvedDate.getUTCFullYear();
     let heatmap = await HeatmapData.findOne({ userId, year });
     if (!heatmap) {
@@ -363,7 +355,6 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`heatmap:*:user:${userId}:*`);
     }
 
-    // First solve notification (unchanged)
     if (isFirstSolve) {
       await Notification.create({
         userId,
@@ -399,7 +390,6 @@ const handleQuestionSolved = async (job) => {
       }
     }
 
-    // Confidence increment job (unchanged)
     const { jobQueue } = require("../queue.service");
     await jobQueue.add('confidence.increment', {
       userId,

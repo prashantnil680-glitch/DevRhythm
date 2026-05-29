@@ -411,7 +411,7 @@ export default function GoalDetailPage() {
     <div className={styles.container}>
       <Breadcrumb
         items={[
-          { label: 'Dashboard', href: ROUTES.DASHBOARD },
+          // { label: 'Dashboard', href: ROUTES.DASHBOARD },
           { label: 'Home', href: ROUTES.HOME },
           { label: 'Goals', href: ROUTES.GOALS.ROOT },
           { label: 'Goal Details' },

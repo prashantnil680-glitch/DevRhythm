@@ -1,11 +1,25 @@
 const Notification = require('../models/Notification');
+const Question = require('../models/Question');
 const { invalidateCache } = require('../middleware/cache');
-const { invalidateDashboardCache } = require('../middleware/cache');   // NEW LINE
+const { invalidateDashboardCache } = require('../middleware/cache');
 
 /**
  * Create an in-app notification.
+ * Automatically enriches data with platformQuestionId if questionId is present.
  */
 const createNotification = async ({ userId, type, title, message, data = {}, channel = 'in-app', scheduledAt = new Date() }) => {
+  // If data contains a questionId but no platformQuestionId, fetch it
+  if (data.questionId && !data.platformQuestionId) {
+    try {
+      const question = await Question.findById(data.questionId).select('platformQuestionId').lean();
+      if (question && question.platformQuestionId) {
+        data.platformQuestionId = question.platformQuestionId;
+      }
+    } catch (err) {
+      console.warn(`Failed to fetch platformQuestionId for question ${data.questionId}:`, err.message);
+    }
+  }
+
   const status = channel === 'in-app' ? 'sent' : 'pending';
   const notification = await Notification.create({
     userId,
@@ -19,7 +33,7 @@ const createNotification = async ({ userId, type, title, message, data = {}, cha
   });
 
   await invalidateCache(`notifications:${userId}:*`);
-  await invalidateDashboardCache(userId); 
+  await invalidateDashboardCache(userId);
   return notification;
 };
 

@@ -66,6 +66,7 @@ const handleRevisionCompleted = async (job) => {
       message: `You completed a revision for "${questionTitle}"`,
       data: {
         questionId,
+        platformQuestionId,
         revisionId,
         revisionIndex,
         status,

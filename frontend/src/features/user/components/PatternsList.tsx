@@ -170,7 +170,7 @@ const PatternsList: React.FC<PatternsListProps> = ({
         <NoRecordFound
           message={
             isOwnProfile
-              ? 'No patterns yet. Start solving to grow your Attempted Pattern!'
+              ? 'No patterns yet. Start solving to grow your Pattern!'
               : 'This user hasn’t cultivated any patterns yet.'
           }
           icon={<span className={styles.emptyIcon}>🌱</span>}

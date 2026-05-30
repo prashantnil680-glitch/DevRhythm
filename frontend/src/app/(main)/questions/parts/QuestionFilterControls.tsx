@@ -130,7 +130,7 @@ export const QuestionFilterControls: React.FC<QuestionFilterControlsProps> = ({
       </div>
 
       {/* Pattern */}
-      <div className={styles.section}>
+      {/* <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <FiRepeat className={styles.sectionIcon} />
           <span className={styles.sectionTitle}>Pattern</span>
@@ -141,19 +141,19 @@ export const QuestionFilterControls: React.FC<QuestionFilterControlsProps> = ({
           onChange={val => onFilterChange('pattern', val)}
           placeholder="All patterns"
         />
-      </div>
+      </div> */}
 
       {/* Tags (MultiSelect) */}
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
-          <FiTag className={styles.sectionIcon} />
-          <span className={styles.sectionTitle}>Tags</span>
+           <FiRepeat className={styles.sectionIcon} />
+          <span className={styles.sectionTitle}>Patterns</span>
         </div>
         <MultiSelect
           options={tagOptions}
           values={filters.tags}
           onChange={val => onFilterChange('tags', val)}
-          placeholder="Select tags"
+          placeholder="Select patterns"
         />
       </div>
 

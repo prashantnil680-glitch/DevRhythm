@@ -8,6 +8,7 @@ const { getStartOfDay, getEndOfDay, formatDate, isToday } = require('../utils/he
 const { slugify } = require('../utils/helpers/string');
 const { invalidateCache } = require('../middleware/cache');
 const heatmapService = require('./heatmap.service');
+const { updateUserActivity } = require('./user.service');
 
 // ========== Helper: Check if user already has any active past‑revision session ==========
 const userHasActiveSession = async (userId) => {
@@ -210,7 +211,7 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
     { $set: { confidenceLevel: newConfidence } }
   );
 
-  // 4. Update heatmap for revision (no difficulty/platform, not a first solve)
+  // 4. Update heatmap for revision
   await heatmapService.incrementDailyActivityDirect(
     userId,
     new Date(),
@@ -224,6 +225,9 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
     null,  // difficulty
     null   // platform
   );
+
+  // 5. Update user streak and active days (NEW)
+  await updateUserActivity(userId, new Date(), timeZone);
   // ========== END SYNC UPDATES ==========
 
   await invalidateCache(`revisions:*:user:${userId}:*`);
@@ -424,6 +428,9 @@ const completePastRevision = async (userId, questionId, targetDate, confidence =
     null,  // difficulty
     null   // platform
   );
+
+  // 5. Update user streak and active days (NEW)
+  await updateUserActivity(userId, new Date(), timeZone);
   // ========== END SYNC UPDATES ==========
 
   const completionDate = new Date();

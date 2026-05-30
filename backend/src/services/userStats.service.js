@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const RevisionSchedule = require('../models/RevisionSchedule');
+const HeatmapData = require('../models/HeatmapData');
 const Question = require('../models/Question');
 const { getStartOfDay } = require('../utils/helpers/date');
 const { DateTime } = require('luxon');
@@ -190,6 +191,71 @@ const computeUserStats = async (userId, timeZone = 'UTC') => {
   };
 };
 
+/**
+ * Compute current and longest streak from heatmap data.
+ * @param {string} userId - User ObjectId
+ * @param {string} timeZone - IANA timezone (e.g., 'Asia/Kolkata')
+ * @returns {Promise<{currentStreak: number, longestStreak: number}>}
+ */
+const computeUserStreak = async (userId, timeZone = 'UTC') => {
+  const year = new Date().getUTCFullYear();
+  let heatmap = await HeatmapData.findOne({ userId, year }).lean();
+  if (!heatmap) {
+    const heatmapService = require('./heatmap.service');
+    heatmap = await heatmapService.generateHeatmapData(userId, year, timeZone);
+  }
+  if (!heatmap || !heatmap.dailyData) {
+    return { currentStreak: 0, longestStreak: 0 };
+  }
+
+  // Convert UTC dates to local date strings
+  const localActivityMap = new Map();
+  for (const day of heatmap.dailyData) {
+    const utcDate = new Date(day.date);
+    const localDate = DateTime.fromJSDate(utcDate, { zone: timeZone }).toFormat('yyyy-MM-dd');
+    const activity = day.totalActivities || 0;
+    localActivityMap.set(localDate, activity);
+  }
+
+  // Current streak
+  let currentStreak = 0;
+  const todayLocal = DateTime.now().setZone(timeZone).toFormat('yyyy-MM-dd');
+  let currentDate = DateTime.fromISO(todayLocal, { zone: timeZone });
+  while (true) {
+    const dateStr = currentDate.toFormat('yyyy-MM-dd');
+    const activity = localActivityMap.get(dateStr) || 0;
+    if (activity > 0) {
+      currentStreak++;
+      currentDate = currentDate.minus({ days: 1 });
+    } else {
+      break;
+    }
+  }
+
+  // Longest streak
+  let longestStreak = 0;
+  let tempStreak = 0;
+  let prevDate = null;
+  const activeDates = Array.from(localActivityMap.entries())
+    .filter(([_, activity]) => activity > 0)
+    .map(([date]) => date)
+    .sort();
+  for (const dateStr of activeDates) {
+    if (prevDate) {
+      const diff = DateTime.fromISO(dateStr).diff(DateTime.fromISO(prevDate), 'days').days;
+      if (diff === 1) tempStreak++;
+      else tempStreak = 1;
+    } else {
+      tempStreak = 1;
+    }
+    if (tempStreak > longestStreak) longestStreak = tempStreak;
+    prevDate = dateStr;
+  }
+
+  return { currentStreak, longestStreak };
+};
+
 module.exports = {
-  computeUserStats
+  computeUserStats,
+  computeUserStreak
 };

@@ -8,33 +8,35 @@ const { invalidateUserCache, invalidateDashboardCache, invalidateCache } = requi
 const { paginate } = require('../utils/helpers/pagination');
 const { formatResponse } = require('../utils/helpers/response');
 const config = require('../config');
-const { computeUserStats } = require('../services/userStats.service');
+const { computeUserStats, computeUserStreak } = require('../services/userStats.service');
 
 const getCurrentUser = async (req, res, next) => {
   try {
     const user = req.user.toObject();
     delete user.__v;
-    // Online if last activity within 1 minutes
     user.isOnline = (Date.now() - new Date(user.lastOnline).getTime()) < 1 * 60 * 1000;
-    
-    // Compute accurate stats from source collections
+
     const timeZone = user.preferences?.timezone || 'UTC';
     const computedStats = await computeUserStats(user._id, timeZone);
-    
-    // Override the stats field with computed values
+    const computedStreak = await computeUserStreak(user._id, timeZone);
+
     user.stats = {
       totalSolved: computedStats.totalSolved,
       masteryRate: computedStats.masteryRate,
       totalRevisions: computedStats.totalRevisions,
       totalTimeSpent: computedStats.totalTimeSpent,
-      activeDays: computedStats.activeDays
+      activeDays: computedStats.activeDays,
     };
-    
-    // Round masteryRate to 2 decimal places
-    if (user.stats && user.stats.masteryRate) {
+    user.streak = {
+      current: computedStreak.currentStreak,
+      longest: computedStreak.longestStreak,
+      lastActiveDate: user.streak.lastActiveDate, // keep original or compute from heatmap? Keep as is.
+    };
+
+    if (user.stats.masteryRate) {
       user.stats.masteryRate = Math.round(user.stats.masteryRate * 100) / 100;
     }
-    
+
     res.json(formatResponse('User profile retrieved successfully', { user }));
   } catch (error) {
     next(error);

@@ -12,6 +12,7 @@ const revisionService = require('./revision.service');
 const { calculateIntensityLevel } = require('./heatmap.service');
 const { getStartOfDay, getEndOfDay, getStartOfWeek, getEndOfWeek, getStartOfMonth, getEndOfMonth, formatDate } = require('../utils/helpers/date');
 const { slugify } = require('../utils/helpers/string');
+const { computeUserStats, computeUserStreak } = require('./userStats.service');
 
 // Helper to convert UTC to localised ISO string
 const toLocalISOString = (utcDate, timeZone) => {
@@ -20,12 +21,20 @@ const toLocalISOString = (utcDate, timeZone) => {
   return dt.setZone(timeZone).toISO({ includeOffset: true });
 };
 
-const getUserStats = (user) => ({
-  totalSolved: user.stats?.totalSolved || 0,
-  masteryRate: Math.round((user.stats?.masteryRate || 0) * 100) / 100,
-  currentStreak: user.streak?.current || 0,
-  longestStreak: user.streak?.longest || 0
-});
+const getUserStats = async (user) => {
+  const userId = user._id;
+  const timeZone = user.preferences?.timezone || 'UTC';
+
+  const computedStats = await computeUserStats(userId, timeZone);
+  const computedStreak = await computeUserStreak(userId, timeZone);
+
+  return {
+    totalSolved: computedStats.totalSolved,
+    masteryRate: computedStats.masteryRate,
+    currentStreak: computedStreak.currentStreak,
+    longestStreak: computedStreak.longestStreak,
+  };
+};
 
 const getCurrentGoals = async (userId, timeZone) => {
   const now = new Date();

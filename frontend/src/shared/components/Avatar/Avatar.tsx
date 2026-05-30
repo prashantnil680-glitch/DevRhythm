@@ -1,3 +1,4 @@
+'use client'
 import React, { useState, forwardRef } from "react";
 import Image from "next/image";
 import { FaUser } from "react-icons/fa";

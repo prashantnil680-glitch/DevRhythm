@@ -354,7 +354,7 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
           </Link>
         ))}
         <a href={initialQuestion.problemLink} target="_blank" rel="noopener noreferrer" className={styles.linkIcon}>
-          🔗 Problem Link
+          🔗 Solve on {initialQuestion.platform}
         </a>
         {initialQuestion.solutionLinks?.length > 0 && (
           <span className={styles.linkIcon}>

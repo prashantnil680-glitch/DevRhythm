@@ -5,10 +5,10 @@ import Button from '@/shared/components/Button';
 import Select from '@/shared/components/Select';
 import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
-import { java } from '@codemirror/lang-java';
 import { cpp } from '@codemirror/lang-cpp';
-import { javascript } from '@codemirror/lang-javascript';
-import { EditorView } from '@codemirror/view';
+import { EditorView, keymap } from '@codemirror/view';
+import { StateEffect, StateField, RangeSet, Range, RangeValue } from '@codemirror/state';
+import { indentUnit } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Extension } from '@codemirror/state';
@@ -23,11 +23,15 @@ import {
   FiClock,
   FiUpload,
   FiRotateCcw,
+  FiCopy,
+  FiX,
+  FiChevronLeft,
+  FiChevronRight,
 } from 'react-icons/fi';
 import { toast } from '@/shared/components/Toast';
 import styles from './CodeExecutionArea.module.css';
-import { SiCplusplus, SiJavascript } from 'react-icons/si';
-import { FaJava, FaPython } from 'react-icons/fa';
+import { SiCplusplus } from 'react-icons/si';
+import { FaPython } from 'react-icons/fa';
 import { PartyPopper, PartyPopperRef } from '@/shared/components/PartyPopper';
 
 interface TestCase {
@@ -60,11 +64,143 @@ interface CodeExecutionAreaProps {
 
 const languageOptions = [
   { value: 'python', label: 'Python' },
-  // { value: 'java', label: 'Java' },
   { value: 'cpp', label: 'C++' },
-  // { value: 'javascript', label: 'JavaScript' },
 ];
 
+// Storage keys
+const getStorageKey = (questionId: string, language: string) => `code_${questionId}_${language}`;
+const getLanguageStorageKey = (questionId: string) => `code_language_${questionId}`;
+
+// ========== Custom Find/Replace State ==========
+class SearchMatchValue extends RangeValue {
+  constructor(public type: string) {
+    super();
+  }
+  eq(other: SearchMatchValue) {
+    return this.type === other.type;
+  }
+  map() {
+    return this;
+  }
+  startSide = 0;
+  endSide = 0;
+  mapMode = 0;
+  point = false;
+  side = 0;
+}
+
+const addSearchMatchEffect = StateEffect.define<RangeSet<SearchMatchValue>>();
+const searchMatchField = StateField.define<RangeSet<SearchMatchValue>>({
+  create() {
+    return RangeSet.empty;
+  },
+  update(value, tr) {
+    for (let effect of tr.effects) {
+      if (effect.is(addSearchMatchEffect)) {
+        return effect.value;
+      }
+    }
+    return value;
+  },
+});
+
+const searchHighlightTheme = EditorView.baseTheme({
+  '.cm-search-match': {
+    backgroundColor: 'var(--accent-moss)',
+    color: 'var(--primary-text-on-action)',
+  },
+});
+
+function getMatchRanges(doc: any, searchText: string): { from: number; to: number; value: SearchMatchValue }[] {
+  if (!searchText) return [];
+  const ranges: { from: number; to: number; value: SearchMatchValue }[] = [];
+  const content = doc.toString();
+  let start = 0;
+  while (true) {
+    const idx = content.indexOf(searchText, start);
+    if (idx === -1) break;
+    const from = idx;
+    const to = from + searchText.length;
+    ranges.push({ from, to, value: new SearchMatchValue('search-match') });
+    start = to;
+  }
+  return ranges;
+}
+
+function updateSearchMatches(view: EditorView, searchText: string) {
+  const ranges = getMatchRanges(view.state.doc, searchText);
+  const set = RangeSet.of(ranges.map(r => ({ from: r.from, to: r.to, value: r.value })));
+  view.dispatch({ effects: addSearchMatchEffect.of(set) });
+}
+
+function getCurrentMatchIndex(view: EditorView): number | null {
+  const selection = view.state.selection.main;
+  const from = selection.from;
+  const field = view.state.field(searchMatchField);
+  let matches: { from: number; to: number; value: SearchMatchValue }[] = [];
+  field.between(0, view.state.doc.length, (from, to, value) => {
+    matches.push({ from, to, value });
+  });
+  for (let i = 0; i < matches.length; i++) {
+    if (matches[i].from === from) return i;
+  }
+  return null;
+}
+
+function goToMatch(view: EditorView, direction: 'next' | 'prev') {
+  const field = view.state.field(searchMatchField);
+  let matches: { from: number; to: number; value: SearchMatchValue }[] = [];
+  field.between(0, view.state.doc.length, (from, to, value) => {
+    matches.push({ from, to, value });
+  });
+  if (matches.length === 0) return;
+  let currentIdx = getCurrentMatchIndex(view);
+  let nextIdx: number;
+  if (currentIdx === null) {
+    nextIdx = direction === 'next' ? 0 : matches.length - 1;
+  } else {
+    nextIdx = direction === 'next' ? currentIdx + 1 : currentIdx - 1;
+    if (nextIdx < 0) nextIdx = matches.length - 1;
+    if (nextIdx >= matches.length) nextIdx = 0;
+  }
+  const match = matches[nextIdx];
+  view.dispatch({
+    selection: { anchor: match.from, head: match.to },
+    scrollIntoView: true,
+  });
+}
+
+function replaceCurrent(view: EditorView, replaceText: string) {
+  const selection = view.state.selection.main;
+  const from = selection.from;
+  const to = selection.to;
+  const field = view.state.field(searchMatchField);
+  let isMatch = false;
+  field.between(from, to, (f, t) => {
+    if (f === from && t === to) isMatch = true;
+  });
+  if (!isMatch) return;
+  view.dispatch({
+    changes: { from, to, insert: replaceText },
+    selection: { anchor: from, head: from + replaceText.length },
+  });
+  const searchText = (window as any).__searchText || '';
+  if (searchText) updateSearchMatches(view, searchText);
+}
+
+function replaceAll(view: EditorView, searchText: string, replaceText: string) {
+  if (!searchText) return;
+  const content = view.state.doc.toString();
+  const newContent = content.split(searchText).join(replaceText);
+  if (newContent !== content) {
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: newContent },
+    });
+    updateSearchMatches(view, searchText);
+  }
+}
+
+// ========== Theme & Indentation ==========
 const createCustomTheme = (isDark: boolean): Extension => {
   const backgroundColor = isDark ? 'var(--code-bg)' : 'var(--code-bg)';
   const textColor = isDark ? 'var(--code-text)' : 'var(--code-text)';
@@ -128,6 +264,7 @@ const useTheme = () => {
   return isDark;
 };
 
+// ========== Main Component ==========
 export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
   questionId,
   defaultTestCases,
@@ -155,133 +292,227 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
   const editorViewRef = useRef<EditorView | null>(null);
   const partyPopperRef = useRef<PartyPopperRef>(null);
   const hasLoadedInitialHistory = useRef(false);
+  const saveTimeout = useRef<NodeJS.Timeout | null>(null);
+  const initialLoadDone = useRef(false);
+  const prevIsRunning = useRef(isRunning);
+  const lastPartyTrigger = useRef<string>('');
 
-  const getLanguageExtension = (lang: string) => {
-    switch (lang) {
-      case 'python':
-        return python();
-      // case 'java':
-      //   return java();
-      case 'cpp':
-        return cpp();
-      // case 'javascript': 
-      //   return javascript();
-      default:
-        return python();
+  // Find/Replace UI state
+  const [showFindPanel, setShowFindPanel] = useState(false);
+  const [findText, setFindText] = useState('');
+  const [replaceText, setReplaceText] = useState('');
+  const [showReplace, setShowReplace] = useState(false);
+  const findInputRef = useRef<HTMLInputElement>(null);
+
+  // Persistence helpers
+  const persistCode = useCallback((newCode: string, lang: string) => {
+    if (!newCode) return;
+    const key = getStorageKey(questionId, lang);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(key, newCode);
     }
-  };
+  }, [questionId]);
+
+  const getPersistedCode = useCallback((lang: string): string | null => {
+    const key = getStorageKey(questionId, lang);
+    if (typeof window !== 'undefined') return localStorage.getItem(key);
+    return null;
+  }, [questionId]);
+
+  const persistLanguage = useCallback((lang: string) => {
+    const key = getLanguageStorageKey(questionId);
+    if (typeof window !== 'undefined') localStorage.setItem(key, lang);
+  }, [questionId]);
+
+  const getPersistedLanguage = useCallback((): string | null => {
+    const key = getLanguageStorageKey(questionId);
+    if (typeof window !== 'undefined') return localStorage.getItem(key);
+    return null;
+  }, [questionId]);
 
   const getCurrentStarterCode = useCallback(() => {
     if (!starterCodeByLanguage) return '';
     const lang = language;
-    // Try exact match
-    if (starterCodeByLanguage[lang]) {
-      return starterCodeByLanguage[lang];
-    }
-    // Fallback for python (backend may have 'python3')
-    if (lang === 'python' && starterCodeByLanguage['python3']) {
-      return starterCodeByLanguage['python3'];
-    }
-    // Fallback for cpp (backend may have 'c++')
-    if (lang === 'cpp' && starterCodeByLanguage['c++']) {
-      return starterCodeByLanguage['c++'];
-    }
+    if (starterCodeByLanguage[lang]) return starterCodeByLanguage[lang];
+    if (lang === 'python' && starterCodeByLanguage['python3']) return starterCodeByLanguage['python3'];
+    if (lang === 'cpp' && starterCodeByLanguage['c++']) return starterCodeByLanguage['c++'];
     return `// Starter code not available for ${language}\n`;
   }, [starterCodeByLanguage, language]);
 
-  const checkIfModified = useCallback(
-    (currentCode: string) => {
-      const starter = getCurrentStarterCode();
-      setIsCodeModified(currentCode !== starter);
-    },
-    [getCurrentStarterCode]
-  );
+  const checkIfModified = useCallback((currentCode: string) => {
+    const starter = getCurrentStarterCode();
+    setIsCodeModified(currentCode !== starter);
+  }, [getCurrentStarterCode]);
 
+  const handleCodeChange = useCallback((val: string) => {
+    setCode(val);
+    onCodeChange?.(val);
+    checkIfModified(val);
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
+    saveTimeout.current = setTimeout(() => {
+      persistCode(val, language);
+    }, 500);
+  }, [onCodeChange, checkIfModified, persistCode, language]);
+
+  // Initial load: restore language and code
   useEffect(() => {
-    if (!skipStarterLoad.current) {
-      checkIfModified(code);
+    if (initialLoadDone.current) return;
+    const savedLang = getPersistedLanguage();
+    if (savedLang && languageOptions.some(opt => opt.value === savedLang)) {
+      setLanguage(savedLang as typeof language);
     }
-  }, [code, checkIfModified]);
+    initialLoadDone.current = true;
+  }, [getPersistedLanguage]);
 
-  // Load initial history only on mount
   useEffect(() => {
-    if (!hasLoadedInitialHistory.current) {
-      if (initialHistory.length > 0) {
-        const sorted = [...initialHistory].sort(
-          (a, b) => new Date(b.executedAt).getTime() - new Date(a.executedAt).getTime()
-        );
-        const last = sorted[0];
-        if (last) {
-          let frontendLang = initialLanguage;
-          // Map backend language to frontend language key
-          const backendLang = last.language.toLowerCase();
-          if (backendLang === 'python3') frontendLang = 'python';
-          else if (backendLang === 'c++') frontendLang = 'cpp';
-          else if (backendLang === 'python') frontendLang = 'python';
-          else if (backendLang === 'java') frontendLang = 'java';
-          else if (backendLang === 'javascript') frontendLang = 'javascript';
-          else frontendLang = backendLang;
+    if (!initialLoadDone.current) return;
+    const savedCode = getPersistedCode(language);
+    if (savedCode) {
+      setCode(savedCode);
+      onCodeChange?.(savedCode);
+      checkIfModified(savedCode);
+    } else {
+      const starter = getCurrentStarterCode();
+      setCode(starter);
+      onCodeChange?.(starter);
+      checkIfModified(starter);
+    }
+    skipStarterLoad.current = true;
+  }, [language, getPersistedCode, getCurrentStarterCode, onCodeChange, checkIfModified]);
+
+  // When language changes, persist it and load code
+  useEffect(() => {
+    if (!initialLoadDone.current) return;
+    if (skipStarterLoad.current) return;
+    persistLanguage(language);
+    const saved = getPersistedCode(language);
+    if (saved) {
+      setCode(saved);
+      onCodeChange?.(saved);
+      checkIfModified(saved);
+    } else {
+      const starter = getCurrentStarterCode();
+      setCode(starter);
+      onCodeChange?.(starter);
+      checkIfModified(starter);
+    }
+  }, [language, getPersistedCode, getCurrentStarterCode, onCodeChange, checkIfModified, persistLanguage]);
+
+  // Load last history code if no persisted code exists
+  useEffect(() => {
+    if (!hasLoadedInitialHistory.current && initialHistory.length > 0) {
+      const sorted = [...initialHistory].sort(
+        (a, b) => new Date(b.executedAt).getTime() - new Date(a.executedAt).getTime()
+      );
+      const last = sorted[0];
+      if (last) {
+        let frontendLang = initialLanguage;
+        const backendLang = last.language.toLowerCase();
+        if (backendLang === 'python3') frontendLang = 'python';
+        else if (backendLang === 'c++') frontendLang = 'cpp';
+        else if (backendLang === 'python') frontendLang = 'python';
+        else frontendLang = backendLang;
+        const existing = getPersistedCode(frontendLang);
+        if (!existing && initialLoadDone.current) {
           skipStarterLoad.current = true;
           setLanguage(frontendLang);
+          persistLanguage(frontendLang);
           setCode(last.code);
-          if (onCodeChange) onCodeChange(last.code);
-          setTimeout(() => {
-            skipStarterLoad.current = false;
-          }, 100);
+          onCodeChange?.(last.code);
+          persistCode(last.code, frontendLang);
+          setTimeout(() => { skipStarterLoad.current = false; }, 100);
         }
       }
       hasLoadedInitialHistory.current = true;
     }
-  }, [initialHistory, initialLanguage, onCodeChange]);
+  }, [initialHistory, initialLanguage, onCodeChange, getPersistedCode, persistCode, persistLanguage]);
 
-  // Update code when language changes (unless loading history)
-  useEffect(() => {
-    if (skipStarterLoad.current) return;
-    const starter = getCurrentStarterCode();
-    setCode(starter);
-    if (onCodeChange) onCodeChange(starter);
-    setIsCodeModified(false);
-  }, [language, getCurrentStarterCode, onCodeChange]);
-
-  useEffect(() => {
-    if (onCodeChange) onCodeChange(code);
-  }, [code, onCodeChange]);
-
-  // Auto‑switch to results tab on new execution results
+  // Auto-switch to results tab
   useEffect(() => {
     if (results && results.length > 0 && !autoSwitched.current) {
       autoSwitched.current = true;
       onTabChange('results');
-      setTimeout(() => {
-        autoSwitched.current = false;
-      }, 500);
+      setTimeout(() => { autoSwitched.current = false; }, 500);
     }
   }, [results, onTabChange]);
 
-  const handleAddCustom = () => {
-    setCustomTestCases((prev) => [...prev, { stdin: '', expected: '' }]);
-  };
+  // Party popper: only when run completes and all tests pass
+  useEffect(() => {
+    if (prevIsRunning.current === true && isRunning === false && results && results.length > 0 && results.every(r => r.passed)) {
+      const key = `${results.length}-${results.filter(r => r.passed).length}`;
+      if (lastPartyTrigger.current !== key) {
+        lastPartyTrigger.current = key;
+        partyPopperRef.current?.fire();
+      }
+    }
+    prevIsRunning.current = isRunning;
+  }, [isRunning, results]);
 
-  const handleRemoveCustom = (index: number) => {
-    setCustomTestCases((prev) => prev.filter((_, i) => i !== index));
-  };
+  // ========== Custom Find/Replace Handlers ==========
+  const handleFindNext = useCallback(() => {
+    if (!editorViewRef.current || !findText) return;
+    goToMatch(editorViewRef.current, 'next');
+  }, [findText]);
 
-  const handleCustomChange = (index: number, field: 'stdin' | 'expected', value: string) => {
-    setCustomTestCases((prev) =>
-      prev.map((tc, i) => (i === index ? { ...tc, [field]: value } : tc))
-    );
-  };
+  const handleFindPrev = useCallback(() => {
+    if (!editorViewRef.current || !findText) return;
+    goToMatch(editorViewRef.current, 'prev');
+  }, [findText]);
 
-  const handleRun = () => {
-    const combined = [...defaultTestCases, ...customTestCases];
-    onRun(code, language, combined);
+  const handleReplaceOne = useCallback(() => {
+    if (!editorViewRef.current || !findText) return;
+    replaceCurrent(editorViewRef.current, replaceText);
+  }, [findText, replaceText]);
+
+  const handleReplaceAll = useCallback(() => {
+    if (!editorViewRef.current || !findText) return;
+    replaceAll(editorViewRef.current, findText, replaceText);
+  }, [findText, replaceText]);
+
+  // Update search matches whenever findText changes
+  useEffect(() => {
+    if (!editorViewRef.current) return;
+    const view = editorViewRef.current;
+    updateSearchMatches(view, findText);
+    (window as any).__searchText = findText;
+  }, [findText]);
+
+  // Keyboard shortcuts for find panel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        if (!showFindPanel) {
+          setShowFindPanel(true);
+          setFindText('');
+          setReplaceText('');
+          setShowReplace(false);
+          setTimeout(() => findInputRef.current?.focus(), 10);
+        } else {
+          findInputRef.current?.focus();
+        }
+      }
+      if (e.key === 'Escape' && showFindPanel) {
+        setShowFindPanel(false);
+        editorViewRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showFindPanel]);
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(code);
+    toast.success('Code copied to clipboard');
   };
 
   const handleReset = () => {
     const starter = getCurrentStarterCode();
     setCode(starter);
-    if (onCodeChange) onCodeChange(starter);
-    toast.success('Code reset');
+    onCodeChange?.(starter);
+    const key = getStorageKey(questionId, language);
+    localStorage.removeItem(key);
+    toast.success('Reset to starter code');
   };
 
   const customTheme = useMemo(() => createCustomTheme(isDark), [isDark]);
@@ -297,12 +528,59 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
 
   const resetButtonContent = isMobile ? <FiRotateCcw /> : <><FiRotateCcw /> Reset</>;
 
-  // Fire party popper if all tests pass
-  useEffect(() => {
-    if (results && results.length > 0 && results.every((r) => r.passed)) {
-      partyPopperRef.current?.fire();
+  const getLanguageExtension = (lang: string) => {
+    switch (lang) {
+      case 'python': return python();
+      case 'cpp': return cpp();
+      default: return python();
     }
-  }, [results]);
+  };
+
+  // Custom extensions for 4‑space indentation and Tab key behavior
+  const indentExtensions = useMemo(() => {
+    return [
+      indentUnit.of('    '), // 4 spaces
+      keymap.of([
+        {
+          key: 'Tab',
+          run: (view) => {
+            // Insert 4 spaces at cursor
+            view.dispatch({
+              changes: { from: view.state.selection.main.head, insert: '    ' },
+              selection: { anchor: view.state.selection.main.head + 4 },
+            });
+            return true;
+          },
+          preventDefault: true,
+        },
+        {
+          key: 'Shift-Tab',
+          run: (view) => {
+            // Unindent (remove up to 4 spaces before cursor)
+            const pos = view.state.selection.main.head;
+            const line = view.state.doc.lineAt(pos);
+            const lineStart = line.from;
+            const lineText = line.text;
+            let spacesToRemove = 0;
+            for (let i = 0; i < Math.min(4, lineText.length); i++) {
+              if (lineText[i] === ' ') spacesToRemove++;
+              else break;
+            }
+            if (spacesToRemove > 0) {
+              const from = lineStart;
+              const to = lineStart + spacesToRemove;
+              view.dispatch({
+                changes: { from, to, insert: '' },
+                selection: { anchor: pos - spacesToRemove },
+              });
+            }
+            return true;
+          },
+          preventDefault: true,
+        },
+      ]),
+    ];
+  }, []);
 
   return (
     <div className={styles.container}>
@@ -310,14 +588,8 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
 
       <div className={styles.topRow}>
         <div className={styles.languageRow}>
-          <Select
-            options={languageOptions}
-            value={language}
-            onChange={setLanguage}
-            className={styles.select}
-          />
+          <Select options={languageOptions} value={language} onChange={setLanguage} className={styles.select} />
         </div>
-
         <div className={styles.tabsSwitch}>
           {tabs.map((tab) => (
             <button
@@ -330,22 +602,21 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
             </button>
           ))}
         </div>
-
         <div className={styles.actionButtons}>
-          {isCodeModified && (
-            <button
-              className={styles.iconButton}
-              onClick={handleReset}
-              aria-label="Reset code"
-              title="Reset to starter code"
-            >
+          {activeTab === 'code' && (
+            <button className={styles.iconButton} onClick={copyToClipboard} aria-label="Copy code" title="Copy code">
+              <FiCopy />
+            </button>
+          )}
+          {isCodeModified && activeTab === 'code' && (
+            <button className={styles.iconButton} onClick={handleReset} aria-label="Reset code" title="Reset to starter code">
               {resetButtonContent}
             </button>
           )}
           <Button
             variant="primary"
             size="sm"
-            onClick={handleRun}
+            onClick={() => onRun(code, language, [...defaultTestCases, ...customTestCases])}
             isLoading={isRunning}
             leftIcon={<FiPlay />}
             className={styles.runButton}
@@ -357,53 +628,98 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
 
       {activeTab === 'code' && (
         <>
-          <CodeMirror
-            value={code}
-            onChange={(val) => {
-              setCode(val);
-              if (onCodeChange) onCodeChange(val);
-            }}
-            height={isMobile ? '300px' : '500px'}
-            extensions={[getLanguageExtension(language), customTheme]}
-            basicSetup={{
-              lineNumbers: true,
-              highlightActiveLineGutter: true,
-              highlightActiveLine: true,
-              foldGutter: true,
-              dropCursor: true,
-              allowMultipleSelections: true,
-              indentOnInput: true,
-              bracketMatching: true,
-              closeBrackets: true,
-              autocompletion: true,
-              rectangularSelection: true,
-              crosshairCursor: true,
-              highlightSelectionMatches: true,
-              closeBracketsKeymap: true,
-              defaultKeymap: true,
-              searchKeymap: true,
-              historyKeymap: true,
-              foldKeymap: true,
-              completionKeymap: true,
-              lintKeymap: true,
-            }}
-            className={styles.editor}
-            onCreateEditor={(view) => {
-              editorViewRef.current = view;
-            }}
-          />
+          <div className={styles.editorWrapper}>
+            <CodeMirror
+              value={code}
+              onChange={handleCodeChange}
+              height={isMobile ? '300px' : '500px'}
+              extensions={[
+                getLanguageExtension(language),
+                customTheme,
+                searchHighlightTheme,
+                searchMatchField,
+                indentExtensions,
+                keymap.of([
+                  { key: 'Ctrl-f', run: () => { setShowFindPanel(true); return true; }, preventDefault: true },
+                  { key: 'Cmd-f', run: () => { setShowFindPanel(true); return true; }, preventDefault: true },
+                ]),
+              ]}
+              basicSetup={{
+                lineNumbers: true,
+                highlightActiveLineGutter: true,
+                highlightActiveLine: true,
+                foldGutter: true,
+                dropCursor: true,
+                allowMultipleSelections: true,
+                indentOnInput: true,
+                bracketMatching: true,
+                closeBrackets: true,
+                autocompletion: true,
+                rectangularSelection: true,
+                crosshairCursor: true,
+                highlightSelectionMatches: true,
+                closeBracketsKeymap: true,
+                defaultKeymap: true,
+                historyKeymap: true,
+                foldKeymap: true,
+                completionKeymap: true,
+                lintKeymap: true,
+              }}
+              className={styles.editor}
+              onCreateEditor={(view) => { editorViewRef.current = view; }}
+            />
+
+            {showFindPanel && (
+              <div className={styles.findPanel}>
+                <div className={styles.findPanelContent}>
+                  <div className={styles.findRow}>
+                    <input
+                      ref={findInputRef}
+                      type="text"
+                      placeholder="Find"
+                      value={findText}
+                      onChange={(e) => setFindText(e.target.value)}
+                      className={styles.findInput}
+                    />
+                    <button className={styles.findActionButton} onClick={handleFindPrev} title="Previous match">
+                      <FiChevronLeft />
+                    </button>
+                    <button className={styles.findActionButton} onClick={handleFindNext} title="Next match">
+                      <FiChevronRight />
+                    </button>
+                    <button className={styles.findActionButton} onClick={() => setShowReplace(!showReplace)} title="Show replace">
+                      {showReplace ? <FiChevronUp /> : <FiChevronDown />}
+                    </button>
+                    <button className={styles.findCloseButton} onClick={() => setShowFindPanel(false)} aria-label="Close">
+                      <FiX />
+                    </button>
+                  </div>
+                  {showReplace && (
+                    <div className={styles.replaceRow}>
+                      <input
+                        type="text"
+                        placeholder="Replace with"
+                        value={replaceText}
+                        onChange={(e) => setReplaceText(e.target.value)}
+                        className={styles.replaceInput}
+                      />
+                      <button className={styles.replaceButton} onClick={handleReplaceOne}>Replace</button>
+                      <button className={styles.replaceAllButton} onClick={handleReplaceAll}>Replace All</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className={styles.testCasesSection}>
             <div className={styles.testCasesHeader}>
               <strong>Test Cases</strong>
               <div className={styles.testCasesHeaderActions}>
-                <button className={styles.addButtonSmall} onClick={handleAddCustom}>
+                <button className={styles.addButtonSmall} onClick={() => setCustomTestCases((prev) => [...prev, { stdin: '', expected: '' }])}>
                   <FiPlus /> Add
                 </button>
-                <button
-                  className={styles.toggleButton}
-                  onClick={() => setTestCasesCollapsed(!testCasesCollapsed)}
-                >
+                <button className={styles.toggleButton} onClick={() => setTestCasesCollapsed(!testCasesCollapsed)}>
                   {testCasesCollapsed ? <FiChevronDown /> : <FiChevronUp />}
                 </button>
               </div>
@@ -416,12 +732,8 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
                 </div>
                 {defaultTestCases.map((tc, idx) => (
                   <div key={`default-${idx}`} className={styles.testCaseRow}>
-                    <div className={styles.testCaseCell}>
-                      <code className={styles.mono}>{tc.stdin}</code>
-                    </div>
-                    <div className={styles.testCaseCell}>
-                      <code className={styles.mono}>{tc.expected}</code>
-                    </div>
+                    <div className={styles.testCaseCell}><code className={styles.mono}>{tc.stdin}</code></div>
+                    <div className={styles.testCaseCell}><code className={styles.mono}>{tc.expected}</code></div>
                   </div>
                 ))}
                 {customTestCases.map((tc, idx) => (
@@ -429,7 +741,11 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
                     <div className={styles.testCaseCell}>
                       <textarea
                         value={tc.stdin}
-                        onChange={(e) => handleCustomChange(idx, 'stdin', e.target.value)}
+                        onChange={(e) => {
+                          const newCases = [...customTestCases];
+                          newCases[idx].stdin = e.target.value;
+                          setCustomTestCases(newCases);
+                        }}
                         className={styles.editableInput}
                         rows={2}
                       />
@@ -437,12 +753,16 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
                     <div className={styles.testCaseCell}>
                       <textarea
                         value={tc.expected}
-                        onChange={(e) => handleCustomChange(idx, 'expected', e.target.value)}
+                        onChange={(e) => {
+                          const newCases = [...customTestCases];
+                          newCases[idx].expected = e.target.value;
+                          setCustomTestCases(newCases);
+                        }}
                         className={styles.editableInput}
                         rows={2}
                       />
                     </div>
-                    <button className={styles.deleteButton} onClick={() => handleRemoveCustom(idx)}>
+                    <button className={styles.deleteButton} onClick={() => setCustomTestCases((prev) => prev.filter((_, i) => i !== idx))}>
                       <FiTrash2 />
                     </button>
                   </div>
@@ -464,12 +784,11 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
           ) : (
             <div className={styles.historyTimeline}>
               {initialHistory.map((entry: any, idx: number) => {
-                const passedCount = entry.summary.passedCount;
-                const totalCount = entry.summary.totalCount;
-                const allPassed = passedCount === totalCount;
+                const passed = entry.summary.passedCount;
+                const total = entry.summary.totalCount;
+                const allPassed = passed === total;
                 const executedAt = new Date(entry.executedAt);
-                const now = new Date();
-                const diffMs = now.getTime() - executedAt.getTime();
+                const diffMs = Date.now() - executedAt.getTime();
                 const diffMins = Math.floor(diffMs / 60000);
                 const diffHours = Math.floor(diffMs / 3600000);
                 const diffDays = Math.floor(diffMs / 86400000);
@@ -479,28 +798,18 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
                 else if (diffHours < 24) timeAgo = `${diffHours}h ago`;
                 else timeAgo = `${diffDays}d ago`;
 
-                const isLast = idx === initialHistory.length - 1;
-
                 const getLanguageIcon = () => {
-                  switch (entry.language) {
-                    case 'python':
-                      return <FaPython size={14} />;
-                    case 'java':
-                      return <FaJava size={14} />;
-                    case 'cpp':
-                      return <SiCplusplus size={14} />;
-                    case 'javascript':
-                      return <SiJavascript size={14} />;
-                    default:
-                      return null;
-                  }
+                  const l = entry.language.toLowerCase();
+                  if (l === 'python') return <FaPython size={14} />;
+                  if (l === 'cpp') return <SiCplusplus size={14} />;
+                  return null;
                 };
 
                 return (
                   <div key={entry._id} className={styles.historyEntry}>
                     <div className={styles.historyEntryLine}>
                       <div className={styles.historyEntryDot} />
-                      {!isLast && <div className={styles.historyEntryConnector} />}
+                      {idx !== initialHistory.length - 1 && <div className={styles.historyEntryConnector} />}
                     </div>
                     <div className={styles.historyEntryContent}>
                       <div className={styles.historyEntryHeader}>
@@ -514,32 +823,24 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
                         </div>
                       </div>
                       <div className={styles.historyEntryFooter}>
-                        <span
-                          className={
-                            allPassed
-                              ? styles.historyEntrySuccess
-                              : styles.historyEntryFailure
-                          }
-                        >
-                          {allPassed
-                            ? '✓ All tests passed'
-                            : `${passedCount}/${totalCount} passed`}
+                        <span className={allPassed ? styles.historyEntrySuccess : styles.historyEntryFailure}>
+                          {allPassed ? '✓ All tests passed' : `${passed}/${total} passed`}
                         </span>
                         <button
                           className={styles.historyLoadButton}
                           onClick={() => {
                             let frontendLang = entry.language;
-                            if (entry.language === 'python3') frontendLang = 'python';
-                            else if (entry.language === 'c++') frontendLang = 'cpp';
+                            if (frontendLang === 'python3') frontendLang = 'python';
+                            else if (frontendLang === 'c++') frontendLang = 'cpp';
                             skipStarterLoad.current = true;
                             setLanguage(frontendLang);
+                            persistLanguage(frontendLang);
                             setCode(entry.code);
-                            if (onCodeChange) onCodeChange(entry.code);
+                            onCodeChange?.(entry.code);
+                            persistCode(entry.code, frontendLang);
                             onTabChange('code');
                             toast.success('Code loaded');
-                            setTimeout(() => {
-                              skipStarterLoad.current = false;
-                            }, 100);
+                            setTimeout(() => { skipStarterLoad.current = false; }, 100);
                           }}
                         >
                           <FiUpload size={12} /> Load code
@@ -567,11 +868,7 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
                 {results.map((res, idx) => (
                   <div key={idx} className={styles.resultCard}>
                     <div className={styles.resultHeader}>
-                      <span
-                        className={
-                          res.passed ? styles.resultPassedIcon : styles.resultFailedIcon
-                        }
-                      >
+                      <span className={res.passed ? styles.resultPassedIcon : styles.resultFailedIcon}>
                         {res.passed ? <FiCheckCircle /> : <FiXCircle />}
                       </span>
                       <span className={styles.resultLabel}>Test Case {idx + 1}</span>

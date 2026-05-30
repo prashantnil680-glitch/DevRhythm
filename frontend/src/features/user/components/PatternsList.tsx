@@ -136,7 +136,7 @@ const PatternsList: React.FC<PatternsListProps> = ({
     return (
       <div className={clsx(styles.container, className)}>
         <div className={styles.header}>
-          <h2 className={styles.title}>Knowledge Seeds</h2>
+          <h2 className={styles.title}>Attempted Pattern</h2>
           <SkeletonLoader variant="text" width={80} height={24} />
         </div>
         <div className={styles.grid}>
@@ -160,7 +160,7 @@ const PatternsList: React.FC<PatternsListProps> = ({
     return (
       <div className={clsx(styles.container, styles.empty, className)}>
         <div className={styles.header}>
-          <h2 className={styles.title}>Knowledge Seeds</h2>
+          <h2 className={styles.title}>Attempted Pattern</h2>
           {isOwnProfile && (
             <Link href={ROUTES.PATTERNS.ROOT} className={styles.viewAll}>
               View All →
@@ -170,7 +170,7 @@ const PatternsList: React.FC<PatternsListProps> = ({
         <NoRecordFound
           message={
             isOwnProfile
-              ? 'No patterns yet. Start solving to grow your knowledge seeds!'
+              ? 'No patterns yet. Start solving to grow your Attempted Pattern!'
               : 'This user hasn’t cultivated any patterns yet.'
           }
           icon={<span className={styles.emptyIcon}>🌱</span>}
@@ -194,7 +194,7 @@ const PatternsList: React.FC<PatternsListProps> = ({
     return (
       <div className={clsx(styles.container, className)}>
         <div className={styles.header}>
-          <h2 className={styles.title}>Knowledge Seeds</h2>
+          <h2 className={styles.title}>Attempted Pattern</h2>
           <Link
             href={ROUTES.PATTERNS.ROOT}
             className={styles.viewAll}
@@ -229,7 +229,7 @@ const PatternsList: React.FC<PatternsListProps> = ({
   return (
     <div className={clsx(styles.container, className)}>
       <div className={styles.header}>
-        <h2 className={styles.title}>Knowledge Seeds</h2>
+        <h2 className={styles.title}>Attempted Pattern</h2>
         <Link
           href={isOwnProfile ? ROUTES.PATTERNS.ROOT : `/users/${userId}/patterns`}
           className={styles.viewAll}

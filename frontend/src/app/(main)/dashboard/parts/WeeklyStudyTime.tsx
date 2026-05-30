@@ -10,20 +10,22 @@ interface WeeklyStudyTimeProps {
   data: {
     currentWeekMinutes: number;
     previousWeekMinutes: number;
-    weekOverWeekChangePercent: number;
+    weekOverWeekChangePercent: number | null;
     monthlyAverageWeeklyMinutes: number;
-    changeFromMonthlyAveragePercent: number;
+    changeFromMonthlyAveragePercent: number | null;
   };
   isLoading?: boolean;
 }
 
 export default function WeeklyStudyTime({ data, isLoading }: WeeklyStudyTimeProps) {
+  // Handle null values – default to 0
+  const weekOverWeekChange = data.weekOverWeekChangePercent ?? 0;
+  const monthlyChange = data.changeFromMonthlyAveragePercent ?? 0;
+
   const {
     currentWeekMinutes,
     previousWeekMinutes,
-    weekOverWeekChangePercent,
     monthlyAverageWeeklyMinutes,
-    changeFromMonthlyAveragePercent,
   } = data;
 
   const formatTime = (minutes: number): string => {
@@ -38,37 +40,49 @@ export default function WeeklyStudyTime({ data, isLoading }: WeeklyStudyTimeProp
   const previousFormatted = formatTime(previousWeekMinutes);
   const avgMonthlyFormatted = formatTime(monthlyAverageWeeklyMinutes);
 
-  // Trend icons and colors for the comparison percentages
-  const currentColorClass = weekOverWeekChangePercent > 0 ? styles.trendPositive : weekOverWeekChangePercent < 0 ? styles.trendNegative : styles.trendNeutral;
+  // Determine trend styling based on derived values
+  const isWeeklyPositive = weekOverWeekChange > 0;
+  const isWeeklyNegative = weekOverWeekChange < 0;
+  const isMonthlyPositive = monthlyChange > 0;
+  const isMonthlyNegative = monthlyChange < 0;
 
   const weeklyIcon =
-    weekOverWeekChangePercent > 0 ? (
+    isWeeklyPositive ? (
       <FiTrendingUp className={styles.trendIconUp} />
-    ) : weekOverWeekChangePercent < 0 ? (
+    ) : isWeeklyNegative ? (
       <FiTrendingDown className={styles.trendIconDown} />
     ) : null;
+
   const weeklyColor =
-    weekOverWeekChangePercent > 0 ? styles.trendPositive : weekOverWeekChangePercent < 0 ? styles.trendNegative : styles.trendNeutral;
-  const weeklyText = `${weekOverWeekChangePercent > 0 ? '+' : ''}${weekOverWeekChangePercent}%`;
+    isWeeklyPositive
+      ? styles.trendPositive
+      : isWeeklyNegative
+      ? styles.trendNegative
+      : styles.trendNeutral;
+
+  const weeklyText = `${isWeeklyPositive ? '+' : ''}${weekOverWeekChange.toFixed(0)}%`;
 
   const monthlyIcon =
-    changeFromMonthlyAveragePercent > 0 ? (
+    isMonthlyPositive ? (
       <FiTrendingUp className={styles.trendIconUp} />
-    ) : changeFromMonthlyAveragePercent < 0 ? (
+    ) : isMonthlyNegative ? (
       <FiTrendingDown className={styles.trendIconDown} />
     ) : null;
+
   const monthlyColor =
-    changeFromMonthlyAveragePercent > 0 ? styles.trendPositive : changeFromMonthlyAveragePercent < 0 ? styles.trendNegative : styles.trendNeutral;
-  const monthlyText = `${changeFromMonthlyAveragePercent > 0 ? '+' : ''}${changeFromMonthlyAveragePercent}%`;
+    isMonthlyPositive
+      ? styles.trendPositive
+      : isMonthlyNegative
+      ? styles.trendNegative
+      : styles.trendNeutral;
+
+  const monthlyText = `${isMonthlyPositive ? '+' : ''}${monthlyChange.toFixed(0)}%`;
 
   if (isLoading) {
     return (
       <Card className={styles.container} noHover>
         <div className={styles.header}>
           <h3 className={styles.title}>Weekly Study Time</h3>
-          {/* <Link href={ROUTES.HEATMAP.ROOT} className={styles.viewAllLink}>
-            View All →
-          </Link> */}
         </div>
         <div className={styles.skeletonContent}>
           <div className={styles.skeletonTime} />
@@ -82,15 +96,10 @@ export default function WeeklyStudyTime({ data, isLoading }: WeeklyStudyTimeProp
     <Card className={styles.container} noHover>
       <div className={styles.header}>
         <h3 className={styles.title}>Weekly Study Time</h3>
-        {/* <Link href={ROUTES.HEATMAP.ROOT} className={styles.viewAllLink}>
-          View All →
-        </Link> */}
       </div>
       <div className={styles.content}>
         <div className={styles.timeWrapper}>
-          <div className={`${styles.timeValue} ${currentColorClass}`}>
-            {currentFormatted}
-          </div>
+          <div className={styles.timeValue}>{currentFormatted}</div>
           <div className={styles.timeLabel}>this week</div>
         </div>
 

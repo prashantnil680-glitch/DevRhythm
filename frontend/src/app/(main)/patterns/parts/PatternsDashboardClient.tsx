@@ -15,6 +15,7 @@ import {
   FiZap,
   FiAward,
   FiChevronDown,
+  FiLoader,
 } from 'react-icons/fi';
 import { useMediaQuery } from '@/shared/hooks';
 import {
@@ -25,7 +26,6 @@ import {
 } from '@/features/patternMastery';
 import { usePatterns } from '@/features/question/hooks/usePatterns';
 import ConfidenceStars from '@/shared/components/ConfidenceStars';
-import Pagination from '@/shared/components/Pagination';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import NoRecordFound from '@/shared/components/NoRecordFound';
 import { slugify } from '@/shared/lib/stringUtils';
@@ -33,9 +33,9 @@ import type { PatternMastery } from '@/shared/types';
 import styles from './PatternsDashboardClient.module.css';
 import Tooltip from '@/shared/components/Tooltip';
 
-const ITEMS_PER_PAGE = 10;
 const INITIAL_ALL_PATTERNS_VISIBLE = 20;
 const ALL_PATTERNS_INCREMENT = 20;
+const MASTER_PAGE_SIZE = 10;
 
 type TabType = 'master' | 'all';
 
@@ -251,28 +251,20 @@ interface PatternsDashboardClientProps {
 export default function PatternsDashboardClient({ initialData }: PatternsDashboardClientProps) {
   const router = useRouter();
   const isDesktop = useMediaQuery('(min-width: 940px)');
-  const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState<TabType>('master');
   const [allPatternsVisible, setAllPatternsVisible] = useState(INITIAL_ALL_PATTERNS_VISIBLE);
   const listHeaderRef = useRef<HTMLDivElement>(null);
 
-  // Master tab data
-  const { data: statsData, isLoading: statsLoading } = usePatternStats();
-  const { data: strongestData, isLoading: strongestLoading } = useStrongestPatterns(1);
-  const { data: weakestData, isLoading: weakestLoading } = useWeakestPatterns(1);
-  const {
-    data: patternsData,
-    isLoading: patternsLoading,
-    error: patternsError,
-    refetch: refetchMaster,
-  } = usePatternMastery({
-    page: currentPage,
-    limit: ITEMS_PER_PAGE,
-    sortBy: 'masteryRate',
-    sortOrder: 'desc',
-  });
+  // ---------- Master tab state (show more / infinite load) ----------
+  const [masterPatterns, setMasterPatterns] = useState<PatternMastery[]>([]);
+  const [masterCurrentPage, setMasterCurrentPage] = useState(1);
+  const [masterTotalPages, setMasterTotalPages] = useState(1);
+  const [masterLoading, setMasterLoading] = useState(false);
+  const [masterLoadingMore, setMasterLoadingMore] = useState(false);
+  const [masterHasMore, setMasterHasMore] = useState(true);
+  const [masterError, setMasterError] = useState<Error | null>(null);
 
-  // All patterns data from /api/v1/questions/patterns
+  // ---------- All patterns data (unchanged) ----------
   const {
     data: allPatternsList,
     isLoading: allPatternsLoading,
@@ -280,59 +272,106 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
     refetch: refetchAllPatterns,
   } = usePatterns();
 
+  // ---------- Stats & strongest/weakest (unchanged) ----------
+  const { data: statsData, isLoading: statsLoading } = usePatternStats();
+  const { data: strongestData, isLoading: strongestLoading } = useStrongestPatterns(1);
+  const { data: weakestData, isLoading: weakestLoading } = useWeakestPatterns(1);
+
   const stats = statsData ?? initialData?.stats;
   const strongest = strongestData?.[0] ?? initialData?.strongest?.[0];
   const weakest = weakestData?.[0] ?? initialData?.weakest?.[0];
   const allPatterns = allPatternsList ?? [];
   const totalPatternsCount = allPatterns.length;
 
-  // Filter master patterns (only those with solvedCount > 0 for "Your Pattern Master" tab)
-  const masterPatterns = patternsData?.patterns ?? initialData?.patterns?.patterns ?? [];
-  const filteredMasterPatterns = masterPatterns.filter(p => p.solvedCount > 0);
-  const totalMasterCount = patternsData?.pagination?.total ?? initialData?.patterns?.pagination?.total ?? 0;
-  const totalFilteredMasterCount = filteredMasterPatterns.length;
-  const totalMasterPages = Math.ceil(totalFilteredMasterCount / ITEMS_PER_PAGE);
-
   const totalSolvedCount = stats?.totalSolved ?? 0;
   const totalMasteredCount = stats?.totalMastered ?? 0;
   const avgConfidence = stats?.averageConfidence ?? 0;
   const totalPatternsStat = stats?.totalPatterns ?? 0;
 
-  const isLoading =
-    (statsLoading && !stats) ||
-    (strongestLoading && !strongest) ||
-    (weakestLoading && !weakest) ||
-    (patternsLoading && !patternsData);
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    setTimeout(() => {
-      const headerElement = listHeaderRef.current;
-      if (headerElement) {
-        const yOffset = -80;
-        const y = headerElement.getBoundingClientRect().top + window.pageYOffset + yOffset;
-        window.scrollTo({ top: y, behavior: 'smooth' });
+  // ---------- Helper: fetch a specific page of master patterns ----------
+  const fetchMasterPage = useCallback(
+    async (page: number, isLoadMore = false) => {
+      if (isLoadMore) {
+        setMasterLoadingMore(true);
+      } else {
+        setMasterLoading(true);
       }
-    }, 100);
+      setMasterError(null);
+      try {
+        // Use the existing hook's underlying service? We'll import the service directly to avoid hook restrictions.
+        // Instead, we'll use the same patternMasteryService.
+        const { patternMasteryService } = await import('@/features/patternMastery');
+        const response = await patternMasteryService.getPatternMasteryList({
+          page,
+          limit: MASTER_PAGE_SIZE,
+          sortBy: 'confidenceLevel',
+          sortOrder: 'desc',
+        });
+        const fetchedPatterns = response.patterns || [];
+        // Filter only patterns with solvedCount > 0 (attempted patterns)
+        const filtered = fetchedPatterns.filter((p: PatternMastery) => p.solvedCount > 0);
+        if (isLoadMore) {
+          setMasterPatterns((prev) => [...prev, ...filtered]);
+        } else {
+          setMasterPatterns(filtered);
+        }
+        const total = response.pagination?.total ?? 0;
+        const totalPages = Math.ceil(total / MASTER_PAGE_SIZE);
+        setMasterTotalPages(totalPages);
+        setMasterHasMore(page < totalPages);
+        setMasterCurrentPage(page);
+      } catch (err) {
+        console.error('Failed to fetch master patterns:', err);
+        setMasterError(err as Error);
+      } finally {
+        if (isLoadMore) {
+          setMasterLoadingMore(false);
+        } else {
+          setMasterLoading(false);
+        }
+      }
+    },
+    []
+  );
+
+  // ---------- Reset master patterns when tab becomes active ----------
+  useEffect(() => {
+    if (activeTab === 'master') {
+      // Reset state
+      setMasterPatterns([]);
+      setMasterCurrentPage(1);
+      setMasterHasMore(true);
+      setMasterError(null);
+      fetchMasterPage(1, false);
+    }
+  }, [activeTab, fetchMasterPage]);
+
+  // ---------- Load more (show more) ----------
+  const handleLoadMoreMaster = () => {
+    if (masterLoadingMore || !masterHasMore) return;
+    fetchMasterPage(masterCurrentPage + 1, true);
   };
 
+  // ---------- All Patterns load more ----------
+  const handleLoadMoreAllPatterns = () => {
+    setAllPatternsVisible((prev) => Math.min(prev + ALL_PATTERNS_INCREMENT, totalPatternsCount));
+  };
+
+  // ---------- Tab change ----------
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
-    setCurrentPage(1);
-    setAllPatternsVisible(INITIAL_ALL_PATTERNS_VISIBLE);
+    if (tab === 'all') {
+      setAllPatternsVisible(INITIAL_ALL_PATTERNS_VISIBLE);
+    }
   };
 
-  const handleLoadMore = () => {
-    setAllPatternsVisible(prev => Math.min(prev + ALL_PATTERNS_INCREMENT, totalPatternsCount));
-  };
-
-  // Determine what to show in list header
+  // ---------- Header rendering ----------
   const renderListHeader = () => {
     if (activeTab === 'master') {
       return (
         <div className={styles.listHeader}>
           <h2 className={styles.listTitle}>
-            Attempted Pattern · {totalFilteredMasterCount}
+            Attempted Pattern · {masterPatterns.length}
           </h2>
           <span className={styles.trendHeaderLabel}>Improvement Rate</span>
         </div>
@@ -346,10 +385,19 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
     }
   };
 
+  // ---------- Content rendering ----------
   const renderContent = () => {
     if (activeTab === 'master') {
-      // Master tab content
-      if (patternsError) {
+      if (masterLoading && masterPatterns.length === 0) {
+        return (
+          <div className={styles.patternList}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <SkeletonLoader key={i} variant="custom" className={styles.patternRowSkeleton} />
+            ))}
+          </div>
+        );
+      }
+      if (masterError) {
         return (
           <NoRecordFound
             message="Could not load pattern mastery data. Please try again later."
@@ -357,38 +405,44 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
           />
         );
       }
-
-      if (filteredMasterPatterns.length === 0) {
+      if (masterPatterns.length === 0 && !masterLoading) {
         return (
           <NoRecordFound
-            message="You haven't solved any pattern questions yet. Start solving to see your mastered patterns!"
+            message="You haven't solved any pattern questions yet. Start solving to see your attempted patterns!"
             icon={<FiGrid />}
           />
         );
       }
-
       return (
         <>
           <div className={styles.patternList}>
-            {filteredMasterPatterns.map((pattern) => (
+            {masterPatterns.map((pattern) => (
               <PatternRow key={pattern._id} pattern={pattern} />
             ))}
           </div>
-          {totalMasterPages > 1 && (
-            <div className={styles.paginationWrapper}>
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalMasterPages}
-                siblingCount={isDesktop ? 2 : 1}
-                size={isDesktop ? 'md' : 'sm'}
-                onPageChange={handlePageChange}
-              />
+          {masterHasMore && (
+            <div className={styles.loadMoreWrapper}>
+              <button
+                onClick={handleLoadMoreMaster}
+                disabled={masterLoadingMore}
+                className={styles.loadMoreButton}
+              >
+                {masterLoadingMore ? (
+                  <>
+                    <FiLoader className={styles.spinner} /> Loading...
+                  </>
+                ) : (
+                  <>
+                    Show more <FiChevronDown />
+                  </>
+                )}
+              </button>
             </div>
           )}
         </>
       );
     } else {
-      // All patterns tab content
+      // All patterns tab
       if (allPatternsError) {
         return (
           <div className={styles.errorContainer}>
@@ -402,10 +456,8 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
           </div>
         );
       }
-
       const visiblePatterns = allPatterns.slice(0, allPatternsVisible);
       const hasMore = allPatternsVisible < totalPatternsCount;
-
       return (
         <>
           <div className={styles.allPatternsGrid}>
@@ -415,7 +467,7 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
           </div>
           {hasMore && (
             <div className={styles.loadMoreWrapper}>
-              <button onClick={handleLoadMore} className={styles.loadMoreButton}>
+              <button onClick={handleLoadMoreAllPatterns} className={styles.loadMoreButton}>
                 Show more <FiChevronDown />
               </button>
             </div>
@@ -425,7 +477,11 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
     }
   };
 
-  if (isLoading && activeTab === 'master') {
+  // ---------- Loading state for stats & hero (unchanged) ----------
+  const isLoadingHero =
+    (statsLoading && !stats) || (strongestLoading && !strongest) || (weakestLoading && !weakest);
+
+  if (isLoadingHero && activeTab === 'master') {
     return (
       <div className={styles.container}>
         <div className={styles.statsGrid}>
@@ -449,6 +505,7 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
     );
   }
 
+  // ---------- Main render ----------
   return (
     <div className={styles.container}>
       {/* Stats Grid */}
@@ -459,7 +516,7 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
         <StatCard icon={<FiBarChart2 />} value={parseFloat(avgConfidence.toFixed(1))} label="avg confidence" rotation="0.3deg" />
       </div>
 
-      {/* Hero Area (strongest/weakest – always visible) */}
+      {/* Hero Area */}
       <div className={styles.heroArea}>
         {strongest ? (
           <StrongestCard pattern={strongest} />
@@ -499,7 +556,7 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
         </button>
       </div>
 
-      {/* List Header (depends on tab) */}
+      {/* List Header */}
       {renderListHeader()}
 
       {/* Content */}

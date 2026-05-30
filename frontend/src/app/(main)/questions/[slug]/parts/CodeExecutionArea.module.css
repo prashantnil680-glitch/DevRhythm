@@ -555,3 +555,93 @@
     margin-left: auto;
   }
 }
+.editorWrapper {
+  position: relative;
+}
+
+.findPanel {
+  position: absolute;
+  top: 0.5rem;
+  left: 60%;
+  transform: translateX(-50%);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 12px var(--shadow);
+  z-index: 20;
+  min-width: 300px;
+  max-width: 90%;
+  backdrop-filter: blur(4px);
+  background-color: rgba(var(--bg-surface-rgb), 0.95);
+}
+
+.findPanelContent {
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.findRow, .replaceRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.findInput, .replaceInput {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.findInput:focus, .replaceInput:focus {
+  outline: none;
+  border-color: var(--accent-moss);
+}
+
+.findActionButton, .findCloseButton, .replaceButton, .replaceAllButton {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.findActionButton:hover, .findCloseButton:hover, .replaceButton:hover, .replaceAllButton:hover {
+  background: var(--hover-surface);
+  border-color: var(--accent-moss);
+  color: var(--accent-moss);
+}
+
+.replaceButton, .replaceAllButton {
+  background: var(--accent-moss);
+  color: var(--primary-text-on-action);
+  border: none;
+}
+
+.replaceButton:hover, .replaceAllButton:hover {
+  background: var(--primary-action);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 480px) {
+  .findPanel {
+    min-width: 260px;
+  }
+  .findRow, .replaceRow {
+    flex-wrap: wrap;
+  }
+  .findInput, .replaceInput {
+    width: 100%;
+  }
+}

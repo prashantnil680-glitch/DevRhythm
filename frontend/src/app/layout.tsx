@@ -39,6 +39,8 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <meta name="author" content="Anupam Debnath" />
+        <link rel="author" href="/about/me" />
         <link rel="icon" href="/images/logos/dr-icon-dark-logo.png" type="image/png" />
       </head>
       <body>

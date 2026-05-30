@@ -2,6 +2,8 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Head from 'next/head';
+import Script from 'next/script';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -251,14 +253,51 @@ function HomePageContent() {
 
   return (
     <>
+      <Head>
+        <meta name="author" content="Anupam Debnath" />
+        <link rel="author" href="/about/me" />
+      </Head>
+
+      <Script
+        id="schema-creator"
+        type="application/ld+json"
+        strategy="beforeInteractive"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebSite',
+            name: 'DevRhythm',
+            url: 'https://devrhythm.vercel.app',
+            description:
+              'Rhythm‑based coding practice platform with spaced repetition, heatmaps, and goal tracking.',
+            creator: {
+              '@type': 'Person',
+              name: 'Anupam Debnath',
+              url: 'https://devrhythm.vercel.app/about/me',
+              sameAs: [
+                'https://github.com/anupam6335',
+                'https://www.linkedin.com/in/anupamdebnath6335/',
+                'https://leetcode.com/u/anupam_nlogn/',
+              ],
+            },
+            author: {
+              '@type': 'Person',
+              name: 'Anupam Debnath',
+            },
+          }),
+        }}
+      />
+
       {showLoader && (
         <div className={styles.loadingScreen}>
           <div className={styles.loadingLogo}>
             Dev<span>Rhythm</span>
           </div>
           <div className={styles.rhythmPulse}>
-            <div className={styles.pulseDot}></div><div className={styles.pulseDot}></div>
-            <div className={styles.pulseDot}></div><div className={styles.pulseDot}></div>
+            <div className={styles.pulseDot}></div>
+            <div className={styles.pulseDot}></div>
+            <div className={styles.pulseDot}></div>
+            <div className={styles.pulseDot}></div>
             <div className={styles.pulseDot}></div>
           </div>
         </div>
@@ -414,45 +453,40 @@ function HomePageContent() {
             </OAuthButton>
           </div>
         </section>
+
+        {/* Visible author credit */}
+        <div className={styles.creatorCredit}>
+          <p>
+            Created with ❤️ by <strong>Anupam Debnath</strong> ·{' '}
+            <a href="/about/me" target="_blank" rel="noopener noreferrer">
+              Learn more
+            </a>
+          </p>
+        </div>
       </main>
     </>
   );
 }
-// ==================== MAIN COMPONENT ====================
+
 export default function HomePage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useSession();
   const redirectTriggered = useRef(false);
 
-  console.log('[HomePage] authLoading:', authLoading, 'user:', user?.username || null);
-
-  // Redirect authenticated users (only once)
   useEffect(() => {
     if (!authLoading && user && !redirectTriggered.current) {
-      console.log('[HomePage] User authenticated, redirecting to /dashboard');
       redirectTriggered.current = true;
       router.replace('/dashboard');
     }
   }, [authLoading, user, router]);
 
-  // Clear any stray tokens on homepage when unauthenticated
   useEffect(() => {
     if (!authLoading && !user && window.location.pathname === '/') {
-      console.log('[HomePage] Clearing stray tokens on homepage');
       tokenStorage.clearTokens();
     }
   }, [authLoading, user]);
 
-  if (authLoading) {
-    console.log('[HomePage] Auth loading, returning null');
-    return null;
-  }
-
-  if (!user) {
-    console.log('[HomePage] No user, rendering homepage');
-    return <HomePageContent />;
-  }
-
-  console.log('[HomePage] User exists but redirect pending, returning null');
+  if (authLoading) return null;
+  if (!user) return <HomePageContent />;
   return null;
 }

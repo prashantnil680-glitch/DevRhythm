@@ -13,7 +13,7 @@ const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 const config = require('../config');
 const { client: redisClient } = require('../config/redis');
-const { calculateIntensityLevel, generateCachedRenderData } = heatmapService;
+const { calculateIntensityLevel } = heatmapService;
 
 /**
  * Convert a UTC date to user's local ISO string with offset.
@@ -100,7 +100,7 @@ const getHeatmap = async (req, res, next) => {
     };
 
     const freshTooltipData = generateTooltipData(heatmap.dailyData);
-    const freshRenderData = generateCachedRenderData(heatmap.dailyData);
+    const freshRenderData = heatmapService.generateCachedRenderData(heatmap.dailyData);
 
     if (includeCache && freshRenderData) {
       response.cachedRenderData = {
@@ -177,7 +177,7 @@ const getHeatmapByYear = async (req, res, next) => {
     };
 
     const freshTooltipData = generateTooltipData(heatmap.dailyData);
-    const freshRenderData = generateCachedRenderData(heatmap.dailyData);
+    const freshRenderData = heatmapService.generateCachedRenderData(heatmap.dailyData);
 
     if (includeCache && freshRenderData) {
       response.cachedRenderData = {

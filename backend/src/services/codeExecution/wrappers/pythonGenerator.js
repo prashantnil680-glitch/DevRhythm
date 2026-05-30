@@ -184,8 +184,9 @@ def serialize_nested_integer(ni):
   }
 
   _injectMissingImports(userCode) {
+    let injections = '';
     if (userCode.includes('SortedList')) {
-      return `
+      injections += `
 # Auto-injected SortedList implementation for compatibility
 import bisect
 
@@ -207,7 +208,43 @@ class SortedList:
         return self._list[index]
 `;
     }
-    return '';
+    if (userCode.includes('SortedSet')) {
+      injections += `
+# Auto-injected SortedSet implementation for compatibility
+import bisect
+
+class SortedSet:
+    def __init__(self, iterable=None):
+        self._list = []
+        if iterable:
+            for item in iterable:
+                self.add(item)
+    def add(self, value):
+        idx = bisect.bisect_left(self._list, value)
+        if idx == len(self._list) or self._list[idx] != value:
+            self._list.insert(idx, value)
+    def bisect_right(self, value):
+        return bisect.bisect_right(self._list, value)
+    def index(self, value):
+        idx = bisect.bisect_left(self._list, value)
+        if idx < len(self._list) and self._list[idx] == value:
+            return idx
+        raise ValueError(f"{value} not in SortedSet")
+    def remove(self, value):
+        idx = self.index(value)
+        del self._list[idx]
+    def __len__(self):
+        return len(self._list)
+    def __iter__(self):
+        return iter(self._list)
+    def __contains__(self, value):
+        idx = bisect.bisect_left(self._list, value)
+        return idx < len(self._list) and self._list[idx] == value
+    def __getitem__(self, index):
+        return self._list[index]
+`;
+    }
+    return injections;
   }
 
   _generateExecutionCode(metadata) {

@@ -13,10 +13,34 @@ import {
   subMonths,
   getDate,
 } from 'date-fns';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+import { useTheme } from 'next-themes';
 import Card from '@/shared/components/Card';
 import Tabs from '@/shared/components/Tabs';
-import Tooltip from '@/shared/components/Tooltip';
+import TooltipComponent from '@/shared/components/Tooltip';
 import styles from './RhythmCenter.module.css';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 type Period = 'daily' | 'weekly' | 'monthly';
 
@@ -30,6 +54,92 @@ const safeNumber = (value: unknown): number => {
   const num = Number(value);
   return isNaN(num) ? 0 : num;
 };
+
+// Chart component using Chart.js
+interface LineChartProps {
+  title: string;
+  data: number[];
+  labels: string[];
+  borderColor: string;
+  backgroundColor: string;
+  yAxisLabel?: string;
+}
+
+function LineChart({ title, data, labels, borderColor, backgroundColor, yAxisLabel }: LineChartProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+
+  const textColor = isDark ? '#E6E5DF' : '#242424';
+  const gridColor = isDark ? '#3A3B36' : '#DAD8D2';
+
+  const chartData = {
+    labels,
+    datasets: [
+      {
+        label: title,
+        data,
+        borderColor,
+        backgroundColor,
+        borderWidth: 2.5,
+        pointRadius: 2,
+        pointHoverRadius: 5,
+        pointBackgroundColor: borderColor,
+        pointBorderColor: borderColor,
+        tension: 0.3,
+        fill: true,
+      },
+    ],
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false, // we show title separately
+      },
+      tooltip: {
+        backgroundColor: isDark ? '#2C2D28' : '#FBFAF6',
+        titleColor: textColor,
+        bodyColor: textColor,
+        borderColor: gridColor,
+        borderWidth: 1,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: { color: gridColor },
+        ticks: { color: textColor, font: { size: 10 } },
+        title: {
+          display: !!yAxisLabel,
+          text: yAxisLabel || '',
+          color: textColor,
+          font: { size: 10 },
+        },
+      },
+      x: {
+        grid: { display: false },
+        ticks: {
+          color: textColor,
+          maxRotation: 45,
+          minRotation: 45,
+          autoSkip: true,
+          font: { size: 10 },
+        },
+      },
+    },
+  };
+
+  return (
+    <div className={styles.graphCard}>
+      <h4>{title}</h4>
+      <div className={styles.chartWrapper}>
+        <Line data={chartData} options={options} />
+      </div>
+    </div>
+  );
+}
 
 export default function RhythmCenter({ trends }: RhythmCenterProps) {
   const [period, setPeriod] = useState<Period>('daily');
@@ -197,7 +307,7 @@ export default function RhythmCenter({ trends }: RhythmCenterProps) {
     { id: 'monthly', label: 'Monthly' },
   ];
 
-  // Build month rows for daily period (exactly like ProductivityHeatmap)
+  // Build month rows for daily period
   const monthRows = useMemo(() => {
     if (period !== 'daily') return null;
     const daysInMonth = heatmapItems.length;
@@ -228,6 +338,21 @@ export default function RhythmCenter({ trends }: RhythmCenterProps) {
     }
   }, [period, heatmapItems]);
 
+  // Theme colors for graphs
+  const completedColor = '#3d8b52';     // moss
+  const confidenceColor = '#C4A265';    // sand
+  const timeColor = '#6C5CE7';
+
+  const completedBg = `${completedColor}20`;
+  const confidenceBg = `${confidenceColor}20`;
+  const timeBg = `${timeColor}20`;
+
+  const currentAggregated = aggregatedData;
+  const labels = currentAggregated.map(d => d.date);
+  const completedData = currentAggregated.map(d => d.completed);
+  const confidenceData = currentAggregated.map(d => d.avgConfidence);
+  const timeData = currentAggregated.map(d => d.totalTimeSpent);
+
   return (
     <Card className={styles.container}>
       <div className={styles.header}>
@@ -236,12 +361,33 @@ export default function RhythmCenter({ trends }: RhythmCenterProps) {
       </div>
 
       <div className={styles.graphsRow}>
-        <SmoothLineGraph title="Revisions / day" data={aggregatedData.map(d => d.completed)} labels={aggregatedData.map(d => d.date)} />
-        <SmoothLineGraph title="Confidence trend" data={aggregatedData.map(d => d.avgConfidence)} labels={aggregatedData.map(d => d.date)} />
-        <SmoothLineGraph title="Time spent (min)" data={aggregatedData.map(d => d.totalTimeSpent)} labels={aggregatedData.map(d => d.date)} />
+        <LineChart
+          title="Revisions / day"
+          data={completedData}
+          labels={labels}
+          borderColor={completedColor}
+          backgroundColor={completedBg}
+          yAxisLabel="revisions"
+        />
+        <LineChart
+          title="Confidence trend"
+          data={confidenceData}
+          labels={labels}
+          borderColor={confidenceColor}
+          backgroundColor={confidenceBg}
+          yAxisLabel="confidence (1‑5)"
+        />
+        <LineChart
+          title="Time spent (min)"
+          data={timeData}
+          labels={labels}
+          borderColor={timeColor}
+          backgroundColor={timeBg}
+          yAxisLabel="minutes"
+        />
       </div>
 
-      {/* HEATMAP SECTION – CLEAN GRID LAYOUT WITHOUT LARGE GAPS */}
+      {/* HEATMAP SECTION – unchanged */}
       <div className={styles.heatmapContainer}>
         <div className={styles.heatmapHeader}>
           <span>{period === 'daily' ? format(new Date(), 'MMMM yyyy') : period === 'weekly' ? 'Weekly Activity' : 'Monthly Activity'}</span>
@@ -260,7 +406,7 @@ export default function RhythmCenter({ trends }: RhythmCenterProps) {
                     const confidence = dayItem?.confidence ?? 0;
                     const tooltipText = `${dayNumber}: ${completed} revision${completed !== 1 ? 's' : ''}`;
                     return (
-                      <Tooltip key={dayNumber} content={tooltipText}>
+                      <TooltipComponent key={dayNumber} content={tooltipText}>
                         <div
                           className={styles.cell}
                           style={{ backgroundColor: getIntensityColor(completed) }}
@@ -273,7 +419,7 @@ export default function RhythmCenter({ trends }: RhythmCenterProps) {
                             }}
                           />
                         </div>
-                      </Tooltip>
+                      </TooltipComponent>
                     );
                   })}
                 </div>
@@ -285,7 +431,7 @@ export default function RhythmCenter({ trends }: RhythmCenterProps) {
             {heatmapItems.map(item => {
               const tooltipText = `${item.label}: ${item.value} revision${item.value !== 1 ? 's' : ''}, avg confidence ${item.confidence.toFixed(1)}`;
               return (
-                <Tooltip key={item.id} content={tooltipText}>
+                <TooltipComponent key={item.id} content={tooltipText}>
                   <div
                     className={styles.cell}
                     style={{ backgroundColor: getIntensityColor(item.value) }}
@@ -298,134 +444,12 @@ export default function RhythmCenter({ trends }: RhythmCenterProps) {
                       }}
                     />
                   </div>
-                </Tooltip>
+                </TooltipComponent>
               );
             })}
           </div>
         )}
       </div>
     </Card>
-  );
-}
-
-// Smooth cubic bezier line graph
-function SmoothLineGraph({ title, data, labels }: { title: string; data: number[]; labels: string[] }) {
-  const width = 300;
-  const height = 140;
-  const padding = { top: 10, right: 10, bottom: 20, left: 30 };
-  const innerWidth = width - padding.left - padding.right;
-  const innerHeight = height - padding.top - padding.bottom;
-
-  const validData = data.map(v => (isNaN(v) ? 0 : v));
-  const maxValue = Math.max(...validData, 1);
-  const minValue = Math.min(...validData, 0);
-  const range = maxValue - minValue;
-
-  const getX = (i: number) => padding.left + (i / (validData.length - 1)) * innerWidth;
-  const getY = (value: number) => padding.top + innerHeight - ((value - minValue) / range) * innerHeight;
-
-  const getSegmentPath = (p0: { x: number; y: number }, p1: { x: number; y: number }) => {
-    const cp1x = p0.x + (p1.x - p0.x) / 2;
-    const cp1y = p0.y;
-    const cp2x = p1.x - (p1.x - p0.x) / 2;
-    const cp2y = p1.y;
-    return `M ${p0.x} ${p0.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p1.x} ${p1.y}`;
-  };
-
-  const getSegmentColor = (prevValue: number, currValue: number) => {
-    if (currValue > prevValue) return '#2e7d32';
-    if (currValue < prevValue) return '#d32f2f';
-    return 'var(--accent-moss)';
-  };
-
-  const getPointColor = (idx: number) => {
-    if (idx === 0 && validData.length > 1) {
-      return getSegmentColor(validData[0], validData[1]);
-    }
-    if (idx === validData.length - 1 && idx > 0) {
-      return getSegmentColor(validData[idx - 1], validData[idx]);
-    }
-    if (idx > 0 && idx < validData.length - 1) {
-      const prevDiff = validData[idx] - validData[idx - 1];
-      const nextDiff = validData[idx + 1] - validData[idx];
-      if (prevDiff > 0 || nextDiff > 0) return '#2e7d32';
-      if (prevDiff < 0 || nextDiff < 0) return '#d32f2f';
-    }
-    return 'var(--accent-moss)';
-  };
-
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; value: number; label: string } | null>(null);
-
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>, idx: number) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setTooltip({ x, y, value: validData[idx], label: labels[idx] });
-  };
-  const handleMouseLeave = () => setTooltip(null);
-
-  return (
-    <div className={styles.graphCard}>
-      <h4>{title}</h4>
-      <div className={styles.svgWrapper}>
-        <svg
-          width="100%"
-          viewBox={`0 0 ${width} ${height}`}
-          preserveAspectRatio="xMidYMid meet"
-          style={{ overflow: 'visible' }}
-        >
-          {validData.length > 1 &&
-            validData.slice(0, -1).map((_, i) => {
-              const p0 = { x: getX(i), y: getY(validData[i]) };
-              const p1 = { x: getX(i + 1), y: getY(validData[i + 1]) };
-              const color = getSegmentColor(validData[i], validData[i + 1]);
-              const path = getSegmentPath(p0, p1);
-              return (
-                <path
-                  key={`segment-${i}`}
-                  d={path}
-                  fill="none"
-                  stroke={color}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              );
-            })}
-
-          <line x1={padding.left} y1={padding.top} x2={padding.left} y2={padding.top + innerHeight} stroke="var(--border)" strokeWidth="1" />
-          <line x1={padding.left} y1={padding.top + innerHeight} x2={padding.left + innerWidth} y2={padding.top + innerHeight} stroke="var(--border)" strokeWidth="1" />
-
-          {validData.map((value, i) => {
-            const cx = getX(i);
-            const cy = getY(value);
-            const pointColor = getPointColor(i);
-            return (
-              <circle
-                key={i}
-                cx={cx}
-                cy={cy}
-                r="4"
-                fill="var(--bg-surface)"
-                stroke={pointColor}
-                strokeWidth="2"
-                style={{ cursor: 'pointer' }}
-                onMouseEnter={(e) => handleMouseMove(e as any, i)}
-                onMouseLeave={handleMouseLeave}
-              />
-            );
-          })}
-        </svg>
-
-        {tooltip && (
-          <div className={styles.graphTooltip} style={{ left: tooltip.x, top: tooltip.y - 40 }}>
-            <strong>{tooltip.label}</strong><br />
-            {tooltip.value.toFixed(1)}
-          </div>
-        )}
-      </div>
-      <div className={styles.xAxis}>
-        {labels.map((l, i) => i % Math.ceil(labels.length / 5) === 0 && <span key={i}>{l}</span>)}
-      </div>
-    </div>
   );
 }

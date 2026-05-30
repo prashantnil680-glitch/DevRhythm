@@ -61,19 +61,20 @@ export default function GoalsProgressGraph({ className }: GoalsProgressGraphProp
           label: 'Your goals',
           data: data.user.goalsCompleted,
           borderColor: userLineColor,
-          backgroundColor: `${userLineColor}20`,
+          backgroundColor: `${userLineColor}20`, // 12% opacity fill
           borderWidth: 2.5,
           pointRadius: 3,
           pointHoverRadius: 5,
           pointBackgroundColor: userPointColor,
           pointBorderColor: userPointColor,
           tension: 0.3,
-          fill: false,
+          fill: true,           // ← fill under the line
         },
         {
           label: 'Average user',
           data: data.comparison?.avgGoalsCompleted || [],
           borderColor: avgLineColor,
+          backgroundColor: `${avgLineColor}20`, // 12% opacity fill
           borderWidth: 2,
           borderDash: [5, 5],
           pointRadius: 2,
@@ -81,7 +82,7 @@ export default function GoalsProgressGraph({ className }: GoalsProgressGraphProp
           pointBackgroundColor: avgPointColor,
           pointBorderColor: avgPointColor,
           tension: 0.3,
-          fill: false,
+          fill: true,           // ← fill under the line
         },
       ],
     };
@@ -90,7 +91,7 @@ export default function GoalsProgressGraph({ className }: GoalsProgressGraphProp
   const chartOptions = useMemo(() => {
     return {
       responsive: true,
-      maintainAspectRatio: false, // ← KEY FIX: allows parent flex height control
+      maintainAspectRatio: false,
       plugins: {
         legend: {
           position: 'bottom' as const,

@@ -13,6 +13,9 @@ interface WeakestPatternInsightProps {
 }
 
 export default function WeakestPatternInsight({ pattern, isLoading }: WeakestPatternInsightProps) {
+  // Determine the link URL based on pattern availability
+  const viewAllLink = pattern ? `/patterns/${pattern.slug}` : '/patterns';
+
   if (isLoading) {
     return (
       <Card className={styles.container} noHover>
@@ -33,7 +36,7 @@ export default function WeakestPatternInsight({ pattern, isLoading }: WeakestPat
       <Card className={styles.container} noHover>
         <div className={styles.header}>
           <h3 className={styles.title}>Weakest Pattern Insight</h3>
-          <Link href={ROUTES.PATTERNS.RECOMMENDATIONS} className={styles.viewAllLink}>
+          <Link href={viewAllLink} className={styles.viewAllLink}>
             View Pattern →
           </Link>
         </div>
@@ -93,14 +96,6 @@ export default function WeakestPatternInsight({ pattern, isLoading }: WeakestPat
           </div>
         </div>
       </div>
-
-      {/* <div className={styles.actionRow}>
-        <Link href={patternUrl} className={styles.actionLink}>
-          <Button variant="primary" size="md" className={styles.exploreButton}>
-            Explore resources →
-          </Button>
-        </Link>
-      </div> */}
     </Card>
   );
 }

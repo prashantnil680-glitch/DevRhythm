@@ -14,6 +14,8 @@ const { getStartOfDay, getEndOfDay, getStartOfWeek, getEndOfWeek, getStartOfMont
 const { slugify } = require('../utils/helpers/string');
 const { computeUserStats, computeUserStreak } = require('./userStats.service');
 
+const computeConfidence = (solvedCount) => Math.min(5, 1 + Math.floor((solvedCount || 0) / 5));
+
 // Helper to convert UTC to localised ISO string
 const toLocalISOString = (utcDate, timeZone) => {
   if (!utcDate) return null;
@@ -685,11 +687,21 @@ const getActivePlannedGoals = async (userId, limit = 2) => {
 };
 
 const getTopWeakestPattern = async (userId) => {
-  const patterns = await PatternMastery.find({ userId, solvedCount: { $gt: 0 } })
+  // Remove solvedCount filter to include patterns with 0 solves
+  const patterns = await PatternMastery.find({ userId })
     .select('patternName confidenceLevel masteryRate solvedCount')
     .lean();
   if (!patterns.length) return null;
-  patterns.sort((a, b) => a.confidenceLevel - b.confidenceLevel || a.masteryRate - b.masteryRate);
+  
+  // Recompute confidence from solvedCount
+  patterns.forEach(p => p.confidenceLevel = computeConfidence(p.solvedCount));
+  
+  // Sort by confidence ascending, then solvedCount ascending
+  patterns.sort((a, b) => {
+    if (a.confidenceLevel !== b.confidenceLevel) return a.confidenceLevel - b.confidenceLevel;
+    return a.solvedCount - b.solvedCount;
+  });
+  
   const weakest = patterns[0];
   return {
     patternName: weakest.patternName,

@@ -10,8 +10,15 @@ const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 
 /**
+ * Compute confidence level from solvedCount.
+ * Formula: 1 + floor(solvedCount / 5), capped at 5.
+ */
+const computeConfidence = (solvedCount) => {
+  return Math.min(5, 1 + Math.floor((solvedCount || 0) / 5));
+};
+
+/**
  * Generate a default pattern mastery object for a user who has no progress in that pattern.
- * This object is NOT saved to the database – only returned in responses.
  */
 const getDefaultPatternMastery = (userId, patternName) => {
   const patternSlug = slugify(patternName);
@@ -70,6 +77,70 @@ const getPatternMasteryList = async (req, res, next) => {
     if (minMasteryRate) query.masteryRate = { $gte: parseFloat(minMasteryRate) };
     if (search) query.patternName = { $regex: search, $options: 'i' };
     
+    // For confidence-based sorting, we need to compute confidence after fetching all matching patterns
+    if (sortBy === 'confidenceLevel') {
+      // Fetch all matching patterns (no pagination yet)
+      let allPatterns = await PatternMastery.find(query).lean();
+      
+      // Override confidenceLevel with computed value from solvedCount
+      allPatterns = allPatterns.map(p => ({
+        ...p,
+        confidenceLevel: computeConfidence(p.solvedCount)
+      }));
+      
+      // Apply filters on computed confidence if minConfidence/maxConfidence provided
+      if (minConfidence || maxConfidence) {
+        allPatterns = allPatterns.filter(p => {
+          if (minConfidence && p.confidenceLevel < minConfidence) return false;
+          if (maxConfidence && p.confidenceLevel > maxConfidence) return false;
+          return true;
+        });
+      }
+      
+      // Sort by confidence (and secondary by solvedCount for consistency)
+      const sortOrderMultiplier = sortOrder === 'desc' ? -1 : 1;
+      allPatterns.sort((a, b) => {
+        if (a.confidenceLevel !== b.confidenceLevel) {
+          return (a.confidenceLevel - b.confidenceLevel) * sortOrderMultiplier;
+        }
+        return (a.solvedCount - b.solvedCount) * sortOrderMultiplier;
+      });
+      
+      const total = allPatterns.length;
+      const paginatedPatterns = allPatterns.slice(skip, skip + limit);
+      
+      // Populate platformQuestionId in recentQuestions
+      for (const pattern of paginatedPatterns) {
+        if (pattern.recentQuestions && pattern.recentQuestions.length > 0) {
+          const missingIds = pattern.recentQuestions
+            .filter(rq => !rq.platformQuestionId && rq.questionId)
+            .map(rq => rq.questionId);
+          if (missingIds.length > 0) {
+            const questions = await Question.find(
+              { _id: { $in: missingIds } },
+              { _id: 1, platformQuestionId: 1 }
+            ).lean();
+            const platformIdMap = new Map(
+              questions.map(q => [q._id.toString(), q.platformQuestionId])
+            );
+            pattern.recentQuestions = pattern.recentQuestions.map(rq => {
+              if (!rq.platformQuestionId && rq.questionId) {
+                const qid = rq.questionId.toString();
+                if (platformIdMap.has(qid)) {
+                  rq.platformQuestionId = platformIdMap.get(qid);
+                }
+              }
+              return rq;
+            });
+          }
+        }
+      }
+      
+      res.json(formatResponse('Pattern mastery list retrieved', { patterns: paginatedPatterns }, { pagination: paginate(total, page, limit) }));
+      return;
+    }
+    
+    // For all other sort fields, use database sorting (fields already indexed)
     const sort = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
     let patterns = await PatternMastery.find(query)
       .sort(sort)
@@ -77,23 +148,26 @@ const getPatternMasteryList = async (req, res, next) => {
       .limit(limit)
       .lean();
     
-    // --- FIX: Populate platformQuestionId in recentQuestions (similar to detail endpoint) ---
+    // Override confidenceLevel with computed value from solvedCount
+    patterns = patterns.map(p => ({
+      ...p,
+      confidenceLevel: computeConfidence(p.solvedCount)
+    }));
+    
+    // Populate platformQuestionId in recentQuestions
     for (const pattern of patterns) {
       if (pattern.recentQuestions && pattern.recentQuestions.length > 0) {
         const missingIds = pattern.recentQuestions
           .filter(rq => !rq.platformQuestionId && rq.questionId)
           .map(rq => rq.questionId);
-        
         if (missingIds.length > 0) {
           const questions = await Question.find(
             { _id: { $in: missingIds } },
             { _id: 1, platformQuestionId: 1 }
           ).lean();
-          
           const platformIdMap = new Map(
             questions.map(q => [q._id.toString(), q.platformQuestionId])
           );
-          
           pattern.recentQuestions = pattern.recentQuestions.map(rq => {
             if (!rq.platformQuestionId && rq.questionId) {
               const qid = rq.questionId.toString();
@@ -106,7 +180,6 @@ const getPatternMasteryList = async (req, res, next) => {
         }
       }
     }
-    // --- END FIX ---
     
     const total = await PatternMastery.countDocuments(query);
     res.json(formatResponse('Pattern mastery list retrieved', { patterns }, { pagination: paginate(total, page, limit) }));
@@ -116,47 +189,35 @@ const getPatternMasteryList = async (req, res, next) => {
 const getPatternMastery = async (req, res, next) => {
   try {
     let rawPatternName = req.params.patternName;
-    if (!rawPatternName) {
-      throw new AppError('Pattern name is required', 400);
-    }
+    if (!rawPatternName) throw new AppError('Pattern name is required', 400);
     
     const patternSlug = slugify(rawPatternName);
-    
-    let pattern = await PatternMastery.findOne({
-      userId: req.user._id,
-      patternSlug: patternSlug
-    }).lean();
-    
+    let pattern = await PatternMastery.findOne({ userId: req.user._id, patternSlug }).lean();
     if (!pattern) {
-      pattern = await PatternMastery.findOne({
-        userId: req.user._id,
-        patternName: rawPatternName
-      }).lean();
+      pattern = await PatternMastery.findOne({ userId: req.user._id, patternName: rawPatternName }).lean();
     }
     
-    // If still not found, return a default object (all zeros) instead of 404
     if (!pattern) {
       pattern = getDefaultPatternMastery(req.user._id, rawPatternName);
-      // For default object, no need to populate recentQuestions (empty array)
       return res.json(formatResponse('Pattern mastery retrieved', { pattern }));
     }
 
-    // For existing pattern, populate platformQuestionId for recentQuestions if missing
+    // Override confidenceLevel
+    pattern.confidenceLevel = computeConfidence(pattern.solvedCount);
+
+    // Populate platformQuestionId in recentQuestions
     if (pattern.recentQuestions && pattern.recentQuestions.length > 0) {
       const missingIds = pattern.recentQuestions
         .filter(rq => !rq.platformQuestionId && rq.questionId)
         .map(rq => rq.questionId);
-      
       if (missingIds.length > 0) {
         const questions = await Question.find(
           { _id: { $in: missingIds } },
           { _id: 1, platformQuestionId: 1 }
         ).lean();
-        
         const platformIdMap = new Map(
           questions.map(q => [q._id.toString(), q.platformQuestionId])
         );
-        
         pattern.recentQuestions = pattern.recentQuestions.map(rq => {
           if (!rq.platformQuestionId && rq.questionId) {
             const qid = rq.questionId.toString();
@@ -175,23 +236,77 @@ const getPatternMastery = async (req, res, next) => {
 
 const getPatternStats = async (req, res, next) => {
   try {
-    const patterns = await PatternMastery.find({ userId: req.user._id }).lean();
+    let patterns = await PatternMastery.find({ userId: req.user._id }).lean();
+    
+    // Recompute confidence for all patterns
+    patterns = patterns.map(p => ({
+      ...p,
+      confidenceLevel: computeConfidence(p.solvedCount)
+    }));
+    
+    const totalPatterns = patterns.length;
+    const totalSolved = patterns.reduce((sum, p) => sum + p.solvedCount, 0);
+    const totalMastered = patterns.reduce((sum, p) => sum + p.masteredCount, 0);
+    const averageConfidence = totalPatterns
+      ? patterns.reduce((sum, p) => sum + p.confidenceLevel, 0) / totalPatterns
+      : 0;
+    const averageMasteryRate = totalPatterns
+      ? patterns.reduce((sum, p) => sum + p.masteryRate, 0) / totalPatterns
+      : 0;
+    
+    // Determine strongest pattern: highest masteryRate, then solvedCount
+    let strongestPattern = null;
+    if (patterns.length) {
+      strongestPattern = patterns.reduce((best, current) => {
+        if (current.masteryRate > best.masteryRate) return current;
+        if (current.masteryRate === best.masteryRate && current.solvedCount > best.solvedCount) return current;
+        return best;
+      }, patterns[0]);
+      strongestPattern = {
+        patternName: strongestPattern.patternName,
+        patternSlug: strongestPattern.patternSlug,
+        solvedCount: strongestPattern.solvedCount,
+        masteredCount: strongestPattern.masteredCount,
+        masteryRate: Math.round(strongestPattern.masteryRate),
+        confidenceLevel: strongestPattern.confidenceLevel
+      };
+    }
+    
+    // Determine weakest pattern: lowest masteryRate, then solvedCount
+    let weakestPattern = null;
+    if (patterns.length) {
+      weakestPattern = patterns.reduce((worst, current) => {
+        if (current.masteryRate < worst.masteryRate) return current;
+        if (current.masteryRate === worst.masteryRate && current.solvedCount < worst.solvedCount) return current;
+        return worst;
+      }, patterns[0]);
+      weakestPattern = {
+        patternName: weakestPattern.patternName,
+        patternSlug: weakestPattern.patternSlug,
+        solvedCount: weakestPattern.solvedCount,
+        masteredCount: weakestPattern.masteredCount,
+        masteryRate: Math.round(weakestPattern.masteryRate),
+        confidenceLevel: weakestPattern.confidenceLevel
+      };
+    }
+    
+    const patternsByConfidence = {
+      1: patterns.filter(p => p.confidenceLevel === 1).length,
+      2: patterns.filter(p => p.confidenceLevel === 2).length,
+      3: patterns.filter(p => p.confidenceLevel === 3).length,
+      4: patterns.filter(p => p.confidenceLevel === 4).length,
+      5: patterns.filter(p => p.confidenceLevel === 5).length
+    };
     
     const stats = {
-      totalPatterns: patterns.length,
-      totalSolved: patterns.reduce((sum, p) => sum + p.solvedCount, 0),
-      totalMastered: patterns.reduce((sum, p) => sum + p.masteredCount, 0),
-      averageConfidence: patterns.length ? patterns.reduce((sum, p) => sum + p.confidenceLevel, 0) / patterns.length : 0,
-      averageMasteryRate: patterns.length ? patterns.reduce((sum, p) => sum + p.masteryRate, 0) / patterns.length : 0,
-      strongestPattern: patterns.length ? patterns.reduce((a, b) => a.masteryRate > b.masteryRate ? a : b) : null,
-      weakestPattern: patterns.length ? patterns.reduce((a, b) => a.masteryRate < b.masteryRate ? a : b) : null,
-      patternsByConfidence: {
-        1: patterns.filter(p => p.confidenceLevel === 1).length,
-        2: patterns.filter(p => p.confidenceLevel === 2).length,
-        3: patterns.filter(p => p.confidenceLevel === 3).length,
-        4: patterns.filter(p => p.confidenceLevel === 4).length,
-        5: patterns.filter(p => p.confidenceLevel === 5).length
-      }
+      totalPatterns,
+      totalSolved,
+      totalMastered,
+      averageConfidence: parseFloat(averageConfidence.toFixed(2)),
+      averageMasteryRate: parseFloat(averageMasteryRate.toFixed(2)),
+      strongestPattern,
+      weakestPattern,
+      patternsByConfidence
     };
     
     res.json(formatResponse('Pattern mastery stats retrieved', { stats }));
@@ -203,7 +318,8 @@ const getRecommendations = async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 5;
     const focus = req.query.focus || 'weakest';
     
-    const patterns = await PatternMastery.find({ userId: req.user._id }).lean();
+    let patterns = await PatternMastery.find({ userId: req.user._id }).lean();
+    patterns = patterns.map(p => ({ ...p, confidenceLevel: computeConfidence(p.solvedCount) }));
     
     let recommendations = [];
     if (focus === 'weakest') {
@@ -232,10 +348,19 @@ const getWeakestPatterns = async (req, res, next) => {
     const metric = req.query.metric || 'confidence';
     
     let patterns = await PatternMastery.find({ userId: req.user._id }).lean();
+    // Recompute confidence for all patterns based on solvedCount
+    patterns = patterns.map(p => ({
+      ...p,
+      confidenceLevel: computeConfidence(p.solvedCount)
+    }));
     
     let weakest = [];
     if (metric === 'confidence') {
-      weakest = patterns.sort((a, b) => a.confidenceLevel - b.confidenceLevel).slice(0, limit);
+      // Sort by confidence ascending, then solvedCount ascending
+      weakest = patterns.sort((a, b) => {
+        if (a.confidenceLevel !== b.confidenceLevel) return a.confidenceLevel - b.confidenceLevel;
+        return a.solvedCount - b.solvedCount;
+      }).slice(0, limit);
     } else if (metric === 'masteryRate') {
       weakest = patterns.sort((a, b) => a.masteryRate - b.masteryRate).slice(0, limit);
     } else if (metric === 'lastPracticed') {
@@ -244,23 +369,20 @@ const getWeakestPatterns = async (req, res, next) => {
         .slice(0, limit);
     }
 
-    // Ensure platformQuestionId is present in recentQuestions
+    // Populate platformQuestionId in recentQuestions
     for (const pattern of weakest) {
       if (pattern.recentQuestions && pattern.recentQuestions.length > 0) {
         const missingIds = pattern.recentQuestions
           .filter(rq => !rq.platformQuestionId && rq.questionId)
           .map(rq => rq.questionId);
-        
         if (missingIds.length > 0) {
           const questions = await Question.find(
             { _id: { $in: missingIds } },
             { _id: 1, platformQuestionId: 1 }
           ).lean();
-          
           const platformIdMap = new Map(
             questions.map(q => [q._id.toString(), q.platformQuestionId])
           );
-          
           pattern.recentQuestions = pattern.recentQuestions.map(rq => {
             if (!rq.platformQuestionId && rq.questionId) {
               const qid = rq.questionId.toString();
@@ -284,10 +406,18 @@ const getStrongestPatterns = async (req, res, next) => {
     const metric = req.query.metric || 'confidence';
     
     let patterns = await PatternMastery.find({ userId: req.user._id }).lean();
+    // Recompute confidence
+    patterns = patterns.map(p => ({
+      ...p,
+      confidenceLevel: computeConfidence(p.solvedCount)
+    }));
     
     let strongest = [];
     if (metric === 'confidence') {
-      strongest = patterns.sort((a, b) => b.confidenceLevel - a.confidenceLevel).slice(0, limit);
+      strongest = patterns.sort((a, b) => {
+        if (b.confidenceLevel !== a.confidenceLevel) return b.confidenceLevel - a.confidenceLevel;
+        return b.solvedCount - a.solvedCount;
+      }).slice(0, limit);
     } else if (metric === 'masteryRate') {
       strongest = patterns.sort((a, b) => b.masteryRate - a.masteryRate).slice(0, limit);
     } else if (metric === 'lastPracticed') {
@@ -297,23 +427,20 @@ const getStrongestPatterns = async (req, res, next) => {
         .slice(0, limit);
     }
 
-    // Ensure platformQuestionId is present in recentQuestions
+    // Populate platformQuestionId in recentQuestions
     for (const pattern of strongest) {
       if (pattern.recentQuestions && pattern.recentQuestions.length > 0) {
         const missingIds = pattern.recentQuestions
           .filter(rq => !rq.platformQuestionId && rq.questionId)
           .map(rq => rq.questionId);
-        
         if (missingIds.length > 0) {
           const questions = await Question.find(
             { _id: { $in: missingIds } },
             { _id: 1, platformQuestionId: 1 }
           ).lean();
-          
           const platformIdMap = new Map(
             questions.map(q => [q._id.toString(), q.platformQuestionId])
           );
-          
           pattern.recentQuestions = pattern.recentQuestions.map(rq => {
             if (!rq.platformQuestionId && rq.questionId) {
               const qid = rq.questionId.toString();
@@ -337,7 +464,8 @@ const getPatternProgress = async (req, res, next) => {
     const query = { userId: req.user._id };
     if (patternName) query.patternName = patternName;
     
-    const patterns = await PatternMastery.find(query).lean();
+    let patterns = await PatternMastery.find(query).lean();
+    patterns = patterns.map(p => ({ ...p, confidenceLevel: computeConfidence(p.solvedCount) }));
     
     const now = new Date();
     let progressData = [];
@@ -440,16 +568,19 @@ const getUserPatternMastery = async (req, res, next) => {
     }
 
     const query = { userId };
-
-    const [patterns, total] = await Promise.all([
-      PatternMastery.find(query)
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      PatternMastery.countDocuments(query)
-    ]);
-
+    let patterns = await PatternMastery.find(query)
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .lean();
+    
+    // Override confidence for public view
+    patterns = patterns.map(p => ({
+      ...p,
+      confidenceLevel: computeConfidence(p.solvedCount)
+    }));
+    
+    const total = await PatternMastery.countDocuments(query);
     res.json(formatResponse(
       'User pattern mastery retrieved',
       { patterns },
@@ -469,5 +600,5 @@ module.exports = {
   getStrongestPatterns,
   getPatternProgress,
   syncPatternMastery,
-  getUserPatternMastery
+  getUserPatternMastery,
 };

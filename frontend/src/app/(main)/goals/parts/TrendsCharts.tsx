@@ -177,7 +177,7 @@ export default function TrendsCharts({ className }: TrendsChartsProps) {
     };
   }, [textColor, gridColor, isDark, isMobile, isTablet]);
 
-  // Monthly chart data – smooth curves enabled with tension
+  // Monthly chart data – with fill under the lines
   const monthlyChartData = useMemo(() => {
     if (!monthlyData?.labels || !monthlyData.user?.goalsCompleted) return null;
     return {
@@ -187,19 +187,20 @@ export default function TrendsCharts({ className }: TrendsChartsProps) {
           label: 'Your goals',
           data: monthlyData.user.goalsCompleted,
           borderColor: userLineColor,
-          backgroundColor: `${userLineColor}20`,
+          backgroundColor: `${userLineColor}20`, // 12% opacity fill
           borderWidth: 2.5,
           pointRadius: isMobile ? 2 : 3,
           pointHoverRadius: isMobile ? 3 : 5,
           pointBackgroundColor: userPointColor,
           pointBorderColor: userPointColor,
-          tension: 0.3,        // smooth curved line
-          fill: false,
+          tension: 0.3,
+          fill: true,           // ← area fill enabled
         },
         {
           label: 'Average user',
           data: monthlyData.comparison?.avgGoalsCompleted || [],
           borderColor: avgLineColor,
+          backgroundColor: `${avgLineColor}20`, // 12% opacity fill
           borderWidth: 2,
           borderDash: [5, 5],
           pointRadius: isMobile ? 1.5 : 2,
@@ -207,7 +208,7 @@ export default function TrendsCharts({ className }: TrendsChartsProps) {
           pointBackgroundColor: avgPointColor,
           pointBorderColor: avgPointColor,
           tension: 0.3,
-          fill: false,
+          fill: true,           // ← area fill enabled
         },
       ],
     };
@@ -230,12 +231,13 @@ export default function TrendsCharts({ className }: TrendsChartsProps) {
           pointBackgroundColor: userPointColor,
           pointBorderColor: userPointColor,
           tension: 0.3,
-          fill: false,
+          fill: true,
         },
         {
           label: 'Average user',
           data: yearlyData.comparison?.avgGoalsCompleted || [],
           borderColor: avgLineColor,
+          backgroundColor: `${avgLineColor}20`,
           borderWidth: 2,
           borderDash: [5, 5],
           pointRadius: isMobile ? 1.5 : 2,
@@ -243,7 +245,7 @@ export default function TrendsCharts({ className }: TrendsChartsProps) {
           pointBackgroundColor: avgPointColor,
           pointBorderColor: avgPointColor,
           tension: 0.3,
-          fill: false,
+          fill: true,
         },
       ],
     };

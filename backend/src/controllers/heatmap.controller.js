@@ -13,7 +13,7 @@ const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 const config = require('../config');
 const { client: redisClient } = require('../config/redis');
-const { calculateIntensityLevel } = heatmapService;
+const { calculateIntensityLevel, generateCachedRenderData } = heatmapService;
 
 /**
  * Convert a UTC date to user's local ISO string with offset.
@@ -27,26 +27,28 @@ const toLocalISOString = (utcDate, timeZone) => {
 };
 
 /**
- * Helper to convert dailyData array to local dates and recompute dayOfWeek.
+ * Convert dailyData array to local dates and recompute dayOfWeek.
  */
 const convertDailyDataToLocal = (dailyData, timeZone) => {
   if (!dailyData) return [];
   return dailyData.map(day => {
     const localDateStr = toLocalISOString(day.date, timeZone);
-    // Extract the date part for possible further use (optional)
     const localDateObj = DateTime.fromISO(localDateStr);
     return {
       ...day,
       date: localDateStr,
-      // Recompute dayOfWeek based on local date (0 = Sunday, 6 = Saturday)
-      dayOfWeek: localDateObj.weekday % 7, // luxon weekday: Monday=1 → Sunday=7, we want Sunday=0
+      // dayOfWeek: 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      dayOfWeek: localDateObj.weekday % 7,
     };
   });
 };
 
+/**
+ * Generate tooltip data from dailyData (local dates already).
+ */
 const generateTooltipData = (dailyData) => {
   return dailyData.map(day => ({
-    date: day.date, // already local ISO string
+    date: day.date,
     summary: `${day.totalActivities} submission${day.totalActivities !== 1 ? 's' : ''} on ${formatDate(new Date(day.date))}`,
     details: `New: ${day.newProblemsSolved}, Revisions: ${day.revisionProblems}, Submissions: ${day.totalSubmissions}, Study: ${day.studyGroupActivity}, Time: ${day.totalTimeSpent}min`
   }));
@@ -98,10 +100,11 @@ const getHeatmap = async (req, res, next) => {
     };
 
     const freshTooltipData = generateTooltipData(heatmap.dailyData);
+    const freshRenderData = generateCachedRenderData(heatmap.dailyData);
 
-    if (includeCache && heatmap.cachedRenderData) {
+    if (includeCache && freshRenderData) {
       response.cachedRenderData = {
-        ...heatmap.cachedRenderData,
+        ...freshRenderData,
         tooltipData: freshTooltipData
       };
     } else {
@@ -110,7 +113,7 @@ const getHeatmap = async (req, res, next) => {
         colorScale: ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'],
         monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
         weekLabels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-        currentDayIndex: heatmap.cachedRenderData?.currentDayIndex ?? -1
+        currentDayIndex: freshRenderData?.currentDayIndex ?? -1
       };
     }
 
@@ -174,10 +177,11 @@ const getHeatmapByYear = async (req, res, next) => {
     };
 
     const freshTooltipData = generateTooltipData(heatmap.dailyData);
+    const freshRenderData = generateCachedRenderData(heatmap.dailyData);
 
-    if (includeCache && heatmap.cachedRenderData) {
+    if (includeCache && freshRenderData) {
       response.cachedRenderData = {
-        ...heatmap.cachedRenderData,
+        ...freshRenderData,
         tooltipData: freshTooltipData
       };
     } else {
@@ -186,7 +190,7 @@ const getHeatmapByYear = async (req, res, next) => {
         colorScale: ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'],
         monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
         weekLabels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-        currentDayIndex: heatmap.cachedRenderData?.currentDayIndex ?? -1
+        currentDayIndex: freshRenderData?.currentDayIndex ?? -1
       };
     }
 

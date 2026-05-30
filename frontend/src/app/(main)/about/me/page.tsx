@@ -2,6 +2,7 @@ import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import Script from 'next/script';
+import dynamic from 'next/dynamic';
 import {
   FiHeart,
   FiTrendingUp,
@@ -64,8 +65,7 @@ const projectsData = [
   {
     id: 1,
     title: 'DevRhythm',
-    description:
-      'DSA habit platform with spaced repetition, heatmaps, and revision schedules.',
+    description: 'DSA habit platform with spaced repetition, heatmaps, and revision schedules.',
     image: '/images/projects/devrhythm-thumb.png',
     url: 'https://devrhythm.vercel.app',
   },
@@ -95,7 +95,7 @@ const projectsData = [
 export default function AboutPage() {
   return (
     <>
-      {/* JSON‑LD Structured Data for Person */}
+      {/* JSON‑LD Structured Data for Person with @id */}
       <Script
         id="schema-person"
         type="application/ld+json"
@@ -104,12 +104,14 @@ export default function AboutPage() {
           __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'Person',
+            '@id': 'https://devrhythm.vercel.app/about/me#person',
             name: 'Anupam Debnath',
             url: 'https://devrhythm.vercel.app/about/me',
             jobTitle: 'Web Developer',
             worksFor: {
               '@type': 'Organization',
               name: 'DevRhythm',
+              url: 'https://devrhythm.vercel.app',
             },
             image: 'https://devrhythm.vercel.app/devrhythm-maker.jpg',
             sameAs: [
@@ -156,8 +158,7 @@ export default function AboutPage() {
                 2+ years experience · B.Tech in CSE
               </p>
               <p className={styles.bio}>
-                Building tools that turn short‑term motivation into lasting
-                habits.
+                Building tools that turn short‑term motivation into lasting habits.
               </p>
             </div>
           </div>
@@ -171,36 +172,32 @@ export default function AboutPage() {
           </div>
           <div className={styles.storyContent}>
             <p>
-              Every time I started solving DSA problems, I'd be highly motivated
-              for a month, maybe a month and a half. I'd solve daily, feel
-              progress, and think, <em>"This time, I'll master it."</em>
+              Every time I started solving DSA problems, I'd be highly motivated for a month,
+              maybe a month and a half. I'd solve daily, feel progress, and think,{' '}
+              <em>"This time, I'll master it."</em>
             </p>
             <p>
-              Then it would happen. Life gets busy. A difficult problem takes
-              too long. The streak breaks. And just like that, I'd stop – for
-              weeks, sometimes months.
+              Then it would happen. Life gets busy. A difficult problem takes too long.
+              The streak breaks. And just like that, I'd stop – for weeks, sometimes months.
             </p>
             <p>
-              I wasn't lazy. I was missing a <strong>system</strong>. Motivation
-              fades, but habits shouldn't. The problem wasn't my effort – it was
-              the lack of a rhythm.
+              I wasn't lazy. I was missing a <strong>system</strong>. Motivation fades,
+              but habits shouldn't. The problem wasn't my effort – it was the lack of a rhythm.
             </p>
             <p>
-              That's why I built <strong>DevRhythm</strong>. Not just another
-              problem tracker, but a habit engine. Spaced repetition reminds you
-              exactly when you're about to forget. Revision schedules keep
-              patterns alive. Your heatmap shows your consistency, not just your
-              solves.
+              That's why I built <strong>DevRhythm</strong>. Not just another problem tracker,
+              but a habit engine. Spaced repetition reminds you exactly when you're about to forget.
+              Revision schedules keep patterns alive. Your heatmap shows your consistency,
+              not just your solves.
             </p>
             <p className={styles.highlight}>
-              This isn't about cramming 500 problems. It's about solving 5
-              problems, 10 times, with rhythm.{' '}
-              <strong>1 day, 3 days, 6 days, 30 days</strong> – the intervals
-              that turn short‑term memory into lasting mastery.
+              This isn't about cramming 500 problems. It's about solving 5 problems, 10 times,
+              with rhythm.{' '}
+              <strong>1 day, 3 days, 6 days, 30 days</strong> – the intervals that turn
+              short‑term memory into lasting mastery.
             </p>
             <p>
-              DevRhythm is my attempt to solve my own problem – and help others
-              break the cycle too.
+              DevRhythm is my attempt to solve my own problem – and help others break the cycle too.
             </p>
           </div>
         </Card>
@@ -220,10 +217,7 @@ export default function AboutPage() {
             <div className={styles.feature}>
               <FiTrendingUp className={styles.featureIcon} />
               <h3>Heatmaps & Streaks</h3>
-              <p>
-                Track your daily productivity and consistency over time. Every
-                activity contributes to building long-term progress.
-              </p>
+              <p>Track your daily productivity and consistency over time.</p>
             </div>
             <div className={styles.feature}>
               <FiTarget className={styles.featureIcon} />
@@ -259,8 +253,7 @@ export default function AboutPage() {
               <div className={styles.leetcodeInfo}>
                 <h3 className={styles.leetcodeTitle}>LeetCode Profile</h3>
                 <p className={styles.leetcodeDescription}>
-                  Track my problem solving journey – see what I've been
-                  practicing.
+                  Track my problem solving journey – see what I've been practicing.
                 </p>
                 <span className={styles.leetcodeLinkText}>
                   Visit Profile <FiExternalLink />
@@ -297,9 +290,7 @@ export default function AboutPage() {
                   </div>
                   <div className={styles.projectInfo}>
                     <h3 className={styles.projectTitle}>{project.title}</h3>
-                    <p className={styles.projectDescription}>
-                      {project.description}
-                    </p>
+                    <p className={styles.projectDescription}>{project.description}</p>
                     <span className={styles.projectLink}>
                       View Project <FiExternalLink />
                     </span>

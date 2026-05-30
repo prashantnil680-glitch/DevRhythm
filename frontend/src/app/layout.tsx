@@ -25,6 +25,10 @@ const patrickHand = Patrick_Hand({
 export const metadata: Metadata = {
   title: 'DevRhythm',
   description: 'Track your coding journey',
+  metadataBase: new URL('https://devrhythm.vercel.app'),
+  alternates: {
+    canonical: '/',
+  },
 };
 
 export default function RootLayout({

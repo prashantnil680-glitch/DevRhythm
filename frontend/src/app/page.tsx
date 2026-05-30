@@ -258,8 +258,9 @@ function HomePageContent() {
         <link rel="author" href="/about/me" />
       </Head>
 
+      {/* WebSite Schema referencing the Person @id */}
       <Script
-        id="schema-creator"
+        id="schema-website"
         type="application/ld+json"
         strategy="beforeInteractive"
         dangerouslySetInnerHTML={{
@@ -270,20 +271,8 @@ function HomePageContent() {
             url: 'https://devrhythm.vercel.app',
             description:
               'Rhythm‑based coding practice platform with spaced repetition, heatmaps, and goal tracking.',
-            creator: {
-              '@type': 'Person',
-              name: 'Anupam Debnath',
-              url: 'https://devrhythm.vercel.app/about/me',
-              sameAs: [
-                'https://github.com/anupam6335',
-                'https://www.linkedin.com/in/anupamdebnath6335/',
-                'https://leetcode.com/u/anupam_nlogn/',
-              ],
-            },
-            author: {
-              '@type': 'Person',
-              name: 'Anupam Debnath',
-            },
+            creator: { '@id': 'https://devrhythm.vercel.app/about/me#person' },
+            author: { '@id': 'https://devrhythm.vercel.app/about/me#person' },
           }),
         }}
       />

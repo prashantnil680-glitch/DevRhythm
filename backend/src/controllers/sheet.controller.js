@@ -52,10 +52,12 @@ const createSheet = async (req, res, next) => {
  */
 const getSheets = async (req, res, next) => {
   try {
-    const { search, ownerId, sortBy, sortOrder, page, limit } = req.query;
+    const { search, ownerId, sortBy, sortOrder, page, limit, mySheets } = req.query;
+    const currentUserId = req.user ? req.user._id : null;
     const result = await SheetService.getSheetsList(
-      { search, ownerId, sortBy, sortOrder },
-      { page, limit }
+      { search, ownerId, sortBy, sortOrder, mySheets: mySheets === 'true' },
+      { page, limit },
+      currentUserId
     );
     res.json(formatResponse('Sheets retrieved successfully', result.sheets, { pagination: result.pagination }));
   } catch (error) {

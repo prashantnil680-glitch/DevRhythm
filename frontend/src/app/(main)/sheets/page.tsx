@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FiPlus } from 'react-icons/fi';
@@ -11,12 +11,16 @@ import Button from '@/shared/components/Button';
 import Pagination from '@/shared/components/Pagination';
 import Breadcrumb from '@/shared/components/Breadcrumb';
 import type { BreadcrumbItem } from '@/shared/components/Breadcrumb';
-
-import styles from './page.module.css';
 import SheetFilterBar from './parts/SheetFilterBar';
-import SheetsSkeleton from './parts/SheetsSkeleton';
 import SheetCard from './parts/SheetCard';
+import SheetsSkeleton from './parts/SheetsSkeleton';
 import JoinSheetModal from './parts/JoinSheetModal';
+import styles from './page.module.css';
+
+// Helper to scroll to top smoothly
+const scrollToTop = () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 
 export default function SheetsListingPage() {
   const router = useRouter();
@@ -30,6 +34,11 @@ export default function SheetsListingPage() {
   const [page, setPage] = useState(1);
   const limit = 10;
 
+  // Sticky filter logic
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const filterWrapperRef = useRef<HTMLDivElement>(null);
+  const [isSticky, setIsSticky] = useState(false);
+
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('');
   useEffect(() => {
@@ -37,15 +46,16 @@ export default function SheetsListingPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Reset page when filters change
+  // Reset page when filters change AND scroll to top
   useEffect(() => {
     setPage(1);
+    scrollToTop();
   }, [debouncedSearch, ownerFilter, sortBy, sortOrder]);
 
   // Build query params
   const params = {
     search: debouncedSearch || undefined,
-    ownerId: ownerFilter === 'mine' && user ? user._id : undefined,
+    ...(ownerFilter === 'mine' && user ? { mySheets: true } : {}),
     sortBy,
     sortOrder,
     page,
@@ -75,7 +85,7 @@ export default function SheetsListingPage() {
   };
 
   const breadcrumbItems: BreadcrumbItem[] = [
-    { label: 'Home', href: ROUTES.DASHBOARD },
+    { label: 'Dashboard', href: ROUTES.DASHBOARD },
     { label: 'Sheets' },
   ];
 
@@ -83,6 +93,20 @@ export default function SheetsListingPage() {
     if (!item.href) return <span {...props}>{props.children}</span>;
     return <Link href={item.href} className={props.className}>{props.children}</Link>;
   };
+
+  // Sticky observer
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsSticky(!entry.isIntersecting);
+      },
+      { threshold: [0] }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div className={styles.container}>
@@ -97,17 +121,26 @@ export default function SheetsListingPage() {
         </Link>
       </div>
 
-      <SheetFilterBar
-        search={search}
-        onSearchChange={setSearch}
-        ownerFilter={ownerFilter}
-        onOwnerFilterChange={setOwnerFilter}
-        sortBy={sortBy}
-        onSortByChange={setSortBy}
-        sortOrder={sortOrder}
-        onSortOrderChange={setSortOrder}
-        isLoggedIn={!!user}
-      />
+      {/* Sentinel for sticky detection */}
+      <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />
+
+      {/* Filter wrapper with sticky behavior */}
+      <div
+        ref={filterWrapperRef}
+        className={`${styles.filterWrapper} ${isSticky ? styles.sticky : ''}`}
+      >
+        <SheetFilterBar
+          search={search}
+          onSearchChange={setSearch}
+          ownerFilter={ownerFilter}
+          onOwnerFilterChange={setOwnerFilter}
+          sortBy={sortBy}
+          onSortByChange={setSortBy}
+          sortOrder={sortOrder}
+          onSortOrderChange={setSortOrder}
+          isLoggedIn={!!user}
+        />
+      </div>
 
       {isLoading && <SheetsSkeleton count={limit} />}
 
@@ -133,7 +166,6 @@ export default function SheetsListingPage() {
         <div className={styles.sheetsList}>
           {sheets.map((sheet) => {
             const isOwner = user ? sheet.ownerId === user._id : false;
-            // Check if current user is in participants array
             const isJoined = user ? sheet.participants?.some(p => p.userId === user._id) : false;
             return (
               <SheetCard
@@ -153,7 +185,10 @@ export default function SheetsListingPage() {
           <Pagination
             currentPage={page}
             totalPages={pagination.pages}
-            onPageChange={setPage}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+              scrollToTop();
+            }}
             showFirstLast
             showPrevNext
             size="md"

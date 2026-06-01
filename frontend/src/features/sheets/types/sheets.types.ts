@@ -183,6 +183,7 @@ export interface GetSheetsParams {
   sortOrder?: 'asc' | 'desc';
   page?: number;
   limit?: number;
+  mySheets?: boolean;
 }
 
 /**

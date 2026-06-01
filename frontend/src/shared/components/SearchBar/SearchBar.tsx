@@ -211,9 +211,36 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
   useClickOutside(containerRef, () => setIsOpen(false));
 
+  // Global keyboard shortcut: Ctrl + / to focus the search bar
   useEffect(() => {
-    if (!isControlled) setInternalValue(initialValue);
-  }, [initialValue, isControlled]);
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Check for Ctrl + / (or Cmd + / on Mac)
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+      if (isCtrlOrCmd && e.key === '/') {
+        e.preventDefault(); // Prevent browser's default action (e.g., opening help)
+
+        // Do not focus if the current active element is an input, textarea, or contenteditable
+        const activeElement = document.activeElement;
+        const isInputActive =
+          activeElement &&
+          (activeElement.tagName === 'INPUT' ||
+            activeElement.tagName === 'TEXTAREA' ||
+            (activeElement as HTMLElement).isContentEditable);
+
+        if (isInputActive) return;
+
+        // Focus the input element of this search bar
+        if (inputRef.current) {
+          inputRef.current.focus();
+          // If the element is not visible, scroll it into view smoothly
+          inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown as any);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown as any);
+  }, []); // No dependencies – the ref is stable, and we don't need to reattach
 
   useEffect(() => {
     if (!isFocused) {

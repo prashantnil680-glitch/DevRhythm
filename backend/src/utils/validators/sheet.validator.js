@@ -60,6 +60,7 @@ const getSheets = Joi.object({
   ownerId: Joi.string().hex().length(24),
   sortBy: Joi.string().valid('createdAt', 'name', 'updatedAt').default('createdAt'),
   sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
+  mySheets: Joi.boolean().default(false),
 });
 
 const getUserProgress = Joi.object({

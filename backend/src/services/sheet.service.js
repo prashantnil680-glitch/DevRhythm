@@ -711,41 +711,166 @@ class SheetService {
 
   /**
    * List sheets with pagination, search, and filtering.
-   * @param {Object} filters
-   * @param {Object} pagination
+   * Supports mySheets=true to show sheets owned or joined by current user.
+   * @param {Object} filters - { search, ownerId, sortBy, sortOrder, mySheets }
+   * @param {Object} pagination - { page, limit }
+   * @param {string|null} currentUserId - required if mySheets=true
    * @returns {Promise<Object>}
    */
-  static async getSheetsList(filters = {}, pagination = {}) {
-    const { search, ownerId, sortBy = 'createdAt', sortOrder = 'desc' } = filters;
-    const { page = 1, limit = 20 } = pagination;
-    const skip = (page - 1) * limit;
+  static async getSheetsList(filters = {}, pagination = {}, currentUserId = null) {
+    const { search, ownerId, sortBy = 'createdAt', sortOrder = 'desc', mySheets = false } = filters;
+    let { page = 1, limit = 20 } = pagination;
 
-    const match = { isActive: true };
-    if (ownerId) match.ownerId = ownerId;
-    if (search) {
-      const searchSlug = slugify(search);
-      match.$or = [
-        { slug: { $regex: searchSlug, $options: 'i' } },
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-      ];
+    // Ensure page and limit are numbers
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    if (isNaN(pageNum) || isNaN(limitNum) || pageNum < 1 || limitNum < 1) {
+      throw new AppError('Invalid pagination parameters', 400);
+    }
+    const skipNum = (pageNum - 1) * limitNum;
+
+    // For normal (non-mySheets) case, keep original find() approach
+    if (!mySheets) {
+      const match = { isActive: true };
+      if (ownerId) match.ownerId = ownerId;
+      if (search) {
+        const searchSlug = slugify(search);
+        match.$or = [
+          { slug: { $regex: searchSlug, $options: 'i' } },
+          { name: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } },
+        ];
+      }
+      const sort = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
+      const [sheets, total] = await Promise.all([
+        Sheet.find(match).sort(sort).skip(skipNum).limit(limitNum).lean(),
+        Sheet.countDocuments(match),
+      ]);
+      const sheetIds = sheets.map(s => s._id);
+      const memberships = await SheetMembership.find({ sheetId: { $in: sheetIds } })
+        .populate('userId', 'username avatarUrl displayName')
+        .lean();
+      const membersBySheet = new Map();
+      for (const m of memberships) {
+        const sheetIdStr = m.sheetId.toString();
+        if (!membersBySheet.has(sheetIdStr)) membersBySheet.set(sheetIdStr, []);
+        membersBySheet.get(sheetIdStr).push({
+          userId: m.userId._id,
+          username: m.userId.username,
+          displayName: m.userId.displayName,
+          avatarUrl: m.userId.avatarUrl,
+        });
+      }
+      const ownerIds = sheets.map(s => s.ownerId).filter(id => id);
+      const owners = await User.find({ _id: { $in: ownerIds } }).select('displayName username').lean();
+      const ownerMap = new Map();
+      for (const owner of owners) ownerMap.set(owner._id.toString(), owner.displayName || owner.username);
+      const sheetsWithDetails = sheets.map(s => ({
+        ...s,
+        ownerDisplayName: s.ownerId ? (ownerMap.get(s.ownerId.toString()) || 'Anonymous User') : 'Anonymous User',
+        participantCount: membersBySheet.get(s._id.toString())?.length || 0,
+        participants: membersBySheet.get(s._id.toString()) || [],
+      }));
+      return {
+        sheets: sheetsWithDetails,
+        pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) }
+      };
     }
 
-    const sort = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
+    // ---------- mySheets = true ----------
+    if (!currentUserId) {
+      throw new AppError('Authentication required for mySheets filter', 401);
+    }
 
-    const [sheets, total] = await Promise.all([
-      Sheet.find(match).sort(sort).skip(skip).limit(limit).lean(),
-      Sheet.countDocuments(match),
-    ]);
+    // Build aggregation pipeline
+    const pipeline = [];
 
+    // 1. Match active sheets
+    pipeline.push({ $match: { isActive: true } });
+
+    // 2. Lookup memberships for current user to find sheets they joined
+    pipeline.push({
+      $lookup: {
+        from: 'sheetmemberships',
+        let: { sheetId: '$_id' },
+        pipeline: [
+          { $match: { $expr: { $and: [ { $eq: ['$sheetId', '$$sheetId'] }, { $eq: ['$userId', currentUserId] } ] } } },
+          { $limit: 1 }
+        ],
+        as: 'userMembership'
+      }
+    });
+
+    // 3. Add flag: user owns sheet or has membership
+    pipeline.push({
+      $addFields: {
+        isOwner: { $eq: ['$ownerId', currentUserId] },
+        hasMembership: { $gt: [{ $size: '$userMembership' }, 0] }
+      }
+    });
+
+    // 4. Filter: isOwner OR hasMembership
+    pipeline.push({ $match: { $or: [{ isOwner: true }, { hasMembership: true }] } });
+
+    // 5. Lookup all memberships to compute participant count
+    pipeline.push({
+      $lookup: {
+        from: 'sheetmemberships',
+        localField: '_id',
+        foreignField: 'sheetId',
+        as: 'allMembers'
+      }
+    });
+
+    // 6. Add participantCount
+    pipeline.push({
+      $addFields: {
+        participantCount: { $size: '$allMembers' }
+      }
+    });
+
+    // 7. Apply search if provided
+    if (search) {
+      const searchSlug = slugify(search);
+      pipeline.push({
+        $match: {
+          $or: [
+            { slug: { $regex: searchSlug, $options: 'i' } },
+            { name: { $regex: search, $options: 'i' } },
+            { description: { $regex: search, $options: 'i' } },
+          ]
+        }
+      });
+    }
+
+    // 8. Sort by participantCount descending (popularity)
+    pipeline.push({ $sort: { participantCount: -1 } });
+
+    // 9. Pagination (use numeric values)
+    pipeline.push({ $skip: skipNum });
+    pipeline.push({ $limit: limitNum });
+
+    // Execute aggregation
+    const sheets = await Sheet.aggregate(pipeline);
+
+    // Get total count for pagination (copy pipeline, remove $skip and $limit, add $count)
+    const countPipeline = pipeline.slice(0, -2);
+    countPipeline.push({ $count: 'total' });
+    const countResult = await Sheet.aggregate(countPipeline);
+    const total = countResult[0]?.total || 0;
+
+    // Prepare response (similar to normal path)
     const sheetIds = sheets.map(s => s._id);
+    // Fetch owner display names
+    const ownerIds = sheets.map(s => s.ownerId).filter(id => id);
+    const owners = await User.find({ _id: { $in: ownerIds } }).select('displayName username').lean();
+    const ownerMap = new Map();
+    for (const owner of owners) ownerMap.set(owner._id.toString(), owner.displayName || owner.username);
 
-    // Fetch memberships for all sheets in this page
+    // Build participants per sheet (populate user details)
     const memberships = await SheetMembership.find({ sheetId: { $in: sheetIds } })
       .populate('userId', 'username avatarUrl displayName')
       .lean();
-
-    // Group memberships by sheetId
     const membersBySheet = new Map();
     for (const m of memberships) {
       const sheetIdStr = m.sheetId.toString();
@@ -758,36 +883,21 @@ class SheetService {
       });
     }
 
-    // Fetch owner display names for all sheets (bulk)
-    const ownerIds = sheets.map(s => s.ownerId).filter(id => id);
-    const owners = await User.find({ _id: { $in: ownerIds } }).select('displayName username').lean();
-    const ownerMap = new Map();
-    for (const owner of owners) {
-      ownerMap.set(owner._id.toString(), owner.displayName || owner.username);
-    }
-
-    const sheetsWithDetails = sheets.map(s => {
-      let ownerDisplayName = 'Anonymous User';
-      if (s.ownerId) {
-        const name = ownerMap.get(s.ownerId.toString());
-        if (name) ownerDisplayName = name;
-      }
-      return {
-        ...s,
-        ownerDisplayName,
-        participantCount: membersBySheet.get(s._id.toString())?.length || 0,
-        participants: membersBySheet.get(s._id.toString()) || [],
-      };
-    });
+    const sheetsWithDetails = sheets.map(s => ({
+      ...s,
+      ownerDisplayName: s.ownerId ? (ownerMap.get(s.ownerId.toString()) || 'Anonymous User') : 'Anonymous User',
+      participantCount: membersBySheet.get(s._id.toString())?.length || 0,
+      participants: membersBySheet.get(s._id.toString()) || [],
+      // Remove aggregation helper fields
+      userMembership: undefined,
+      allMembers: undefined,
+      isOwner: undefined,
+      hasMembership: undefined,
+    }));
 
     return {
       sheets: sheetsWithDetails,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-      },
+      pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) },
     };
   }
 

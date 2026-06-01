@@ -9,6 +9,7 @@ const { paginate } = require('../utils/helpers/pagination');
 const { formatResponse } = require('../utils/helpers/response');
 const config = require('../config');
 const { computeUserStats, computeUserStreak } = require('../services/userStats.service');
+const Question = require('../models/Question');
 
 const getCurrentUser = async (req, res, next) => {
   try {
@@ -647,6 +648,40 @@ const getAllUsers = async (req, res, next) => {
       countPipeline.push({ $count: 'total' });
       const countResult = await User.aggregate(countPipeline);
       total = countResult.length ? countResult[0].total : 0;
+    }
+
+    // ========== Compute real stats from UserQuestionProgress for these users ==========
+    const userIds = users.map(u => u._id);
+    if (userIds.length > 0) {
+      // Get solved counts and total time spent from UserQuestionProgress
+      const statsAgg = await UserQuestionProgress.aggregate([
+        { $match: { userId: { $in: userIds }, status: { $in: ['Solved', 'Mastered'] } } },
+        { $group: {
+            _id: '$userId',
+            totalSolved: { $sum: 1 },
+            totalTimeSpent: { $sum: '$totalTimeSpent' }
+          }
+        }
+      ]);
+      const statsMap = new Map();
+      statsAgg.forEach(s => statsMap.set(s._id.toString(), { totalSolved: s.totalSolved, totalTimeSpent: s.totalTimeSpent }));
+
+      // Get total number of active questions (for mastery rate calculation)
+      const totalActiveQuestions = await Question.countDocuments({ isActive: true });
+
+      // Override the stats for each user
+      users = users.map(user => {
+        const uid = user._id.toString();
+        const computed = statsMap.get(uid) || { totalSolved: 0, totalTimeSpent: 0 };
+        const totalSolved = computed.totalSolved;
+        const masteryRate = totalActiveQuestions > 0 ? (totalSolved / totalActiveQuestions) * 100 : 0;
+        return {
+          ...user,
+          totalSolved,
+          masteryRate: Math.round(masteryRate * 100) / 100,
+          totalTimeSpent: computed.totalTimeSpent
+        };
+      });
     }
 
     const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;

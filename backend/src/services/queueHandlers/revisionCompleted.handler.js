@@ -10,6 +10,7 @@ const heatmapService = require('../heatmap.service');
 const { parseDate } = require('../../utils/helpers/date');
 const { updateUserActivity } = require('../user.service');
 const { DateTime } = require('luxon');
+const SheetService = require('../sheet.service'); // ADDED: Import SheetService
 
 const handleRevisionCompleted = async (job) => {
   const { userId, revisionId, questionId, completedAt, revisionIndex, status } = job.data;
@@ -26,6 +27,8 @@ const handleRevisionCompleted = async (job) => {
     await user.save();
     await invalidateCache(`user:${userId}:profile`);
 
+    // ========== Update sheet progress for this revision completion ==========
+    await SheetService.updateSheetProgressOnRevisionComplete(userId, questionId);
     // NOTE: revisionCount is now incremented synchronously in revisionActivity.service.js
     // No longer increment here to avoid double counting.
     // The following line has been removed:

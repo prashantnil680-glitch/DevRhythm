@@ -19,6 +19,7 @@ const { updateUserActivity } = require("../user.service");
 const { client: redisClient } = require("../../config/redis");
 const constants = require("../../config/constants");
 const leetcodeService = require("../leetcode.service");
+const SheetService = require("../sheet.service"); // ADDED: Import SheetService
 
 const getGoalDailySolveKey = (userId, dateStr) => `goal:solved:daily:${userId}:${dateStr}`;
 
@@ -67,6 +68,9 @@ const handleQuestionSolved = async (job) => {
 
     await updateUserActivity(userId, solvedDate, userTimeZone);
     await user.save();
+
+    // ========== Update sheet progress for this solve ==========
+    await SheetService.updateSheetProgressOnSolve(userId, questionId);
     await invalidateUserCache(userId);
 
     const updateData = {

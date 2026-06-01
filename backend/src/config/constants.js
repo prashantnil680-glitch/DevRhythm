@@ -22,6 +22,8 @@ module.exports = {
     WEEKLY_REPORT: 'weekly_report',
     POD_AVAILABLE: 'pod_available',
     POD_SOLVED: 'pod_solved',      
+    SHEET_IMPORT_COMPLETED: 'sheet_import_completed', 
+    SHEET_IMPORT_FAILED: 'sheet_import_failed',      
   },
   LEADERBOARD_TYPES: ['weekly', 'monthly'],
   SNAPSHOT_PERIODS: ['daily', 'weekly', 'monthly'],

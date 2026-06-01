@@ -90,6 +90,14 @@ const invalidateDashboardCache = async (userId) => {
   await invalidateCache(`dashboard:user:${userId}`);
 };
 
+const invalidateSheetCache = async (sheetId, slug = null) => {
+  await invalidateCache(`sheet:${sheetId}:*`);
+  if (slug) {
+    await invalidateCache(`sheet:${slug}:*`);
+  }
+  await invalidateCache('sheets:list:*');
+};
+
 module.exports = {
   cache,
   invalidateCache,
@@ -98,4 +106,5 @@ module.exports = {
   invalidateProgressCache,
   invalidateGoalChartCache,
   invalidateDashboardCache,
+  invalidateSheetCache, 
 };

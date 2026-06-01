@@ -21,6 +21,7 @@ const dashboardRoutes = require('./dashboard.routes');
 const trendsRoutes = require('./trends.routes');
 const activityDayRoutes = require('./activityDay.routes');
 const adminRoutes = require('./admin.routes');
+const sheetRoutes = require('./sheet.routes');
 
 router.get('/health', (req, res) => {
   res.json({
@@ -64,5 +65,6 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/trends', trendsRoutes);
 router.use('/activity', activityDayRoutes);
 router.use('/admin', adminRoutes);
+router.use('/sheets', sheetRoutes);
 
 module.exports = router;

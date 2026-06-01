@@ -637,7 +637,9 @@ class SheetService {
     const match = { isActive: true };
     if (ownerId) match.ownerId = ownerId;
     if (search) {
+      const searchSlug = slugify(search);
       match.$or = [
+        { slug: { $regex: searchSlug, $options: 'i' } },
         { name: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } },
       ];

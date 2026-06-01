@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import { toast } from '@/shared/components/Toast';
 import Modal from '@/shared/components/Modal';
 import Button from '@/shared/components/Button';
 import DatePicker from '@/shared/components/DatePicker';
@@ -25,26 +26,31 @@ export default function UpdateTargetDateModal({
   const [targetDate, setTargetDate] = useState<Date | null>(
     currentTargetDate ? new Date(currentTargetDate) : null
   );
-  const [error, setError] = useState<string | null>(null);
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 2);
+  tomorrow.setHours(0, 0, 0, 0);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTargetDate(currentTargetDate ? new Date(currentTargetDate) : null);
+    }
+  }, [isOpen, currentTargetDate]);
 
   const handleConfirm = () => {
     if (!targetDate) {
-      setError('Please select a target date');
+      toast.error('Please select a target date');
       return;
     }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (targetDate < today) {
-      setError('Target date must be in the future');
+    if (targetDate < tomorrow) {
+      toast.error('Target date must be tomorrow or later');
       return;
     }
-    setError(null);
     onConfirm(format(targetDate, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"));
   };
 
   const handleClose = () => {
     setTargetDate(currentTargetDate ? new Date(currentTargetDate) : null);
-    setError(null);
     onClose();
   };
 
@@ -68,16 +74,12 @@ export default function UpdateTargetDateModal({
           </label>
           <DatePicker
             selected={targetDate}
-            onChange={(date: Date | null) => {
-              setTargetDate(date);
-              setError(null);
-            }}
+            onChange={(date: Date | null) => setTargetDate(date)}
             placeholder="Select a future date"
-            minDate={new Date()}
+            minDate={tomorrow}
             dateFormat="yyyy-MM-dd"
             id="targetDate"
           />
-          {error && <span className={styles.error}>{error}</span>}
         </div>
         <div className={styles.actions}>
           <Button variant="outline" onClick={handleClose} disabled={isLoading}>

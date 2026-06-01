@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useRef } from 'react';
 import ReactDatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { FiCalendar } from 'react-icons/fi';
@@ -64,23 +64,26 @@ const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
       name,
       required,
       'aria-label': ariaLabel,
-      className, // will be passed to Input
+      className,
       ...rest
     },
     ref
   ) => {
+    const datePickerRef = useRef<any>(null);
+
     // Custom input component that wraps the shared Input and makes the calendar icon clickable.
     const CustomInput = forwardRef<HTMLInputElement, any>(
-      ({ value, onClick, onChange: onInputChange, onBlur, ...props }, ref) => {
-        // Handle icon click separately to trigger the datepicker
+      ({ value, onClick, onChange: onInputChange, onBlur, ...props }, inputRef) => {
         const handleIconClick = (e: React.MouseEvent) => {
           e.stopPropagation(); // prevent double trigger if event bubbles
+          // Programmatically open the date picker
+          datePickerRef.current?.setOpen(true);
           onClick?.(e);
         };
 
         return (
           <Input
-            ref={ref}
+            ref={inputRef}
             value={value}
             onChange={onInputChange}
             onBlur={onBlur}
@@ -112,6 +115,7 @@ const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
     return (
       <div className={`${styles.container} ${wrapperClassName}`}>
         <ReactDatePicker
+          ref={datePickerRef}
           selected={selected}
           onChange={onChange}
           minDate={minDate}

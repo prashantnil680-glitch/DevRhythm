@@ -26,7 +26,10 @@ export function useJoinSheet() {
     },
 
     onError: (error: any) => {
-      const message = error.response?.data?.message || error.message || 'Failed to join sheet';
+      let message = error.response?.data?.message || error.message || 'Failed to join sheet';
+      if (message === 'Validation failed') {
+        message = 'Target date must be a future date (tomorrow or later).';
+      }
       toast.error(message);
     },
   });

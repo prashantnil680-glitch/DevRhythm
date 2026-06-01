@@ -71,7 +71,7 @@ export default function ImportTab({
       description: initialData?.description || '',
       targetDate: initialData?.targetDate ? new Date(initialData.targetDate) : (() => {
         const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setDate(tomorrow.getDate() + 2);
         tomorrow.setHours(0, 0, 0, 0);
         return tomorrow;
       })(),

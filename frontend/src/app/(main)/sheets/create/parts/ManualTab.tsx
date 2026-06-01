@@ -201,7 +201,7 @@ export default function ManualTab({
                       placeholder="Select a future date"
                       minDate={(() => {
                         const tomorrow = new Date();
-                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        tomorrow.setDate(tomorrow.getDate() + 2);
                         return tomorrow;
                       })()}
                       dateFormat="yyyy-MM-dd"

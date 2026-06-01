@@ -97,6 +97,10 @@ export const ROUTES = {
     DETAIL: (groupId: string) => `/groups/${groupId}`,
   },
 
+  NOTIFICATIONS: {
+    ROOT: '/notifications',
+  },
+
   SHEETS: {
     ROOT: '/sheets',
     CREATE: '/sheets/create',

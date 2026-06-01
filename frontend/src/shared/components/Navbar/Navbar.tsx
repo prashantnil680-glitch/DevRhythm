@@ -20,6 +20,7 @@ import {
   FiClock,
   FiGrid,
   FiChevronRight,
+  FiBell,
 } from 'react-icons/fi';
 import { FaFire } from 'react-icons/fa';
 import clsx from 'clsx';
@@ -31,6 +32,7 @@ import { Avatar } from '@/shared/components/Avatar';
 import ThemeToggle from '@/shared/components/ThemeToggle';
 import Button from '@/shared/components/Button';
 import { useSession } from '@/features/auth/hooks/useSession';
+import { useUnreadCount } from '@/features/notification/hooks/useNotifications';
 
 import styles from './Navbar.module.css';
 
@@ -52,6 +54,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { user, logout } = useSession();
   const pathname = usePathname();
   const isMobile = useMediaQuery('(max-width: 768px)');
+  const { data: unreadCountData } = useUnreadCount();
+  const unreadCount = unreadCountData?.unreadCount ?? 0;
 
   const [openDropdown, setOpenDropdown] = useState<DropdownId>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -223,6 +227,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             )}
 
+            {/* Notification icon (only for logged in users) */}
+            {user && (
+              <Link
+                href={ROUTES.NOTIFICATIONS.ROOT}
+                className={styles.notificationLink}
+                aria-label="Notifications"
+              >
+                <FiBell className={styles.notificationIcon} />
+                {unreadCount > 0 && (
+                  <span className={styles.notificationBadge}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </Link>
+            )}
+
             <ThemeToggle variant="icon" className={styles.themeToggle} />
 
             {/* Profile dropdown */}
@@ -301,6 +321,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <ThemeToggle variant="both" />
               </div>
 
+                {/* Notifications section (only for logged in users) */}
+                {user && (
+                  <div className={styles.drawerSection}>
+                    <h3>Notifications</h3>
+                    <Link href={ROUTES.NOTIFICATIONS.ROOT} onClick={() => setIsDrawerOpen(false)}>
+                      View Notifications
+                      {unreadCount > 0 && <span className={styles.drawerBadge}>{unreadCount}</span>}
+                    </Link>
+                  </div>
+                )}
+
+
               {user ? (
                 <Link
                   href={ROUTES.USER_PROFILE.OWN(user.username)}
@@ -357,9 +389,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <Link href={ROUTES.PATTERNS.ROOT} onClick={() => setIsDrawerOpen(false)}>
                   Patterns
                 </Link>
-                {/* <Link href={ROUTES.QUESTIONS.TAGS} onClick={() => setIsDrawerOpen(false)}>
-                  Tags
-                </Link> */}
               </div>
 
               {/* Progress section */}
@@ -387,7 +416,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </Link>
               </div>
 
-              {/* Profile section – only for logged in users, includes profile, shares, settings, logout */}
+              {/* Notifications section (only for logged in users) */}
+              {user && (
+                <div className={styles.drawerSection}>
+                  <h3>Notifications</h3>
+                  <Link href={ROUTES.NOTIFICATIONS.ROOT} onClick={() => setIsDrawerOpen(false)}>
+                    View Notifications
+                    {unreadCount > 0 && <span className={styles.drawerBadge}>{unreadCount}</span>}
+                  </Link>
+                </div>
+              )}
+
+              {/* Profile section */}
               {user && (
                 <div className={styles.drawerSection}>
                   <h3>Profile</h3>
@@ -443,6 +483,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className={styles.mobileBadge}>{pendingRevisionsCount}</span>
             )}
           </Link>
+
+          {/* Notifications (mobile) */}
+          {user && (
+            <Link
+              href={ROUTES.NOTIFICATIONS.ROOT}
+              className={clsx(styles.mobileNavItem, isActive(ROUTES.NOTIFICATIONS.ROOT) && styles.active)}
+              aria-label="Notifications"
+            >
+              <FiBell className={styles.mobileIcon} />
+              <span className={styles.mobileLabel}>Alerts</span>
+              {unreadCount > 0 && (
+                <span className={styles.mobileBadge}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </Link>
+          )}
 
           <Link
             href={ROUTES.QUESTIONS.CREATE}

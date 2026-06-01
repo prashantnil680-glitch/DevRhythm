@@ -85,7 +85,7 @@ export default function SheetsListingPage() {
   };
 
   const breadcrumbItems: BreadcrumbItem[] = [
-    { label: 'Dashboard', href: ROUTES.DASHBOARD },
+    { label: 'Home', href: ROUTES.DASHBOARD },
     { label: 'Sheets' },
   ];
 

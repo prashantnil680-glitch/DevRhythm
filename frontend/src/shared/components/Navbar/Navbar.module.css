@@ -702,4 +702,48 @@
   }
 }
 
-/* Remove outdated goalPill rules – not needed */
+/* Notification icon and badge (desktop) */
+.notificationLink {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: 0 0.1rem;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.notificationLink:hover {
+  background-color: var(--hover-surface);
+  color: var(--text-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+.notificationIcon {
+  font-size: 1.2rem;
+}
+
+.notificationBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  padding: 0 0.25rem;
+  background-color: var(--accent-moss);
+  color: var(--primary-text-on-action);
+  font-size: 0.65rem;
+  font-weight: 600;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border: 2px solid var(--bg-surface);
+  box-shadow: 0 1px 2px var(--shadow);
+}

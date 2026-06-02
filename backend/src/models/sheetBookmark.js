@@ -19,7 +19,6 @@ const SheetBookmarkSchema = new mongoose.Schema(
       default: Date.now,
       index: true,
     },
-    // Future extensibility (folders, custom order, notes)
     folderId: {
       type: mongoose.Schema.Types.ObjectId,
       default: null,

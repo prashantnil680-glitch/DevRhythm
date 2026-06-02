@@ -17,7 +17,7 @@ import Button from '@/shared/components/Button';
 import Tabs from '@/shared/components/Tabs';
 import Modal from '@/shared/components/Modal';
 import { toast } from '@/shared/components/Toast';
-import { FiMaximize2, FiMinimize2 } from 'react-icons/fi';
+import { FiExternalLink, FiMaximize2, FiMinimize2 } from 'react-icons/fi';
 import type { Question } from '@/shared/types';
 import { ProgressCard } from './ProgressCard';
 import { SimilarQuestionsGrid } from './SimilarQuestionsGrid';
@@ -298,75 +298,77 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
 
   return (
     <div className={isFullWindow ? styles.fullWindow : styles.page}>
-      {/* Header */}
-      <div className={styles.header}>
-        <div className={styles.titleRow}>
-          <h1 className={styles.title}>{initialQuestion.title}</h1>
-          {mounted && isAuthenticated && userStatus && (
-            <span className={`${styles.statusBadge} ${getStatusClass(userStatus)}`}>
-              {userStatus}
-            </span>
-          )}
-        </div>
-        <div className={styles.actions}>
-          <div className={styles.fullWindowButtonWrapper}>
-            <div className={styles.rippleRing} />
-            <div className={styles.rippleRing} />
-            <div className={styles.rippleRing} />
-            <Button
-              className={styles.fullWindowButton}
-              variant="ghost"
-              size="sm"
-              onClick={toggleFullWindow}
-              leftIcon={isFullWindow ? <FiMinimize2 /> : <FiMaximize2 />}
-            >
-              {isFullWindow ? 'Exit Window' : 'Full Window'}
-            </Button>
-          </div>
-          {mounted && isAuthenticated && isCreator && (
-            <>
-              <Button variant="secondary" size="sm" onClick={handleEditQuestion}>
-                Edit
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleDeleteClick}>
-                Delete
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Metadata bar */}
-      <div className={styles.metadataBar}>
-        <span className={styles.metadataItem}>{initialQuestion.platform}</span>
-        <span className={styles.badge} data-difficulty={initialQuestion.difficulty.toLowerCase()}>
-          {initialQuestion.difficulty}
-        </span>
-        {progress?.personalDifficulty && (
-          <span className={styles.personalBadge}>Personal: {progress.personalDifficulty}</span>
+    {/* Header */}
+    <div className={styles.header}>
+      <div className={styles.titleSection}>
+        <h1 className={styles.title}>{initialQuestion.title}</h1>
+        {mounted && isAuthenticated && userStatus && (
+          <span className={`${styles.statusBadge} ${getStatusClass(userStatus)}`}>
+            {userStatus}
+          </span>
         )}
-          {/* {initialQuestion.tags.map(tag => (
-            <span key={tag} className={styles.tag}>#{tag}</span>
-          ))} */}
-        {initialQuestion.pattern?.map(p => (
-          <Link key={p} href={`/patterns/${slugify(p)}`} className={styles.patternLink}>
-            #{p}
-          </Link>
-        ))}
-        <a href={initialQuestion.problemLink} target="_blank" rel="noopener noreferrer" className={styles.linkIcon}>
-          🔗 Solve on {initialQuestion.platform}
-        </a>
-        {initialQuestion.solutionLinks?.length > 0 && (
-          <span className={styles.linkIcon}>
+      </div>
+      <div className={styles.actionButtons}>
+        <div className={styles.fullWindowButtonWrapper}>
+          <div className={styles.rippleRing} />
+          <div className={styles.rippleRing} />
+          <div className={styles.rippleRing} />
+          <Button
+            className={styles.fullWindowButton}
+            variant="ghost"
+            size="sm"
+            onClick={toggleFullWindow}
+            leftIcon={isFullWindow ? <FiMinimize2 /> : <FiMaximize2 />}
+          >
+            {isFullWindow ? 'Exit' : 'Full'}
+          </Button>
+        </div>
+        {mounted && isAuthenticated && isCreator && (
+          <>
+            <Button variant="outline" size="sm" onClick={handleEditQuestion}>
+              Edit
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleDeleteClick}>
+              Delete
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+
+    {/* Metadata bar  */}
+    <div className={styles.metadataBar}>
+      <Link href={`/questions?platform=${encodeURIComponent(initialQuestion.platform)}&page=1`} className={styles.metadataChip}>
+        {initialQuestion.platform}
+      </Link>
+      <Link href={`/questions?difficulty=${initialQuestion.difficulty}&page=1`} className={`${styles.metadataChip} ${styles.difficultyChip}`} data-difficulty={initialQuestion.difficulty.toLowerCase()}>
+        {initialQuestion.difficulty}
+      </Link>
+        {initialQuestion.tags.map(tag => {
+          const slug = slugify(tag);
+          return (
+            <Link key={tag} href={`/patterns/${slug}`} className={styles.metadataChip}>
+              #{tag}
+            </Link>
+          );
+        })}
+      <a href={initialQuestion.problemLink} target="_blank" rel="noopener noreferrer" className={styles.metadataChip}>
+        Solve on {initialQuestion.platform} <FiExternalLink size={10} />
+      </a>
+      {initialQuestion.solutionLinks && initialQuestion.solutionLinks.length > 0 && (
+        <div className={styles.solutionDropdown}>
+          <span className={styles.metadataChip}>
             🔗 Solutions
-            <select className={styles.solutionSelect}>
+            <select className={styles.solutionSelect} onChange={(e) => window.open(e.target.value, '_blank')} value="">
+              <option value="" disabled>Select solution</option>
               {initialQuestion.solutionLinks.map((link, idx) => (
                 <option key={idx} value={link}>Solution {idx + 1}</option>
               ))}
             </select>
           </span>
-        )}
-      </div>
+        </div>
+      )}
+    </div>
 
       {/* Progress Card */}
       {mounted && isAuthenticated && (

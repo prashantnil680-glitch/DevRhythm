@@ -1,15 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FaChevronUp, FaChevronDown, FaRedo, FaBook, FaCalendarAlt, FaCheck, FaCheckCircle, FaCalendarPlus } from 'react-icons/fa';
+import { FaChevronUp, FaChevronDown, FaRedo, FaCalendarAlt, FaCheck, FaCheckCircle, FaCalendarPlus } from 'react-icons/fa';
 import ConfidenceStars from '@/shared/components/ConfidenceStars';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import Button from '@/shared/components/Button';
 import DatePicker from '@/shared/components/DatePicker';
 import { useRescheduleRevision } from '@/features/revision/hooks/useRescheduleRevision';
 import type { UserQuestionProgress, RevisionSchedule } from '@/shared/types';
-import styles from './ProgressCard.module.css';
 import Tooltip from '@/shared/components/Tooltip';
+import styles from './ProgressCard.module.css';
 
 interface ProgressCardProps {
   progress?: UserQuestionProgress;
@@ -24,7 +24,7 @@ interface ProgressCardProps {
 
 const formatLocalDate = (dateString: string): string => {
   const date = new Date(dateString);
-  return date.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' });
+  return date.toLocaleDateString('default', { month: 'short', day: 'numeric' });
 };
 
 export const ProgressCard: React.FC<ProgressCardProps> = ({
@@ -41,9 +41,9 @@ export const ProgressCard: React.FC<ProgressCardProps> = ({
   const [autoCollapseTriggered, setAutoCollapseTriggered] = useState(false);
   const [showReschedulePicker, setShowReschedulePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-
   const rescheduleMutation = useRescheduleRevision(questionId || '', revision?._id || '');
 
+  // Auto-collapse after 10 seconds (only once)
   useEffect(() => {
     if (!autoCollapseTriggered && !isCollapsed && !isLoading) {
       const timer = setTimeout(() => {
@@ -58,31 +58,26 @@ export const ProgressCard: React.FC<ProgressCardProps> = ({
   const confidence = progress?.confidenceLevel || 1;
   const attempts = progress?.attempts?.count || 0;
   const revisionsDone = progress?.revisionCount || 0;
-
   const schedule = revision?.schedule || [];
   const completedRevisions = revision?.completedRevisions || [];
   const totalRevisions = schedule.length;
   const completedCount = completedRevisions.length;
-
   const scheduleStatuses = revision?.scheduleStatuses || [];
   const pendingEntry = scheduleStatuses.find(item => item.status === 'Pending');
   const upcomingEntry = scheduleStatuses.find(item => item.status === 'Upcoming');
   const hasPendingRevision = !!pendingEntry;
   const hasUpcomingRevision = !!upcomingEntry;
   const hasActiveRevisions = hasPendingRevision || hasUpcomingRevision;
+  const noActiveRevisions = !hasActiveRevisions && totalRevisions > 0;
 
   const formatTime = (minutes: number) => {
-    if (minutes < 60) {
-      return { value: minutes, unit: 'min' };
-    }
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (mins === 0) {
-      return { value: hours, unit: hours === 1 ? 'hour' : 'hours' };
-    }
-    return { value: `${hours}.${Math.floor(mins / 6)}`, unit: 'hours' };
+    if (minutes < 60) return { value: minutes, unit: 'min' };
+    const hours = minutes / 60;
+    const rounded = Math.round(hours * 10) / 10;
+    return { value: rounded, unit: 'hours' };
   };
   const timeDisplay = formatTime(timeSpent);
+  const revisionPercentage = totalRevisions > 0 ? (completedCount / totalRevisions) * 100 : 0;
 
   const handleReschedule = async () => {
     if (!selectedDate) return;
@@ -99,8 +94,23 @@ export const ProgressCard: React.FC<ProgressCardProps> = ({
           <SkeletonLoader variant="text" width={20} height={20} />
         </div>
         <div className={styles.content}>
-          <SkeletonLoader variant="text" width={100} height={24} />
-          <SkeletonLoader variant="text" width={150} height={48} />
+          <div className={styles.tileGrid}>
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className={styles.tile}>
+                <SkeletonLoader variant="text" width={60} height={32} />
+                <SkeletonLoader variant="text" width={40} height={14} />
+              </div>
+            ))}
+          </div>
+          <SkeletonLoader variant="text" width={120} height={20} />
+          <div className={styles.progressRow}>
+            <SkeletonLoader variant="text" width="100%" height={6} />
+          </div>
+          <div className={styles.actions}>
+            <SkeletonLoader variant="custom" width={120} height={32} />
+            <SkeletonLoader variant="custom" width={120} height={32} />
+            <SkeletonLoader variant="custom" width={100} height={32} />
+          </div>
         </div>
       </div>
     );
@@ -114,87 +124,94 @@ export const ProgressCard: React.FC<ProgressCardProps> = ({
           {isCollapsed ? <FaChevronDown /> : <FaChevronUp />}
         </button>
       </div>
+
       {!isCollapsed && (
         <div className={styles.content}>
-          <div className={styles.leftColumn}>
-            {(!progress || progress?.status === 'Not Started') && onMarkSolved && (
+          {/* 4‑tile grid */}
+          <div className={styles.tileGrid}>
+            <div className={styles.tile}>
+              <div className={styles.tileValue}>{timeDisplay.value}</div>
+              <div className={styles.tileLabel}>{timeDisplay.unit} spent</div>
+            </div>
+            <div className={styles.tile}>
+              <div className={styles.tileValue}>
+                {hasPendingRevision
+                  ? formatLocalDate(pendingEntry!.date)
+                  : hasUpcomingRevision
+                  ? formatLocalDate(upcomingEntry!.date)
+                  : '—'}
+              </div>
+              <div className={styles.tileLabel}>next revision</div>
+            </div>
+            <div className={styles.tile}>
+              <div className={styles.tileValue}>{attempts}</div>
+              <div className={styles.tileLabel}>attempts</div>
+            </div>
+            <div className={styles.tile}>
+              <div className={styles.tileValue}>{Math.round(revisionPercentage)}%</div>
+              <div className={styles.tileLabel}>revision done</div>
+            </div>
+          </div>
+
+          {/* Confidence stars */}
+          <div className={styles.confidenceRow}>
+            <span className={styles.confidenceLabel}>Confidence:</span>
+            <ConfidenceStars level={confidence} size={16} />
+          </div>
+
+          {/* Revision progress bar + circles */}
+          {totalRevisions > 0 && (
+            <div className={styles.progressRow}>
+              <div className={styles.progressBar}>
+                <div className={styles.progressFill} style={{ width: `${revisionPercentage}%` }} />
+              </div>
+              <div className={styles.progressStats}>
+                <span>{completedCount}/{totalRevisions} revisions</span>
+                <div className={styles.revisionCircles}>
+                  {Array.from({ length: totalRevisions }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`${styles.circle} ${i < completedCount ? styles.circleFilled : styles.circleEmpty}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className={styles.actions}>
+            {hasPendingRevision && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onMarkRevised}
+                leftIcon={<FaCheck />}
+                isLoading={isMarking}
+                className={styles.actionButton}
+              >
+                Mark as Revised
+              </Button>
+            )}
+
+            {(!progress || progress.status === 'Not Started') && onMarkSolved && (
               <Button
                 variant="primary"
-                size="md"
+                size="sm"
                 onClick={onMarkSolved}
                 isLoading={isMarkingSolved}
                 leftIcon={<FaCheckCircle />}
-                className={styles.markSolvedButton}
-                fullWidth
+                className={styles.actionButton}
               >
                 Mark as Solved
               </Button>
             )}
-            <div className={styles.metricRow}>
-              <FaRedo className={styles.icon} />
-              <span className={styles.metricValue}>{attempts}</span>
-              <span className={styles.metricLabel}>attempts</span>
-            </div>
-            <div className={styles.metricRow}>
-              <FaBook className={styles.icon} />
-              <span className={styles.metricValue}>{revisionsDone}</span>
-              <span className={styles.metricLabel}>revisions</span>
-            </div>
-            <div className={styles.metricRow}>
-              <ConfidenceStars level={confidence} size={16} />
-              <span className={styles.metricLabel}>confidence</span>
-            </div>
-            <div className={styles.metricRow}>
-              <FaCalendarAlt className={styles.icon} />
-              {hasPendingRevision ? (
-                <>
-                  <span className={styles.metricValue}>
-                    {formatLocalDate(pendingEntry!.date)}
-                  </span>
-                  <span className={styles.metricLabel}>due today</span>
-                </>
-              ) : hasUpcomingRevision ? (
-                <>
-                  <span className={styles.metricValue}>
-                    {formatLocalDate(upcomingEntry!.date)}
-                  </span>
-                  <span className={styles.metricLabel}>next revision</span>
-                </>
-              ) : (
-                <span className={styles.metricLabel}>no upcoming revisions</span>
-              )}
-            </div>
-            {totalRevisions > 0 && (
-              <div className={styles.progressIndicator}>
-                <span className={styles.progressText}>
-                  {completedCount} of {totalRevisions} revisions done
-                </span>
-                <div className={styles.progressBar}>
-                  <div
-                    className={styles.progressFill}
-                    style={{ width: `${(completedCount / totalRevisions) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
-            {hasPendingRevision && (
-              <Tooltip content="You need to spend at least 20 minutes or pass all test cases to complete this revision.">
+
+            {/* Reschedule button – only when no active revisions and there is a schedule */}
+            {noActiveRevisions && revision?._id && (
+              <div className={styles.rescheduleWrapper}>
                 <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onMarkRevised}
-                  leftIcon={<FaCheck />}
-                  isLoading={isMarking}
-                  className={styles.markButton}
-                >
-                  Mark as Revised
-                </Button>
-              </Tooltip>
-            )}
-            {!hasActiveRevisions && totalRevisions > 0 && revision?._id && (
-              <div className={styles.rescheduleContainer}>
-                <Button
-                  variant="secondary"
+                  variant="ghost"
                   size="sm"
                   onClick={() => setShowReschedulePicker(!showReschedulePicker)}
                   leftIcon={<FaCalendarPlus />}
@@ -216,40 +233,12 @@ export const ProgressCard: React.FC<ProgressCardProps> = ({
                       <Button size="sm" variant="outline" onClick={() => setShowReschedulePicker(false)}>
                         Cancel
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        onClick={handleReschedule}
-                        isLoading={rescheduleMutation.isPending}
-                        disabled={!selectedDate}
-                      >
+                      <Button size="sm" variant="primary" onClick={handleReschedule} isLoading={rescheduleMutation.isPending} disabled={!selectedDate}>
                         Apply
                       </Button>
                     </div>
                   </div>
                 )}
-              </div>
-            )}
-          </div>
-          <div className={styles.rightColumn}>
-            <div className={styles.timeBlock}>
-              <div className={styles.timeNumber}>{timeDisplay.value}</div>
-              <div className={styles.timeLabel}>{timeDisplay.unit}</div>
-              <div className={styles.timeSub}>total time spent</div>
-            </div>
-            {totalRevisions > 0 && (
-              <div className={styles.revisionProgress}>
-                <div className={styles.revisionCircles}>
-                  {Array.from({ length: totalRevisions }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`${styles.circle} ${i < completedCount ? styles.circleFilled : styles.circleEmpty}`}
-                    />
-                  ))}
-                </div>
-                <span className={styles.revisionLabel}>
-                  {completedCount}/{totalRevisions} revisions
-                </span>
               </div>
             )}
           </div>

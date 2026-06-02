@@ -2,15 +2,14 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { FiCheckCircle, FiClock, FiHelpCircle } from 'react-icons/fi';
+import { FiCheckCircle, FiHelpCircle, FiClock } from 'react-icons/fi';
 import PlatformIcon from '@/shared/components/PlatformIcon';
-import Card from '@/shared/components/Card';
 import NoRecordFound from '@/shared/components/NoRecordFound';
 import Pagination from '@/shared/components/Pagination';
-import Badge from '@/shared/components/Badge';
 import Tooltip from '@/shared/components/Tooltip';
 import { usePatternQuestions } from '@/features/question';
 import { formatDistanceToNow } from 'date-fns';
+import { slugify } from '@/shared/lib/stringUtils';
 import styles from './SuggestedQuestionsList.module.css';
 
 interface SuggestedQuestionsListProps {
@@ -29,12 +28,10 @@ const formatSolvedDate = (dateStr?: string): string => {
 export default function SuggestedQuestionsList({ patternSlug }: SuggestedQuestionsListProps) {
   const [page, setPage] = useState(1);
   const limit = 15;
-
   const { data, isLoading, error } = usePatternQuestions(patternSlug, page, limit);
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
-    // Smooth scroll to top of the list
     setTimeout(() => {
       const element = document.getElementById('suggested-questions-section');
       if (element) {
@@ -51,7 +48,7 @@ export default function SuggestedQuestionsList({ patternSlug }: SuggestedQuestio
         </div>
         <div className={styles.list}>
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className={styles.skeletonCard} />
+            <div key={i} className={styles.skeletonRow} />
           ))}
         </div>
       </div>
@@ -104,49 +101,58 @@ export default function SuggestedQuestionsList({ patternSlug }: SuggestedQuestio
           const solvedDate = q.solvedAt ? formatSolvedDate(q.solvedAt) : null;
 
           return (
-            <Link
-              key={q._id}
-              href={`/questions/${q.platformQuestionId}`}
-              className={styles.cardLink}
-            >
-              <Card className={styles.suggestedCard}>
-                <div className={styles.cardHeader}>
-                  <span className={styles.cardTitle}>{q.title}</span>
-                  <span className={`${styles.difficultyBadge} ${styles[q.difficulty.toLowerCase()]}`}>
-                    {q.difficulty}
-                  </span>
-                </div>
-                <div className={styles.cardMeta}>
-                  <PlatformIcon platform={q.platform} size="sm" />
-                  <span className={styles.platformName}>{q.platform}</span>
-                  {isSolved && (
-                    <Tooltip content={`Solved ${solvedDate || ''}`}>
-                      <span className={styles.solvedBadge}>
-                        <FiCheckCircle size={12} />
-                        <span>Solved</span>
-                      </span>
-                    </Tooltip>
-                  )}
-                  {solvedDate && isSolved && (
-                    <span className={styles.solvedDate}>
-                      <FiClock size={10} />
-                      {solvedDate}
-                    </span>
-                  )}
-                </div>
-                {q.tags && q.tags.length > 0 && (
-                  <div className={styles.tags}>
-                    {q.tags.slice(0, 3).map((tag) => (
-                      <span key={tag} className={styles.tag}>
-                        #{tag}
-                      </span>
-                    ))}
-                    {q.tags.length > 3 && (
-                      <span className={styles.tag}>+{q.tags.length - 3}</span>
+            <Link key={q._id} href={`/questions/${q.platformQuestionId}`} className={styles.rowLink}>
+              <div className={styles.row}>
+                {/* Dot indicator */}
+                <div className={`${styles.dot} ${isSolved ? styles.dotSolved : ''}`} />
+
+                {/* Content */}
+                <div className={styles.content}>
+                  <div className={styles.titleRow}>
+                    <span className={styles.questionTitle}>{q.title}</span>
+                    {isSolved && (
+                      <Tooltip content={`Solved ${solvedDate || ''}`}>
+                        <span className={styles.solvedBadge}>
+                          <FiCheckCircle size={12} /> Solved
+                        </span>
+                      </Tooltip>
                     )}
                   </div>
-                )}
-              </Card>
+                  <div className={styles.metadataRow}>
+                    <span className={`${styles.difficulty} ${styles[q.difficulty.toLowerCase()]}`}>
+                      {q.difficulty}
+                    </span>
+                    <span className={styles.platform}>
+                      <PlatformIcon platform={q.platform} size="sm" />
+                      {q.platform}
+                    </span>
+                    {q.tags &&
+                      q.tags.slice(0, 3).map((tag) => {
+                        const slug = slugify(tag);
+                        return (
+                          <Link
+                            key={tag}
+                            href={`/patterns/${slug}`}
+                            className={styles.tag}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            #{tag}
+                          </Link>
+                        );
+                      })}
+                    {q.tags && q.tags.length > 3 && (
+                      <Tooltip content={q.tags.slice(3).join(', ')}>
+                        <span className={styles.tagMore}>+{q.tags.length - 3}</span>
+                      </Tooltip>
+                    )}
+                    {solvedDate && isSolved && (
+                      <span className={styles.solvedDate}>
+                        <FiClock size={10} /> {solvedDate}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </Link>
           );
         })}

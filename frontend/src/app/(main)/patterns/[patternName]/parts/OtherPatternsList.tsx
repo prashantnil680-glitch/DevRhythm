@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { FiGrid } from 'react-icons/fi';
-import Card from '@/shared/components/Card';
 import NoRecordFound from '@/shared/components/NoRecordFound';
+import Tooltip from '@/shared/components/Tooltip';
 import { slugify } from '@/shared/lib/stringUtils';
 import type { PatternMastery } from '@/shared/types';
 import styles from './OtherPatternsList.module.css';
@@ -37,22 +37,29 @@ export default function OtherPatternsList({ patterns, currentPatternName }: Othe
           View all patterns →
         </Link>
       </div>
-      <div className={styles.grid}>
-        {patterns.map((pattern) => (
-          <Link
-            key={pattern._id}
-            href={`/patterns/${slugify(pattern.patternName)}`}
-            className={styles.cardLink}
-          >
-            <Card className={styles.otherCard}>
-              <div className={styles.cardName}>{pattern.patternName}</div>
-              <div className={styles.cardMastery}>
-                <span className={styles.masteryValue}>{pattern.masteryRate.toFixed(1)}%</span>
-                <span className={styles.masteryLabel}>mastery</span>
+      <div className={styles.list}>
+        {patterns.map((pattern) => {
+          const mastery = pattern.masteryRate || 0;
+          const solved = pattern.solvedCount || 0;
+          const slug = slugify(pattern.patternName);
+          return (
+            <Link key={pattern._id} href={`/patterns/${slug}`} className={styles.rowLink}>
+              <div className={styles.row}>
+                <span className={styles.patternName}>{pattern.patternName}</span>
+                <div className={styles.progressWrapper}>
+                  <div className={styles.progressBar}>
+                    <div className={styles.progressFill} style={{ width: `${mastery}%` }} />
+                  </div>
+                  <Tooltip content={`Mastery: ${Math.round(mastery)}%`}>
+                    <span className={styles.percentage}>
+                      {solved} solved
+                    </span>
+                  </Tooltip>
+                </div>
               </div>
-            </Card>
-          </Link>
-        ))}
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

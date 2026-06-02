@@ -115,6 +115,9 @@ const heatmapExportLimiter = createRedisLimiter(60 * 60 * 1000, 20, 'heatmap:exp
 const heatmapStatsLimiter = createRedisLimiter(60 * 60 * 1000, 1000, 'heatmap:stats');
 const heatmapFilterLimiter = createRedisLimiter(60 * 60 * 1000, 500, 'heatmap:filter');
 
+// Sheet
+const progressLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'progress');
+
 module.exports = {
   oauthLimiter,
   tokenLimiter,
@@ -162,5 +165,6 @@ module.exports = {
 
   // Keep helpers for any custom use
   createMemoryLimiter,
-  createRedisLimiter
+  createRedisLimiter,
+  progressLimiter,  
 };

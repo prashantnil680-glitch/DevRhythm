@@ -155,6 +155,36 @@ export interface UserProgress {
 }
 
 // ===== Chart Data =====
+export interface AggregatedChartData {
+  chart: {
+    type: string;
+    labels: string[];
+    datasets: Array<{ data: number[] }>;
+  };
+  metadata: {
+    totalQuestions: number;
+    totalParticipants: number;
+    totalProgressRecords: number;
+    solvedPercentage: number;
+    revisionCompletedPercentage: number;
+  };
+}
+
+export interface RankEntry {
+  rank: number;
+  _id: string;
+  solvedCount: number;
+  revisionCompletedCount: number;
+  userId: string;
+  username: string;
+  displayName: string;
+  avatarUrl?: string;
+}
+
+export interface RankResponse {
+  topRanks: RankEntry[];
+  currentUser: RankEntry;
+}
 
 /**
  * Chart‑ready data for a user's progress.
@@ -208,12 +238,20 @@ export interface SheetsListResponse {
 export interface SheetDetailsResponse {
   sheet: Sheet;
   questions: SheetQuestion[];
-  tagGroups: TagGroup[];
   participants: Participant[];
   stats: SheetStats;
   hasJoined: boolean;
   currentUserProgress: UserSheetProgress | null;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
 }
+
 
 /**
  * Request body for POST /api/v1/sheets (manual creation).

@@ -17,6 +17,26 @@
   }
 }
 
+.communityProgressSection {
+  margin: 1.5rem 0;
+}
+
+.questionsSection {
+  margin: 1.5rem 0;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 1rem;
+}
+.paginationWrapper {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
 .progressSection {
   margin: 1.5rem 0;
   background: var(--bg-surface);

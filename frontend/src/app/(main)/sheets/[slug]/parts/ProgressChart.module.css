@@ -6,17 +6,29 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 0.75rem;
-  margin: 0; /* no outer margin, relies on parent */
-  padding: 0; /* no inner padding */
+  margin: 0;
+  padding: 0;
 }
 
 /* Left column */
-.metrics {
+.leftColumn {
   flex: 1;
-  min-width: 120px;
+  min-width: 180px;
+}
+
+.communityTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+}
+
+/* Metrics section (existing) */
+.metrics {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  margin-bottom: 1rem;
 }
 
 .metricItem {
@@ -48,6 +60,90 @@
   margin-left: 0.25rem;
 }
 
+/* Leaderboard section */
+.leaderboard {
+  margin-top: 1rem;
+}
+
+.leaderboardTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+}
+
+.rankList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rankItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.rankNumber {
+  font-weight: 600;
+  font-family: var(--font-code);
+  color: var(--accent-moss);
+  min-width: 2rem;
+}
+
+.rankUserInfo {
+  flex: 1;
+}
+
+.rankName {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.rankStats {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.divider {
+  border: none;
+  border-top: 1px dashed var(--border);
+  margin: 0.75rem 0;
+}
+
+.yourRank {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.yourRankLabel {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.yourRankValue {
+  font-weight: 700;
+  font-family: var(--font-code);
+  color: var(--accent-moss);
+}
+
+.yourRankName {
+  font-weight: 500;
+}
+
+.yourRankStats {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
 /* Right column – chart */
 .chartWrapper {
   flex: 0 0 auto;
@@ -57,6 +153,35 @@
   justify-content: center;
   align-items: center;
 }
+
+/* Loading states */
+.loadingText,
+.loadingChart {
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.rankLink {
+  display: inline-flex;
+  text-decoration: none;
+}
+
+.rankNameLink {
+  text-decoration: none;
+  color: inherit;
+}
+
+.rankNameLink:hover .rankName,
+.rankNameLink:hover .yourRankName {
+  color: var(--accent-moss);
+  text-decoration: underline;
+}
+
+.rankLink:hover {
+  opacity: 0.9;
+}
+
 
 /* Responsive */
 @media (max-width: 768px) {

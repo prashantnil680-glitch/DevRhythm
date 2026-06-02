@@ -9,6 +9,8 @@ const sheetsKeys = {
   bookmarks: (params?: { page?: number; limit?: number; search?: string }) => 
     [...sheetsKeys.all, 'bookmarks', params] as const,
   count: () => [...sheetsKeys.all, 'count'] as const,
+  details: () => [...sheetsKeys.all, 'detail'] as const,
+  detail: (slug: string) => [...sheetsKeys.details(), slug] as const,
 };
 
 export function useSheets(params?: GetSheetsParams) {

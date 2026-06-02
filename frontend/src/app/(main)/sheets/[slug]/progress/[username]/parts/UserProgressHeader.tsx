@@ -23,7 +23,6 @@ interface UserProgressHeaderProps {
   isFullyCompleted: boolean;
   stats: UserProgress['stats'];
   shareLink: string;
-  // Bookmark & Join props
   isAuthenticated: boolean;
   hasJoinedSheet: boolean;
   isBookmarked: boolean;
@@ -131,8 +130,8 @@ export default function UserProgressHeader({
         </Link>
       </div>
 
-      {/* Stats row */}
-      <div className={styles.statsRow}>
+      {/* ===== Stats row – COMMENTED OUT (duplicated in chart below) ===== */}
+      {/* <div className={styles.statsRow}>
         <span className={styles.stat}>
           {stats.solvedCount}/{stats.totalQuestions} solved
         </span>
@@ -142,35 +141,33 @@ export default function UserProgressHeader({
         </span>
         <span className={styles.separator}>•</span>
         <span className={styles.stat}>{Math.round(overallPercentage)}% overall</span>
-      </div>
+      </div> */}
 
-      {/* Metadata row */}
-      <div className={styles.metadataRow}>
-        <span className={styles.metaItem}>
-          <FiCalendar className={styles.metaIcon} />
-          Joined {format(new Date(joinedAt), 'MMM d, yyyy')}
-        </span>
-        <span className={styles.separator}>•</span>
-        <span className={styles.metaItem}>
-          <FiClock className={styles.metaIcon} />
-          Target {format(targetDateObj, 'MMM d, yyyy')}
-          {isOverdue && <span className={styles.overdueBadge}>Overdue</span>}
+      {/* Enlarged Metadata row */}
+      <div className={styles.metadataRowLarge}>
+        <div className={styles.metaItemLarge}>
+          <FiCalendar className={styles.metaIconLarge} />
+          <span>Joined {format(new Date(joinedAt), 'MMM d, yyyy')}</span>
+        </div>
+        <div className={styles.metaItemLarge}>
+          <FiClock className={styles.metaIconLarge} />
+          <span>Target {format(targetDateObj, 'MMM d, yyyy')}</span>
+          {isOverdue && <span className={styles.overdueBadgeLarge}>Overdue</span>}
           {!isOverdue && daysLeft >= 0 && (
-            <span className={styles.daysLeft}>
-              ({daysLeft === 0 ? 'Due today' : `${daysLeft} days left`})
+            <span className={`${styles.daysLeftBadge} ${daysLeft <= 3 ? styles.daysLeftUrgent : styles.daysLeftSafe}`}>
+              {daysLeft === 0 ? 'Due today' : `${daysLeft} days left`}
             </span>
           )}
-        </span>
+        </div>
         {(completedAt || isFullyCompleted) && (
-          <>
-            <span className={styles.separator}>•</span>
-            <span className={styles.metaItem}>
-              <FiCheckCircle className={styles.metaIcon} />
+          <div className={styles.metaItemLarge}>
+            <FiCheckCircle className={styles.metaIconLarge} />
+            <span>
               {completedAt
                 ? `Completed ${format(new Date(completedAt), 'MMM d, yyyy')}`
                 : 'Fully completed!'}
             </span>
-          </>
+          </div>
         )}
       </div>
     </div>

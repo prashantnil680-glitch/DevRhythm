@@ -1,0 +1,52 @@
+/* frontend/src/app/(main)/sheets/[slug]/parts/QuestionsFilterBar.module.css */
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1rem 0 1.5rem 0;
+  padding: 0.5rem 0;
+}
+
+.searchWrapper {
+  flex: 2;
+  min-width: 180px;
+}
+
+.searchBar {
+  width: 100%;
+}
+
+.filterControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filterSelect {
+  min-width: 120px;
+  width: auto;
+}
+
+.clearButton {
+  white-space: nowrap;
+}
+
+/* Responsive: on mobile, stack search and filters vertically */
+@media (max-width: 767px) {
+  .filterBar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  .filterControls {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .filterSelect {
+    flex: 1;
+    min-width: auto;
+  }
+}

@@ -57,64 +57,65 @@
   color: var(--text-secondary);
 }
 
-/* Stats row */
-.statsRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.25rem 0.5rem;
-  font-size: 0.85rem;
-  margin-bottom: 0.5rem;
-}
-
-.stat {
-  font-weight: 500;
-  color: var(--text-primary);
-  font-family: var(--font-code);
-}
-
-.separator {
-  color: var(--text-muted);
-  font-weight: normal;
-}
-
-/* Metadata row */
-.metadataRow {
+/* ===== Enlarged Metadata Row ===== */
+.metadataRowLarge {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
+  gap: 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
-.metaItem {
+.metaItemLarge {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.5rem;
+  background-color: var(--bg-elevated);
+  padding: 0.4rem 1rem;
+  border-radius: 40px;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
 }
 
-.metaIcon {
-  font-size: 0.8rem;
+.metaIconLarge {
+  font-size: 1rem;
   color: var(--accent-moss);
 }
 
-.overdueBadge {
-  background-color: var(--error);
+.overdueBadgeLarge {
+  background-color: #dc2626;
   color: white;
-  padding: 0.1rem 0.4rem;
-  border-radius: 12px;
-  font-size: 0.65rem;
-  font-weight: 500;
-  margin-left: 0.4rem;
+  padding: 0.2rem 0.7rem;
+  border-radius: 30px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
 }
 
-.daysLeft {
-  margin-left: 0.25rem;
-  color: var(--text-muted);
-  font-style: italic;
+.daysLeftBadge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.7rem;
+  border-radius: 30px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
+.daysLeftSafe {
+  background-color: #e5e7eb;
+  color: #1f2937;
+}
+
+.daysLeftUrgent {
+  background-color: #f97316;
+  color: white;
+}
+
+/* Action buttons & bookmark styles (unchanged) */
 .actionButtons {
   display: flex;
   align-items: center;
@@ -184,11 +185,13 @@
   .sheetName {
     font-size: 1.2rem;
   }
-  .statsRow {
-    font-size: 0.8rem;
+  .metadataRowLarge {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
   }
-  .metadataRow {
-    font-size: 0.7rem;
+  .metaItemLarge {
+    justify-content: center;
   }
   .username {
     font-size: 0.85rem;

@@ -73,7 +73,15 @@ const getSheetBySlug = async (req, res, next) => {
   try {
     const { slug } = req.params;
     const currentUserId = req.user ? req.user._id : null;
-    const sheetData = await SheetService.getSheetBySlug(slug, currentUserId);
+    const queryOptions = {
+      page: parseInt(req.query.page, 10),
+      limit: parseInt(req.query.limit, 10),
+      search: req.query.search,
+      solveStatus: req.query.solveStatus,
+      revisionStatus: req.query.revisionStatus,
+      difficulty: req.query.difficulty,
+    };
+    const sheetData = await SheetService.getSheetBySlug(slug, currentUserId, queryOptions);
     res.json(formatResponse('Sheet retrieved successfully', sheetData));
   } catch (error) {
     next(error);
@@ -239,6 +247,7 @@ const importSheet = async (req, res, next) => {
       clearTimeout(timeout);
       throw new AppError('No file uploaded', 400);
     }
+
     const { sheetName, description, targetDate, specialTag, originalSourceName, originalSourceUrl } = req.body;
     const { parseExcelFile } = require('../services/excelParser.service');
     const parsedRows = await parseExcelFile(req.file.buffer, req.file.originalname);
@@ -250,11 +259,19 @@ const importSheet = async (req, res, next) => {
       throw new AppError('No valid question titles or slugs found in the file', 400);
     }
     
+    const { resolvedIds, unresolved } = await SheetService.resolveQuestionIdentifiersPartial(identifiers);
+    
+    if (resolvedIds.length === 0) {
+      clearTimeout(timeout);
+      throw new AppError('None of the questions could be matched. Please check the file content.', 400);
+    }
+    
+    // Convert resolved ObjectIds to strings before passing to createSheet
     const sheet = await SheetService.createSheet(
       req.user._id,
       sheetName,
       description || '',
-      identifiers,
+      resolvedIds.map(id => id.toString()),
       targetDate,
       specialTag,
       originalSourceName,
@@ -262,11 +279,25 @@ const importSheet = async (req, res, next) => {
     );
     
     clearTimeout(timeout);
-    res.status(201).json(formatResponse('Sheet imported successfully', {
-      sheet,
-      totalRows: parsedRows.length,
-      matchedCount: identifiers.length,
-    }));
+    
+    const message = unresolved.length
+      ? `Sheet imported successfully. ${resolvedIds.length} questions were added. ${unresolved.length} questions could not be matched and were skipped.`
+      : `Sheet imported successfully with all ${resolvedIds.length} questions.`;
+    
+    res.status(201).json({
+      success: true,
+      statusCode: 201,
+      message,
+      data: {
+        sheet,
+        totalRows: parsedRows.length,
+        matchedCount: resolvedIds.length,
+        skippedCount: unresolved.length,
+        unresolved: unresolved.length ? unresolved : undefined,
+      },
+      meta: { timestamp: new Date().toISOString() },
+      error: null,
+    });
   } catch (error) {
     clearTimeout(timeout);
     if (error.statusCode === 409 && error.data) {
@@ -351,6 +382,31 @@ const getSheetsCount = async (req, res, next) => {
   }
 };
 
+/**
+ * Get aggregated progress chart data for all participants in a sheet.
+ * GET /api/v1/sheets/:slug/progress/chart
+ */
+const getSheetProgressChart = async (req, res, next) => {
+  try {
+    const { slug } = req.params;
+    const chartData = await SheetService.getSheetProgressChartData(slug);
+    res.json(formatResponse('Sheet progress chart data retrieved', chartData));
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getSheetRank = async (req, res, next) => {
+  try {
+    const { slug } = req.params;
+    const currentUserId = req.user._id;
+    const rankData = await SheetService.getSheetRank(slug, currentUserId);
+    res.json(formatResponse('Sheet rank retrieved', rankData));
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createSheet,
   getSheets,
@@ -368,4 +424,6 @@ module.exports = {
   toggleBookmark,
   getBookmarkedSheets,
   getSheetsCount,
+  getSheetProgressChart,
+  getSheetRank,
 };

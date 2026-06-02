@@ -13,6 +13,69 @@ const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 
 class SheetService {
+
+  /**
+   * Resolve question identifiers, returning successfully resolved IDs and a list of unresolved ones.
+   * Does not throw on unresolved identifiers.
+   * @param {Array<string>} identifiers
+   * @returns {Promise<{ resolvedIds: Array<mongoose.Types.ObjectId>, unresolved: Array<string> }>}
+   */
+  static async resolveQuestionIdentifiersPartial(identifiers) {
+    if (!Array.isArray(identifiers)) {
+      return { resolvedIds: [], unresolved: [] };
+    }
+
+    const resolvedIds = [];
+    const unresolved = [];
+
+    for (const id of identifiers) {
+      // Convert to string and trim
+      const trimmed = String(id).trim();
+      if (!trimmed) continue;
+
+      let found = null;
+
+      // 1. Try ObjectId
+      if (mongoose.Types.ObjectId.isValid(trimmed)) {
+        const question = await Question.findOne({ _id: trimmed, isActive: true }).select('_id').lean();
+        if (question) found = question._id;
+      }
+
+      // 2. Try slugified platformQuestionId
+      if (!found) {
+        const slugified = slugify(trimmed);
+        const question = await Question.findOne({ platformQuestionId: slugified, isActive: true }).select('_id').lean();
+        if (question) found = question._id;
+      }
+
+      // 3. Try exact title match (case‑insensitive)
+      if (!found) {
+        const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const question = await Question.findOne({
+          title: { $regex: new RegExp(`^${escaped}$`, 'i') },
+          isActive: true,
+        }).select('_id').lean();
+        if (question) found = question._id;
+      }
+
+      // 4. Final fallback – text search
+      if (!found) {
+        const question = await Question.findOne({ $text: { $search: trimmed }, isActive: true })
+          .select('_id')
+          .lean();
+        if (question) found = question._id;
+      }
+
+      if (found) {
+        resolvedIds.push(found);
+      } else {
+        unresolved.push(trimmed);
+      }
+    }
+
+    return { resolvedIds, unresolved };
+  }
+
   /**
    * Resolve an array of question identifiers (title, platformQuestionId, or ObjectId)
    * into an array of unique MongoDB ObjectIds.
@@ -57,26 +120,41 @@ class SheetService {
       }
     }
 
-    // 2. Search by platformQuestionId or title (case‑insensitive)
+    // 2. Process each search string
     if (searchStrings.length) {
-      const searchedQuestions = await Question.find({
-        $or: [
-          { platformQuestionId: { $in: searchStrings } },
-          { title: { $in: searchStrings.map(s => new RegExp(`^${s}$`, 'i')) } },
-        ],
-        isActive: true,
-      }).select('_id platformQuestionId title').lean();
-
-      const platformIdMap = new Map();
-      const titleMap = new Map();
-      for (const q of searchedQuestions) {
-        platformIdMap.set(q.platformQuestionId, q._id.toString());
-        titleMap.set(q.title.toLowerCase(), q._id.toString());
-      }
-
       for (const search of searchStrings) {
-        let found = platformIdMap.get(search);
-        if (!found) found = titleMap.get(search.toLowerCase());
+        let found = null;
+
+        // Step 2a: Try matching by slugified platformQuestionId
+        const slugified = slugify(search);
+        const bySlug = await Question.findOne({
+          platformQuestionId: slugified,
+          isActive: true,
+        }).select('_id').lean();
+        if (bySlug) found = bySlug._id.toString();
+
+        // Step 2b: If not found, try exact title match (case‑insensitive)
+        if (!found) {
+          const byTitle = await Question.findOne({
+            title: { $regex: new RegExp(`^${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+            isActive: true,
+          }).select('_id').lean();
+          if (byTitle) found = byTitle._id.toString();
+        }
+
+        // Step 2c: Final fallback – text search (same as manual tab)
+        if (!found) {
+          // Note: requires a text index on Question.title (already present in your schema)
+          const byText = await Question.findOne({
+            $text: { $search: search },
+            isActive: true,
+          }, { score: { $meta: 'textScore' } })
+            .sort({ score: { $meta: 'textScore' } })
+            .select('_id')
+            .lean();
+          if (byText) found = byText._id.toString();
+        }
+
         if (found) {
           resolvedIds.add(found);
         } else {
@@ -627,65 +705,102 @@ class SheetService {
    * @param {string|null} currentUserId
    * @returns {Promise<Object>}
    */
-  static async getSheetBySlug(slug, currentUserId = null) {
+  static async getSheetBySlug(slug, currentUserId = null, queryOptions = {}) {
     const sheet = await Sheet.findOne({ slug, isActive: true }).lean();
     if (!sheet) {
       throw new AppError('Sheet not found', 404);
     }
 
-    const questions = await Question.find({
-      _id: { $in: sheet.questions },
-      isActive: true,
-    })
-      .select('_id title problemLink platform platformQuestionId difficulty tags')
-      .lean();
+    // Pagination defaults
+    const page = Math.max(1, parseInt(queryOptions.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(queryOptions.limit, 10) || 20));
+    const skip = (page - 1) * limit;
 
-    // Preserve original order and add tagsSlugs
-    const orderedQuestions = sheet.questions
-      .map(qid => {
-        const q = questions.find(qq => qq._id.toString() === qid.toString());
-        if (!q) return null;
-        const tagsSlugs = (q.tags || []).map(tag => slugify(tag));
-        return { ...q, tagsSlugs };
-      })
-      .filter(Boolean);
+    // Build filter for questions (database level)
+    const filter = { _id: { $in: sheet.questions }, isActive: true };
+    if (queryOptions.search) {
+      const searchRegex = new RegExp(queryOptions.search, 'i');
+      filter.$or = [
+        { title: searchRegex },
+        { platformQuestionId: searchRegex },
+      ];
+    }
+    if (queryOptions.difficulty) {
+      const diff = queryOptions.difficulty.charAt(0).toUpperCase() + queryOptions.difficulty.slice(1).toLowerCase();
+      filter.difficulty = diff;
+    }
+
+    // Get filtered questions with pagination
+    let questionsQuery = Question.find(filter).select('_id title problemLink platform platformQuestionId difficulty tags pattern');
+    const isPaginationOrFilter = queryOptions.page || queryOptions.limit || queryOptions.search || queryOptions.difficulty;
+    if (!isPaginationOrFilter) {
+      // No filters/pagination: return all questions (backward compatible)
+      questionsQuery = questionsQuery.lean();
+    } else {
+      questionsQuery = questionsQuery.skip(skip).limit(limit).lean();
+    }
+    let questions = await questionsQuery;
+
+    // Total count of filtered questions (for pagination)
+    let totalFiltered = 0;
+    if (isPaginationOrFilter) {
+      totalFiltered = await Question.countDocuments(filter);
+    } else {
+      totalFiltered = questions.length;
+    }
+
+    // Add tagsSlugs to each question
+    questions = questions.map(q => ({
+      ...q,
+      tagsSlugs: (q.tags || []).map(tag => slugify(tag)),
+    }));
 
     // Participants list
     const memberships = await SheetMembership.find({ sheetId: sheet._id })
       .populate('userId', 'username avatarUrl displayName')
       .lean();
-
     const participants = memberships.map(m => ({
       userId: m.userId._id,
       username: m.userId.username,
       displayName: m.userId.displayName,
       avatarUrl: m.userId.avatarUrl,
     }));
-
     const totalParticipants = participants.length;
 
-    // Per‑question stats
+    // Per‑question participant and solved counts (for all questions in the sheet)
     const perQuestionParticipantCounts = {};
     const perQuestionSolvedCounts = {};
-
-    for (const q of orderedQuestions) {
+    for (const qid of sheet.questions) {
       const [participantCount, solvedCount] = await Promise.all([
-        SheetProgress.countDocuments({ sheetId: sheet._id, questionId: q._id }),
-        SheetProgress.countDocuments({ sheetId: sheet._id, questionId: q._id, solved: true }),
+        SheetProgress.countDocuments({ sheetId: sheet._id, questionId: qid }),
+        SheetProgress.countDocuments({ sheetId: sheet._id, questionId: qid, solved: true }),
       ]);
-      perQuestionParticipantCounts[q._id.toString()] = participantCount;
-      perQuestionSolvedCounts[q._id.toString()] = solvedCount;
+      perQuestionParticipantCounts[qid.toString()] = participantCount;
+      perQuestionSolvedCounts[qid.toString()] = solvedCount;
     }
 
-    // Current user progress
+    // Current user progress (if logged in)
     let currentUserProgress = null;
     if (currentUserId) {
       const membership = memberships.find(m => m.userId._id.toString() === currentUserId.toString());
       if (membership) {
-        const progress = await SheetProgress.find({
+        let progress = await SheetProgress.find({
           sheetId: sheet._id,
           userId: currentUserId,
         }).lean();
+
+        // Apply solveStatus and revisionStatus filters to the progress details
+        if (queryOptions.solveStatus === 'solved') {
+          progress = progress.filter(p => p.solved === true);
+        } else if (queryOptions.solveStatus === 'unsolved') {
+          progress = progress.filter(p => p.solved === false);
+        }
+        if (queryOptions.revisionStatus === 'completed') {
+          progress = progress.filter(p => p.revisionCompleted === true);
+        } else if (queryOptions.revisionStatus === 'pending') {
+          progress = progress.filter(p => p.revisionCompleted === false);
+        }
+
         const solvedCount = progress.filter(p => p.solved).length;
         const revisionCompletedCount = progress.filter(p => p.revisionCompleted).length;
         currentUserProgress = {
@@ -694,7 +809,7 @@ class SheetService {
           completedAt: membership.completedAt,
           solvedCount,
           revisionCompletedCount,
-          totalQuestions: orderedQuestions.length,
+          totalQuestions: sheet.questions.length,
           details: progress.map(p => ({
             questionId: p.questionId,
             solved: p.solved === true,
@@ -706,18 +821,31 @@ class SheetService {
 
     const hasJoined = !!currentUserProgress;
 
-    // Compute owner display name
+    // Owner display name (unchanged)
     let ownerDisplayName = 'Anonymous User';
     if (sheet.ownerId) {
       const owner = await User.findById(sheet.ownerId).select('displayName username').lean();
       ownerDisplayName = owner?.displayName || owner?.username || 'Anonymous User';
     }
 
-    // Bookmark status
+    // Bookmark status (unchanged)
     let isBookmarked = false;
     if (currentUserId) {
       const bookmark = await SheetBookmark.findOne({ userId: currentUserId, sheetId: sheet._id }).lean();
       isBookmarked = !!bookmark;
+    }
+
+    // Prepare pagination metadata (only if pagination/filtering is used)
+    let paginationMeta;
+    if (isPaginationOrFilter) {
+      paginationMeta = {
+        page,
+        limit,
+        total: totalFiltered,
+        pages: Math.ceil(totalFiltered / limit),
+        hasNext: page < Math.ceil(totalFiltered / limit),
+        hasPrev: page > 1,
+      };
     }
 
     return {
@@ -737,7 +865,7 @@ class SheetService {
         createdAt: sheet.createdAt,
         updatedAt: sheet.updatedAt,
       },
-      questions: orderedQuestions,
+      questions,
       participants,
       stats: {
         totalParticipants,
@@ -746,6 +874,7 @@ class SheetService {
       },
       hasJoined,
       currentUserProgress,
+      pagination: paginationMeta,
     };
   }
 
@@ -1179,6 +1308,184 @@ class SheetService {
       await invalidateCache(`user:${userId}:sheets:*`);
       await invalidateCache(`sheets:bookmarks:user:${userId}:*`);
     }
+  }
+
+    /**
+   * Get aggregated progress chart data for all participants in a sheet.
+   * @param {string} sheetSlug
+   * @returns {Promise<Object>}
+   */
+  static async getSheetProgressChartData(sheetSlug) {
+    const sheet = await Sheet.findOne({ slug: sheetSlug, isActive: true }).lean();
+    if (!sheet) {
+      throw new AppError('Sheet not found', 404);
+    }
+
+    // Aggregation pipeline on SheetProgress
+    const aggregation = await SheetProgress.aggregate([
+      { $match: { sheetId: sheet._id } },
+      {
+        $group: {
+          _id: null,
+          totalSolved: { $sum: { $cond: ['$solved', 1, 0] } },
+          totalRevisionCompleted: { $sum: { $cond: ['$revisionCompleted', 1, 0] } },
+          totalRecords: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const stats = aggregation[0] || { totalSolved: 0, totalRevisionCompleted: 0, totalRecords: 0 };
+    const totalRecords = stats.totalRecords;
+    const totalSolved = stats.totalSolved;
+    const totalUnsolved = totalRecords - totalSolved;
+    const totalRevisionCompleted = stats.totalRevisionCompleted;
+    const totalRevisionPending = totalRecords - totalRevisionCompleted;
+
+    // Optionally compute percentages
+    const solvedPercentage = totalRecords ? (totalSolved / totalRecords) * 100 : 0;
+    const revisionCompletedPercentage = totalRecords ? (totalRevisionCompleted / totalRecords) * 100 : 0;
+
+    return {
+      chart: {
+        type: 'polarArea', // can be changed by frontend
+        labels: ['Solved', 'Unsolved', 'Revision Completed', 'Revision Pending'],
+        datasets: [
+          {
+            data: [totalSolved, totalUnsolved, totalRevisionCompleted, totalRevisionPending],
+          },
+        ],
+      },
+      metadata: {
+        totalQuestions: sheet.questions.length,
+        totalParticipants: await SheetMembership.countDocuments({ sheetId: sheet._id }),
+        totalProgressRecords: totalRecords,
+        solvedPercentage: parseFloat(solvedPercentage.toFixed(2)),
+        revisionCompletedPercentage: parseFloat(revisionCompletedPercentage.toFixed(2)),
+      },
+    };
+  }
+
+    /**
+   * Get top 4 participants and current user's rank for a sheet.
+   * @param {string} sheetSlug
+   * @param {string} currentUserId
+   * @returns {Promise<Object>}
+   */
+  static async getSheetRank(sheetSlug, currentUserId) {
+    const sheet = await Sheet.findOne({ slug: sheetSlug, isActive: true }).lean();
+    if (!sheet) {
+      throw new AppError('Sheet not found', 404);
+    }
+
+    // Check if current user has joined
+    const membership = await SheetMembership.findOne({ sheetId: sheet._id, userId: currentUserId }).lean();
+    const hasJoined = !!membership;
+
+    // Get current user's own stats (solvedCount, revisionCompletedCount)
+    let currentUserStats = null;
+    let currentUserRank = null;
+    if (hasJoined) {
+      const stats = await SheetProgress.aggregate([
+        { $match: { sheetId: sheet._id, userId: currentUserId } },
+        {
+          $group: {
+            _id: null,
+            solvedCount: { $sum: { $cond: ['$solved', 1, 0] } },
+            revisionCompletedCount: { $sum: { $cond: ['$revisionCompleted', 1, 0] } },
+          },
+        },
+      ]);
+      currentUserStats = stats[0] || { solvedCount: 0, revisionCompletedCount: 0 };
+
+      // Compute rank: count participants with better stats
+      const betterCount = await SheetProgress.aggregate([
+        { $match: { sheetId: sheet._id, userId: { $ne: currentUserId } } },
+        {
+          $group: {
+            _id: '$userId',
+            solvedCount: { $sum: { $cond: ['$solved', 1, 0] } },
+            revisionCompletedCount: { $sum: { $cond: ['$revisionCompleted', 1, 0] } },
+          },
+        },
+        {
+          $match: {
+            $or: [
+              { solvedCount: { $gt: currentUserStats.solvedCount } },
+              {
+                solvedCount: currentUserStats.solvedCount,
+                revisionCompletedCount: { $gt: currentUserStats.revisionCompletedCount },
+              },
+            ],
+          },
+        },
+        { $count: 'count' },
+      ]);
+      const better = betterCount[0]?.count || 0;
+      currentUserRank = better + 1;
+    }
+
+    // Get top 4 participants
+    const topRankings = await SheetProgress.aggregate([
+      { $match: { sheetId: sheet._id } },
+      {
+        $group: {
+          _id: '$userId',
+          solvedCount: { $sum: { $cond: ['$solved', 1, 0] } },
+          revisionCompletedCount: { $sum: { $cond: ['$revisionCompleted', 1, 0] } },
+          lastUpdated: { $max: '$lastUpdated' },
+        },
+      },
+      {
+        $sort: {
+          solvedCount: -1,
+          revisionCompletedCount: -1,
+          lastUpdated: 1, // earlier completion first
+        },
+      },
+      { $limit: 4 },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+      {
+        $project: {
+          userId: '$_id',
+          username: '$user.username',
+          displayName: '$user.displayName',
+          avatarUrl: '$user.avatarUrl',
+          solvedCount: 1,
+          revisionCompletedCount: 1,
+        },
+      },
+    ]);
+
+    // Add rank number to top rankings (1-based index)
+    const topRanks = topRankings.map((r, idx) => ({ rank: idx + 1, ...r }));
+
+    // Prepare current user info
+    let currentUserInfo = null;
+    if (hasJoined && currentUserStats) {
+      // Fetch user details for current user
+      const user = await User.findById(currentUserId).select('username displayName avatarUrl').lean();
+      if (user) {
+        currentUserInfo = {
+          rank: currentUserRank,
+          userId: currentUserId,
+          username: user.username,
+          displayName: user.displayName,
+          avatarUrl: user.avatarUrl,
+          solvedCount: currentUserStats.solvedCount,
+          revisionCompletedCount: currentUserStats.revisionCompletedCount,
+        };
+      }
+    }
+
+    return { topRanks, currentUser: currentUserInfo };
   }
 }
 

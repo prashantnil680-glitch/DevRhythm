@@ -96,38 +96,56 @@ router.delete(
   sheetController.leaveSheet
 );
 
+// Progress routes – order matters!
 router.get(
   '/:slug/progress/me',
   auth,
-  rateLimiters.userLimiter,
+  rateLimiters.progressLimiter,
   validate(sheetValidator.sheetIdParam, 'params'),
   sheetController.getMyProgress
 );
 
 router.get(
+  '/:slug/progress/me/chart',
+  auth,
+  rateLimiters.progressLimiter,
+  validate(sheetValidator.sheetIdParam, 'params'),
+  sheetController.getMyProgressChart
+);
+
+// THIS MUST COME BEFORE /:slug/progress/:username
+router.get(
+  '/:slug/progress/chart',
+  auth,
+  rateLimiters.progressLimiter,
+  validate(sheetValidator.sheetIdParam, 'params'),
+  sheetController.getSheetProgressChart
+);
+
+router.get(
   '/:slug/progress/:username',
   auth,
-  rateLimiters.userLimiter,
+  rateLimiters.progressLimiter,
   validate(sheetValidator.sheetIdParam, 'params'),
   validate(sheetValidator.getUserProgress, 'params'),
   sheetController.getUserProgress
 );
 
 router.get(
-  '/:slug/progress/me/chart',
-  auth,
-  rateLimiters.userLimiter,
-  validate(sheetValidator.sheetIdParam, 'params'),
-  sheetController.getMyProgressChart
-);
-
-router.get(
   '/:slug/progress/:username/chart',
   auth,
-  rateLimiters.userLimiter,
+  rateLimiters.progressLimiter,
   validate(sheetValidator.sheetIdParam, 'params'),
   validate(sheetValidator.getUserProgress, 'params'),
   sheetController.getUserProgressChart
+);
+
+router.get(
+  '/:slug/rank',
+  auth,
+  rateLimiters.userLimiter,
+  validate(sheetValidator.sheetIdParam, 'params'),
+  sheetController.getSheetRank
 );
 
 router.put(

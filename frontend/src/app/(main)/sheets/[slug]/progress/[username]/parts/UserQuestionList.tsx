@@ -77,11 +77,11 @@ export default function UserQuestionList({ progress }: UserQuestionListProps) {
                   )}
                   <span className={styles.statusLabel}>Revision</span>
                 </div>
-                {lastUpdated && (
+                {/* {lastUpdated && (
                   <div className={styles.lastUpdated}>
                     Last updated: {new Date(lastUpdated).toLocaleDateString()}
                   </div>
-                )}
+                )} */}
               </div>
             </div>
           </div>

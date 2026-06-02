@@ -1,5 +1,3 @@
-// frontend/src/app/(main)/sheets/[slug]/progress/[username]/page.tsx
-
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
@@ -10,7 +8,7 @@ import { ROUTES } from '@/shared/config';
 import Breadcrumb from '@/shared/components/Breadcrumb';
 import type { BreadcrumbItem } from '@/shared/components/Breadcrumb';
 import NotFoundPage from '@/shared/components/NotFoundPage';
-import ProgressChart from '../../parts/ProgressChart';
+import UserProgressChart from './parts/UserProgressChart';
 import UserProgressHeader from './parts/UserProgressHeader';
 import UserQuestionList from './parts/UserQuestionList';
 import UserProgressSkeleton from './parts/UserProgressSkeleton';
@@ -118,7 +116,7 @@ export default function UserProgressPage() {
       />
 
       <div className={styles.chartSection}>
-        <ProgressChart
+        <UserProgressChart
           solvedCount={stats.solvedCount}
           revisionCompletedCount={stats.revisionCompletedCount}
           totalQuestions={stats.totalQuestions}

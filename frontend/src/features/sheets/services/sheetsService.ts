@@ -12,6 +12,8 @@ import type {
   ProgressChartData,
   SheetMembership,
   SheetWithStats,
+  AggregatedChartData,
+  RankResponse,
 } from '../types/sheets.types';
 
 export const sheetService = {
@@ -33,13 +35,20 @@ export const sheetService = {
     };
   },
 
-  /**
-   * Get a single sheet by slug.
-   * Optional authentication via apiClient (token is added if present).
+/**
+   * Get a single sheet by slug with optional filtering and pagination.
    * GET /api/v1/sheets/:slug
    */
-  async getSheetBySlug(slug: string): Promise<SheetDetailsResponse> {
-    const response = await apiClient.get<SheetDetailsResponse>(`/sheets/${slug}`);
+  async getSheetBySlug(slug: string, params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    solveStatus?: string;
+    revisionStatus?: string;
+    difficulty?: string;
+  }): Promise<SheetDetailsResponse> {
+    const query = buildQueryString(params);
+    const response = await apiClient.get<SheetDetailsResponse>(`/sheets/${slug}${query}`);
     return response.data;
   },
 
@@ -193,6 +202,16 @@ export const sheetService = {
   },
   async getSheetsCount(): Promise<{ count: number }> {
     const response = await apiClient.get('/sheets/count');
+    return response.data;
+  },
+
+  async getAggregatedProgress(slug: string): Promise<AggregatedChartData> {
+    const response = await apiClient.get<AggregatedChartData>(`/sheets/${slug}/progress/chart`);
+    return response.data;
+  },
+
+  async getSheetRank(slug: string): Promise<RankResponse> {
+    const response = await apiClient.get<RankResponse>(`/sheets/${slug}/rank`);
     return response.data;
   },
 };

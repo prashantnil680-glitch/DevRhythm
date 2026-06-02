@@ -1,5 +1,3 @@
-// frontend/src/app/(main)/sheets/[slug]/parts/ProgressChart.tsx
-
 'use client';
 
 import { useMemo } from 'react';
@@ -13,101 +11,169 @@ import {
   Legend,
 } from 'chart.js';
 import { PolarArea } from 'react-chartjs-2';
+import { Avatar } from '@/shared/components/Avatar';
+import { useAggregatedProgress, useSheetRank } from '@/features/sheets';
 import styles from './ProgressChart.module.css';
+import Link from 'next/link';
 
 ChartJS.register(PolarAreaController, ArcElement, RadialLinearScale, Tooltip, Legend);
 
 interface ProgressChartProps {
-  solvedCount: number;
-  revisionCompletedCount: number;
-  totalQuestions: number;
+  slug: string;
 }
 
-export default function ProgressChart({
-  solvedCount,
-  revisionCompletedCount,
-  totalQuestions,
-}: ProgressChartProps) {
+export default function ProgressChart({ slug }: ProgressChartProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
-  // Derived values
-  const unsolvedCount = totalQuestions - solvedCount;
-  const revisionPendingCount = totalQuestions - revisionCompletedCount;
-  const solvedPercentage = totalQuestions ? (solvedCount / totalQuestions) * 100 : 0;
-  const revisionPercentage = totalQuestions ? (revisionCompletedCount / totalQuestions) * 100 : 0;
-  const overallPercentage = (solvedPercentage + revisionPercentage) / 2;
+  // Hooks called unconditionally at top level
+  const { data: aggData, isLoading: aggLoading } = useAggregatedProgress(slug);
+  const { data: rankData, isLoading: rankLoading } = useSheetRank(slug);
 
-  const chartData = useMemo(() => ({
-    labels: ['Solved', 'Unsolved', 'Revision Completed', 'Revision Pending'],
-    datasets: [
-      {
-        data: [solvedCount, unsolvedCount, revisionCompletedCount, revisionPendingCount],
-        backgroundColor: isDark
-          ? ['#4caf50', '#3a3b36', '#f59e0b', '#3a3b36']
-          : ['#4caf50', '#dad8d2', '#f59e0b', '#dad8d2'],
-        borderWidth: 0,
-        hoverOffset: 8,
-      },
-    ],
-  }), [solvedCount, unsolvedCount, revisionCompletedCount, revisionPendingCount, isDark]);
+  // Prepare chart data only when data is available
+  const chartData = useMemo(() => {
+    if (!aggData) return null;
+    const { chart, metadata } = aggData;
+    const labels = chart.labels;
+    const dataset = chart.datasets[0];
+    const [solvedCount, unsolvedCount, revisionCompletedCount, revisionPendingCount] = dataset.data;
+    const totalQuestions = metadata.totalQuestions;
 
-  const chartOptions = useMemo(() => ({
-    responsive: true,
-    maintainAspectRatio: true,
-    plugins: {
-      tooltip: {
-        callbacks: {
-          label: (context: any) => {
-            const label = context.label || '';
-            const value = context.raw;
-            const total = (label === 'Solved' || label === 'Unsolved')
-              ? totalQuestions
-              : totalQuestions;
-            const percentage = total ? ((value / total) * 100).toFixed(1) : 0;
-            return `${label}: ${value} (${percentage}%)`;
+    return {
+      labels,
+      datasets: [
+        {
+          data: [solvedCount, unsolvedCount, revisionCompletedCount, revisionPendingCount],
+          backgroundColor: isDark
+            ? ['#4caf50', '#3a3b36', '#f59e0b', '#3a3b36']
+            : ['#4caf50', '#dad8d2', '#f59e0b', '#dad8d2'],
+          borderWidth: 0,
+          hoverOffset: 8,
+        },
+      ],
+      totalQuestions,
+    };
+  }, [aggData, isDark]);
+
+  const chartOptions = useMemo(() => {
+    const totalQuestions = chartData?.totalQuestions || 0;
+    return {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: (context: any) => {
+              const label = context.label || '';
+              const value = context.raw;
+              const percentage = totalQuestions ? ((value / totalQuestions) * 100).toFixed(1) : 0;
+              return `${label}: ${value} (${percentage}%)`;
+            },
           },
         },
+        legend: { display: false },
       },
-      legend: {
-        display: false,
+      scales: {
+        r: {
+          ticks: { display: false },
+          grid: { display: false },
+          angleLines: { display: false },
+          startAngle: 0,
+        },
       },
-    },
-    scales: {
-      r: {
-        ticks: { display: false },
-        grid: { display: false },
-        angleLines: { display: false },
-        startAngle: 0,
-      },
-    },
-  }), [totalQuestions]);
+    };
+  }, [chartData]);
+
+  // Loading state
+  const isLoading = aggLoading || rankLoading;
+  if (isLoading || !aggData || !rankData || !chartData) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.leftColumn}>
+          <div className={styles.loadingText}>Loading community progress...</div>
+        </div>
+        <div className={styles.chartWrapper}>
+          <div className={styles.loadingChart}>Loading chart...</div>
+        </div>
+      </div>
+    );
+  }
+
+  const { chart, metadata } = aggData;
+  const dataset = chart.datasets[0];
+  const [solvedCount, unsolvedCount, revisionCompletedCount, revisionPendingCount] = dataset.data;
+  const totalQuestions = metadata.totalQuestions;
+  const solvedPercentage = metadata.solvedPercentage;
+  const revisionPercentage = metadata.revisionCompletedPercentage;
+  const overallPercentage = (solvedPercentage + revisionPercentage) / 2;
+
+  const { topRanks, currentUser } = rankData;
 
   return (
     <div className={styles.container}>
-      {/* Left column: metrics */}
-      <div className={styles.metrics}>
-        <div className={styles.metricItem}>
-          <span className={styles.metricLabel}>✓ Solved</span>
-          <span className={styles.metricValue}>
-            {solvedCount} / {totalQuestions}
-            <span className={styles.percentage}>({Math.round(solvedPercentage)}%)</span>
-          </span>
+      {/* Left column: community metrics + leaderboard */}
+      <div className={styles.leftColumn}>
+        <h2 className={styles.communityTitle}>Community Progress</h2>
+        <div className={styles.metrics}>
+          <div className={styles.metricItem}>
+            <span className={styles.metricLabel}>✓ Solved</span>
+            <span className={styles.metricValue}>
+              {solvedCount} / {totalQuestions}
+              <span className={styles.percentage}>({Math.round(solvedPercentage)}%)</span>
+            </span>
+          </div>
+          <div className={styles.metricItem}>
+            <span className={styles.metricLabel}>⟳ Revision</span>
+            <span className={styles.metricValue}>
+              {revisionCompletedCount} / {totalQuestions}
+              <span className={styles.percentage}>({Math.round(revisionPercentage)}%)</span>
+            </span>
+          </div>
+          <div className={styles.metricItem}>
+            <span className={styles.metricLabel}>Overall</span>
+            <span className={styles.metricValue}>{Math.round(overallPercentage)}% complete</span>
+          </div>
         </div>
-        <div className={styles.metricItem}>
-          <span className={styles.metricLabel}>⟳ Revision</span>
-          <span className={styles.metricValue}>
-            {revisionCompletedCount} / {totalQuestions}
-            <span className={styles.percentage}>({Math.round(revisionPercentage)}%)</span>
-          </span>
+
+        {/* Leaderboard section */}
+        <div className={styles.leaderboard}>
+        <h4 className={styles.leaderboardTitle}>🏆 Top Performers</h4>
+        <div className={styles.rankList}>
+          {topRanks.map((entry) => (
+            <div key={entry.userId} className={styles.rankItem}>
+              <span className={styles.rankNumber}>#{entry.rank}</span>
+              <Link href={`/sheets/${slug}/progress/${entry.username}`} className={styles.rankLink}>
+                <Avatar src={entry.avatarUrl} name={entry.displayName || entry.username} size="sm" />
+              </Link>
+              <div className={styles.rankUserInfo}>
+                <Link href={`/sheets/${slug}/progress/${entry.username}`} className={styles.rankNameLink}>
+                  <span className={styles.rankName}>{entry.displayName || entry.username}</span>
+                </Link>
+                <div className={styles.rankStats}>
+                  <span>✓ {entry.solvedCount}</span>
+                  <span>⟳ {entry.revisionCompletedCount}</span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-        <div className={styles.metricItem}>
-          <span className={styles.metricLabel}>Overall</span>
-          <span className={styles.metricValue}>
-            {Math.round(overallPercentage)}% complete
-          </span>
+        <hr className={styles.divider} />
+        <div className={styles.yourRank}>
+          <span className={styles.yourRankLabel}>Your Rank:</span>
+          <span className={styles.yourRankValue}>#{currentUser.rank}</span>
+          <Link href={`/sheets/${slug}/progress/${currentUser.username}`} className={styles.rankLink}>
+            <Avatar src={currentUser.avatarUrl} name={currentUser.displayName || currentUser.username} size="sm" />
+          </Link>
+          <Link href={`/sheets/${slug}/progress/${currentUser.username}`} className={styles.rankNameLink}>
+            <span className={styles.yourRankName}>{currentUser.displayName || currentUser.username}</span>
+          </Link>
+          <div className={styles.yourRankStats}>
+            <span>✓ {currentUser.solvedCount}</span>
+            <span>⟳ {currentUser.revisionCompletedCount}</span>
+          </div>
         </div>
-      </div>
+        </div>
+    </div>
 
       {/* Right column: polar area chart */}
       <div className={styles.chartWrapper}>

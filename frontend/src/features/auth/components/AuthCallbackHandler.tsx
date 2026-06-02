@@ -8,7 +8,6 @@ import apiClient from '@/shared/lib/apiClient';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import styles from './AuthCallbackHandler.module.css';
 
-// Helper to detect browser timezone
 const getBrowserTimezone = (): string => {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -17,7 +16,6 @@ const getBrowserTimezone = (): string => {
   }
 };
 
-// Helper to update user's timezone on backend
 const updateUserTimezone = async (token: string, timezone: string) => {
   try {
     await apiClient.put(
@@ -25,9 +23,7 @@ const updateUserTimezone = async (token: string, timezone: string) => {
       { newTimezone: timezone, confirm: true },
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    // console.log(`Timezone updated to: ${timezone}`);
   } catch (error) {
-    // Silently fail – timezone update is not critical for login
     console.warn('Failed to update timezone:', error);
   }
 };
@@ -57,23 +53,26 @@ export const AuthCallbackHandler: React.FC = () => {
       return;
     }
 
-    // Exchange code for tokens
     apiClient.post('/auth/exchange', { code })
       .then(async (response) => {
-        const { token, refreshToken, userId } = response.data;
+        const { token, refreshToken, userId, showWelcome, showWelcomeBack } = response.data;
         tokenStorage.setTokens(token, refreshToken, userId);
 
-        // Detect browser timezone and update backend (asynchronously)
+        // Store welcome flags in sessionStorage (cleared when tab is closed)
+        if (showWelcome === true) {
+          sessionStorage.setItem('showWelcome', 'true');
+        }
+        if (showWelcomeBack === true) {
+          sessionStorage.setItem('showWelcomeBack', 'true');
+        }
+
         const detectedTz = getBrowserTimezone();
-        // Only set timezone to Asia/Kolkata for Indian users
         if (detectedTz === 'Asia/Kolkata' || detectedTz === 'Asia/Calcutta') {
           updateUserTimezone(token, 'Asia/Kolkata');
         }
 
-        // Trigger background refetch of user data
         await refetch();
 
-        // Redirect immediately
         const returnTo = localStorage.getItem('returnTo');
         if (returnTo && returnTo !== '/login' && returnTo !== '/') {
           localStorage.removeItem('returnTo');

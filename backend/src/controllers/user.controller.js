@@ -734,6 +734,51 @@ const getAllUsers = async (req, res, next) => {
   }
 };
 
+/**
+ * Mark that the first-time welcome message has been shown.
+ * Sets isNewUser = false.
+ * POST /api/v1/users/welcome-shown
+ */
+const markWelcomeShown = async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (user.isNewUser === true) {
+      user.isNewUser = false;
+      await user.save();
+      await invalidateUserCache(user._id);
+    }
+    res.json(formatResponse('Welcome message acknowledged', { success: true }));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Mark that the welcome-back message has been shown.
+ * Sets lastWelcomeBackShownAt = now.
+ * POST /api/v1/users/welcome-back-shown
+ */
+const markWelcomeBackShown = async (req, res, next) => {
+  try {
+    const user = req.user;
+    user.lastWelcomeBackShownAt = new Date();
+    await user.save();
+    await invalidateUserCache(user._id);
+    res.json(formatResponse('Welcome-back message acknowledged', { success: true }));
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getTotalUsersCount = async (req, res, next) => {
+  try {
+    const total = await User.countDocuments({ isActive: true });
+    res.json(formatResponse('Total users count retrieved', { total }));
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getCurrentUser,
   updateCurrentUser,
@@ -748,4 +793,7 @@ module.exports = {
   getUserPublicProgress,
   changeTimezone,
   getAllUsers,
+  markWelcomeShown,
+  markWelcomeBackShown,
+  getTotalUsersCount,
 };

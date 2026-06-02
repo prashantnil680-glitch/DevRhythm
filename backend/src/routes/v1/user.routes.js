@@ -18,6 +18,7 @@ router.put('/me', auth, validate(userValidator.updateUser), userController.updat
 router.get('/me/stats', auth, userController.getUserStats);
 router.put('/me/last-online', auth, userController.updateLastOnline);
 router.delete('/me', auth, userController.deleteCurrentUser);
+router.get('/count', rateLimiters.publicLimiter, cache(300, 'user:count'), userController.getTotalUsersCount);
 
 router.get('/search', auth, rateLimiters.userLimiter, validate(userValidator.searchUsers, 'query'), cache(300, 'user:search'), userController.searchUsers);
 router.get('/top/streaks', auth, rateLimiters.userLimiter, validate(userValidator.topUsers, 'query'), cache(300, 'user:top:streaks'), userController.getTopStreaks);
@@ -61,6 +62,20 @@ router.put('/me/timezone',
     confirm: Joi.boolean().default(false)
   })),
   userController.changeTimezone
+);
+
+router.post(
+  '/welcome-shown',
+  auth,
+  rateLimiters.userLimiter,
+  userController.markWelcomeShown
+);
+
+router.post(
+  '/welcome-back-shown',
+  auth,
+  rateLimiters.userLimiter,
+  userController.markWelcomeBackShown
 );
 
 // ========== GET /users - list all public users (optimized with caching) ==========

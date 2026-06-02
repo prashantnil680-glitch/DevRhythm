@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useSheet, useJoinSheet, useLeaveSheet, useUpdateTargetDate, useDeleteSheet } from '@/features/sheets';
+import { useSheet, useJoinSheet, useLeaveSheet, useUpdateTargetDate, useDeleteSheet, useToggleBookmark } from '@/features/sheets';
 import { useUser } from '@/features/user';
 import { ROUTES } from '@/shared/config';
 import Breadcrumb from '@/shared/components/Breadcrumb';
@@ -24,17 +24,24 @@ export default function SheetDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
   const { user } = useUser();
+  const isAuthenticated = !!user;
 
   const { data: sheetData, isLoading, error, refetch } = useSheet(slug);
   const joinMutation = useJoinSheet();
   const leaveMutation = useLeaveSheet();
   const updateTargetDateMutation = useUpdateTargetDate();
   const deleteMutation = useDeleteSheet();
+  const toggleBookmarkMutation = useToggleBookmark();
 
   const [joinModalOpen, setJoinModalOpen] = useState(false);
   const [targetDateModalOpen, setTargetDateModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+
+  const handleToggleBookmark = async () => {
+    await toggleBookmarkMutation.mutateAsync(slug);
+    refetch(); // Refresh sheet data to get updated bookmarkCount and isBookmarked
+  };
 
   if (isLoading) return <SheetDetailSkeleton />;
   if (error || !sheetData) {
@@ -51,7 +58,6 @@ export default function SheetDetailPage() {
   const {
     sheet,
     questions,
-    tagGroups,
     participants,
     stats,
     hasJoined,
@@ -119,11 +125,14 @@ export default function SheetDetailPage() {
         hasJoined={hasJoined}
         isOwner={isOwner}
         targetDate={targetDate}
+        isAuthenticated={isAuthenticated}
         onJoin={() => setJoinModalOpen(true)}
         onLeave={() => setLeaveModalOpen(true)}
         onUpdateTargetDate={() => setTargetDateModalOpen(true)}
         onEdit={() => router.push(`${ROUTES.SHEETS.ROOT}/${slug}/edit`)}
         onDelete={() => setDeleteModalOpen(true)}
+        onToggleBookmark={handleToggleBookmark}
+        isBookmarkPending={toggleBookmarkMutation.isPending}
       />
 
       {hasJoined && currentUserProgress && (
@@ -143,25 +152,25 @@ export default function SheetDetailPage() {
         </div>
       )}
 
-    <div className={styles.questionGroupsSection}>
-      <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitle}>Questions</h2>
-        <Link href="/questions" className={styles.viewAllLink}>
-          View All →
-        </Link>
+      <div className={styles.questionGroupsSection}>
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>Questions</h2>
+          <Link href="/questions" className={styles.viewAllLink}>
+            View All →
+          </Link>
+        </div>
+        {questions.length === 0 ? (
+          <p className={styles.emptyState}>No questions in this sheet yet.</p>
+        ) : (
+          <QuestionList
+            questions={questions}
+            perQuestionParticipantCounts={stats.perQuestionParticipantCounts}
+            perQuestionSolvedCounts={stats.perQuestionSolvedCounts}
+            userProgressDetails={currentUserProgress?.details}
+            isJoined={hasJoined}
+          />
+        )}
       </div>
-      {questions.length === 0 ? (
-        <p className={styles.emptyState}>No questions in this sheet yet.</p>
-      ) : (
-        <QuestionList
-          questions={questions}
-          perQuestionParticipantCounts={stats.perQuestionParticipantCounts}
-          perQuestionSolvedCounts={stats.perQuestionSolvedCounts}
-          userProgressDetails={currentUserProgress?.details}
-          isJoined={hasJoined}
-        />
-      )}
-    </div>
 
       <div className={styles.participantsSection}>
         <h2 className={styles.sectionTitle}>Participants</h2>

@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { FiUsers, FiCalendar, FiEdit2, FiTrash2, FiLogOut, FiLogIn, FiClock, FiMoreVertical } from 'react-icons/fi';
+import { FiUsers, FiCalendar, FiEdit2, FiTrash2, FiLogOut, FiLogIn, FiClock, FiMoreVertical, FiBookmark } from 'react-icons/fi';
+import { FaBookmark } from 'react-icons/fa';
 import { Avatar } from '@/shared/components/Avatar';
 import Button from '@/shared/components/Button';
 import Badge from '@/shared/components/Badge';
+import Tooltip from '@/shared/components/Tooltip';
 import { ROUTES } from '@/shared/config';
 import type { Sheet, Participant } from '@/features/sheets';
 import styles from './SheetHero.module.css';
@@ -18,11 +20,14 @@ interface SheetHeroProps {
   hasJoined: boolean;
   isOwner: boolean;
   targetDate?: string;
+  isAuthenticated: boolean;
   onJoin: () => void;
   onLeave: () => void;
   onUpdateTargetDate: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleBookmark: () => void;
+  isBookmarkPending?: boolean;
 }
 
 export default function SheetHero({
@@ -32,15 +37,30 @@ export default function SheetHero({
   hasJoined,
   isOwner,
   targetDate,
+  isAuthenticated,
   onJoin,
   onLeave,
   onUpdateTargetDate,
   onEdit,
   onDelete,
+  onToggleBookmark,
+  isBookmarkPending = false,
 }: SheetHeroProps) {
   const [showMenu, setShowMenu] = useState(false);
 
-  const { name, description, ownerId, createdAt, specialTag, originalSourceName, originalSourceUrl, slug } = sheet;
+  const {
+    name,
+    description,
+    ownerId,
+    createdAt,
+    specialTag,
+    originalSourceName,
+    originalSourceUrl,
+    slug,
+    bookmarkCount,
+    isBookmarked,
+  } = sheet;
+
   const formattedCreatedAt = format(new Date(createdAt), 'MMM d, yyyy');
 
   const ownerParticipant = participants.find(p => p.userId === ownerId);
@@ -70,10 +90,23 @@ export default function SheetHero({
 
   return (
     <div className={styles.hero}>
-      {/* Top row: title + primary action + kebab menu */}
+      {/* Top row: title + bookmark + primary actions + kebab menu */}
       <div className={styles.topRow}>
         <h1 className={styles.title}>{name}</h1>
         <div className={styles.actions}>
+          {isAuthenticated && (
+            <Tooltip content={isBookmarked ? 'Remove bookmark' : 'Bookmark this sheet'}>
+              <button
+                onClick={onToggleBookmark}
+                disabled={isBookmarkPending}
+                className={`${styles.bookmarkButton} ${isBookmarked ? styles.bookmarked : ''}`}
+                aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+              >
+                {isBookmarked ? <FaBookmark /> : <FiBookmark />}
+                {bookmarkCount > 0 && <span className={styles.bookmarkCount}>{bookmarkCount}</span>}
+              </button>
+            </Tooltip>
+          )}
           {!hasJoined && !isOwner && (
             <Button variant="primary" size="sm" onClick={onJoin} leftIcon={<FiLogIn />}>
               Join

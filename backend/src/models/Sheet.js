@@ -53,6 +53,12 @@ const SheetSchema = new mongoose.Schema(
       maxlength: 500,
       default: null,
     },
+    bookmarkCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      index: true,
+    },
     isActive: {
       type: Boolean,
       default: true,

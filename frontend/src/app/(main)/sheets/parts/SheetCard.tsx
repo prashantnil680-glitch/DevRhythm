@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { FiUsers, FiCalendar, FiExternalLink, FiTag } from 'react-icons/fi';
+import { FiUsers, FiCalendar, FiExternalLink, FiTag, FiBookmark } from 'react-icons/fi';
+import { FaBookmark } from 'react-icons/fa';
 import clsx from 'clsx';
 import Card from '@/shared/components/Card';
 import Button from '@/shared/components/Button';
 import { Avatar } from '@/shared/components/Avatar';
 import Badge from '@/shared/components/Badge';
+import Tooltip from '@/shared/components/Tooltip';
 import { ROUTES } from '@/shared/config';
 import type { SheetWithStats } from '@/features/sheets';
 import styles from './SheetCard.module.css';
@@ -17,10 +19,22 @@ interface SheetCardProps {
   isOwner: boolean;
   isJoined: boolean;
   onJoin: () => void;
+  onToggleBookmark: () => void;
+  isAuthenticated: boolean;
+  isBookmarkPending?: boolean;
   className?: string;
 }
 
-export default function SheetCard({ sheet, isOwner, isJoined, onJoin, className }: SheetCardProps) {
+export default function SheetCard({
+  sheet,
+  isOwner,
+  isJoined,
+  onJoin,
+  onToggleBookmark,
+  isAuthenticated,
+  isBookmarkPending = false,
+  className,
+}: SheetCardProps) {
   const {
     name,
     description,
@@ -32,6 +46,8 @@ export default function SheetCard({ sheet, isOwner, isJoined, onJoin, className 
     specialTag,
     originalSourceName,
     originalSourceUrl,
+    bookmarkCount,
+    isBookmarked,
   } = sheet;
 
   const formattedDate = format(new Date(createdAt), 'MMM d, yyyy');
@@ -41,10 +57,10 @@ export default function SheetCard({ sheet, isOwner, isJoined, onJoin, className 
   const displayName = ownerParticipant?.displayName || ownerName;
   const ownerAvatar = ownerParticipant?.avatarUrl;
 
-  // Exclude owner from participant display to avoid duplication (owner is already shown separately)
+  // Exclude owner from participant display
   const otherParticipants = participants.filter(p => p.userId !== ownerId);
   const displayParticipants = otherParticipants.slice(0, 4);
-  const remainingCount = Math.max(0, participantCount - 1 - 4); // subtract owner and shown ones
+  const remainingCount = Math.max(0, participantCount - 1 - 4);
 
   const showViewButton = isOwner || isJoined;
   const buttonText = showViewButton ? 'View' : 'Join';
@@ -58,7 +74,6 @@ export default function SheetCard({ sheet, isOwner, isJoined, onJoin, className 
     }
   };
 
-  // Determine if metadata row should be shown (any of participants, tag, source)
   const hasParticipants = otherParticipants.length > 0;
   const hasTag = !!specialTag;
   const hasSource = !!originalSourceName;
@@ -67,24 +82,39 @@ export default function SheetCard({ sheet, isOwner, isJoined, onJoin, className 
   return (
     <Card className={clsx(styles.card, className)} noHover>
       <div className={styles.cardContent}>
-        {/* Top row: title + action */}
+        {/* Top row: title + action buttons (View/Join + Bookmark) */}
         <div className={styles.topRow}>
           <h3 className={styles.sheetTitle}>
             <Link href={ROUTES.SHEETS.DETAIL(slug)} className={styles.titleLink}>
               {name}
             </Link>
           </h3>
-          <Button
-            variant={buttonVariant}
-            size="sm"
-            onClick={handleAction}
-            className={styles.actionButton}
-          >
-            {buttonText}
-          </Button>
+          <div className={styles.actionGroup}>
+            <Button
+              variant={buttonVariant}
+              size="sm"
+              onClick={handleAction}
+              className={styles.actionButton}
+            >
+              {buttonText}
+            </Button>
+            {isAuthenticated && (
+              <Tooltip content={isBookmarked ? 'Remove bookmark' : 'Bookmark this sheet'}>
+                <button
+                  onClick={onToggleBookmark}
+                  disabled={isBookmarkPending}
+                  className={clsx(styles.bookmarkButton, isBookmarked && styles.bookmarked)}
+                  aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+                >
+                  {isBookmarked ? <FaBookmark /> : <FiBookmark />}
+                  {bookmarkCount > 0 && <span className={styles.bookmarkCount}>{bookmarkCount}</span>}
+                </button>
+              </Tooltip>
+            )}
+          </div>
         </div>
 
-        {/* Owner + date row (always shown) */}
+        {/* Owner + date row */}
         <div className={styles.ownerRow}>
           {ownerName !== 'Anonymous User' ? (
             <Link
@@ -108,13 +138,13 @@ export default function SheetCard({ sheet, isOwner, isJoined, onJoin, className 
           </span>
         </div>
 
-        {/* Description – only if present */}
+        {/* Description */}
         {description && <p className={styles.description}>{description}</p>}
 
-        {/* Metadata row – only if at least one of participants, tag, source exists */}
+        {/* Metadata row (participants, tag, source) */}
         {showMetadata && (
           <div className={styles.metadataRow}>
-            {/* Participant avatars – only if there are participants besides owner */}
+            {/* Participant avatars */}
             {hasParticipants && (
               <div className={styles.participantGroup}>
                 <FiUsers size={12} style={{ marginRight: '0.25rem' }} />

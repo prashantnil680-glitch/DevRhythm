@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FiPlus } from 'react-icons/fi';
-import { useSheets, useJoinSheet } from '@/features/sheets';
+import { useSheets, useBookmarkedSheets, useToggleBookmark, useJoinSheet } from '@/features/sheets';
 import { useUser } from '@/features/user';
 import { ROUTES } from '@/shared/config';
 import Button from '@/shared/components/Button';
@@ -17,7 +17,6 @@ import SheetsSkeleton from './parts/SheetsSkeleton';
 import JoinSheetModal from './parts/JoinSheetModal';
 import styles from './page.module.css';
 
-// Helper to scroll to top smoothly
 const scrollToTop = () => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
@@ -25,19 +24,15 @@ const scrollToTop = () => {
 export default function SheetsListingPage() {
   const router = useRouter();
   const { user } = useUser();
+  const isLoggedIn = !!user;
 
   // Filter state
   const [search, setSearch] = useState('');
-  const [ownerFilter, setOwnerFilter] = useState<'all' | 'mine'>('all');
-  const [sortBy, setSortBy] = useState<'createdAt' | 'name' | 'updatedAt'>('createdAt');
+  const [viewFilter, setViewFilter] = useState<'all' | 'mine' | 'bookmarked'>('all');
+  const [sortBy, setSortBy] = useState<'createdAt' | 'name' | 'updatedAt' | 'bookmarkCount'>('bookmarkCount');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const limit = 10;
-
-  // Sticky filter logic
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const filterWrapperRef = useRef<HTMLDivElement>(null);
-  const [isSticky, setIsSticky] = useState(false);
 
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -46,27 +41,58 @@ export default function SheetsListingPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Reset page when filters change AND scroll to top
+  // Reset page when filters change and scroll to top
   useEffect(() => {
     setPage(1);
     scrollToTop();
-  }, [debouncedSearch, ownerFilter, sortBy, sortOrder]);
+  }, [debouncedSearch, viewFilter, sortBy, sortOrder]);
 
-  // Build query params
-  const params = {
-    search: debouncedSearch || undefined,
-    ...(ownerFilter === 'mine' && user ? { mySheets: true } : {}),
-    sortBy,
-    sortOrder,
-    page,
-    limit,
-  };
+  // Determine which data hook to use
+  const useBookmarks = viewFilter === 'bookmarked';
 
-  const { data, isLoading, error, refetch } = useSheets(params);
+  // Query params for regular sheets
+  const params = useBookmarks
+    ? undefined
+    : {
+        search: debouncedSearch || undefined,
+        mySheets: viewFilter === 'mine' ? true : undefined,
+        sortBy,
+        sortOrder,
+        page,
+        limit,
+      };
+
+  const {
+    data: sheetsData,
+    isLoading: sheetsLoading,
+    error: sheetsError,
+    refetch: refetchSheets,
+  } = useSheets(params);
+
+  const {
+    data: bookmarksData,
+    isLoading: bookmarksLoading,
+    error: bookmarksError,
+    refetch: refetchBookmarks,
+  } = useBookmarkedSheets(
+    useBookmarks
+      ? {
+          page,
+          limit,
+          search: debouncedSearch || undefined,
+        }
+      : undefined
+  );
+
+  const isLoading = useBookmarks ? bookmarksLoading : sheetsLoading;
+  const error = useBookmarks ? bookmarksError : sheetsError;
+  const data = useBookmarks ? bookmarksData : sheetsData;
   const sheets = data?.sheets || [];
   const pagination = data?.pagination;
 
   const joinSheetMutation = useJoinSheet();
+  const toggleBookmarkMutation = useToggleBookmark();
+
   const [joinModalOpen, setJoinModalOpen] = useState(false);
   const [selectedSheetSlug, setSelectedSheetSlug] = useState<string | null>(null);
 
@@ -80,8 +106,20 @@ export default function SheetsListingPage() {
     await joinSheetMutation.mutateAsync({ slug: selectedSheetSlug, targetDate });
     setJoinModalOpen(false);
     setSelectedSheetSlug(null);
-    refetch();
+    // Refetch both lists to update participant counts
+    refetchSheets();
+    if (useBookmarks) refetchBookmarks();
     router.push(ROUTES.SHEETS.DETAIL(selectedSheetSlug));
+  };
+
+  const handleToggleBookmark = async (slug: string) => {
+    await toggleBookmarkMutation.mutateAsync(slug);
+    // Refetch current view to sync counts
+    if (useBookmarks) {
+      refetchBookmarks();
+    } else {
+      refetchSheets();
+    }
   };
 
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -94,14 +132,16 @@ export default function SheetsListingPage() {
     return <Link href={item.href} className={props.className}>{props.children}</Link>;
   };
 
-  // Sticky observer
+  // Sticky filter logic (unchanged)
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const filterWrapperRef = useRef<HTMLDivElement>(null);
+  const [isSticky, setIsSticky] = useState(false);
+
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsSticky(!entry.isIntersecting);
-      },
+      ([entry]) => setIsSticky(!entry.isIntersecting),
       { threshold: [0] }
     );
     observer.observe(sentinel);
@@ -121,10 +161,8 @@ export default function SheetsListingPage() {
         </Link>
       </div>
 
-      {/* Sentinel for sticky detection */}
       <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />
 
-      {/* Filter wrapper with sticky behavior */}
       <div
         ref={filterWrapperRef}
         className={`${styles.filterWrapper} ${isSticky ? styles.sticky : ''}`}
@@ -132,13 +170,13 @@ export default function SheetsListingPage() {
         <SheetFilterBar
           search={search}
           onSearchChange={setSearch}
-          ownerFilter={ownerFilter}
-          onOwnerFilterChange={setOwnerFilter}
+          viewFilter={viewFilter}
+          onViewFilterChange={setViewFilter}
           sortBy={sortBy}
           onSortByChange={setSortBy}
           sortOrder={sortOrder}
           onSortOrderChange={setSortOrder}
-          isLoggedIn={!!user}
+          isLoggedIn={isLoggedIn}
         />
       </div>
 
@@ -147,14 +185,22 @@ export default function SheetsListingPage() {
       {error && (
         <div className={styles.errorState}>
           <p>Failed to load sheets. Please try again.</p>
-          <Button variant="outline" onClick={() => refetch()}>Retry</Button>
+          <Button variant="outline" onClick={() => (useBookmarks ? refetchBookmarks() : refetchSheets())}>
+            Retry
+          </Button>
         </div>
       )}
 
       {!isLoading && !error && sheets.length === 0 && (
         <div className={styles.emptyState}>
-          <p>No sheets found.</p>
-          {!search && ownerFilter === 'all' && (
+          <p>
+            {viewFilter === 'bookmarked'
+              ? 'No bookmarked sheets found.'
+              : viewFilter === 'mine'
+              ? 'No sheets found.'
+              : 'No sheets found.'}
+          </p>
+          {!search && viewFilter === 'all' && (
             <Link href={ROUTES.SHEETS.CREATE}>
               <Button variant="primary">Create your first sheet →</Button>
             </Link>
@@ -174,6 +220,9 @@ export default function SheetsListingPage() {
                 isOwner={isOwner}
                 isJoined={isJoined}
                 onJoin={() => handleJoinClick(sheet.slug)}
+                onToggleBookmark={() => handleToggleBookmark(sheet.slug)}
+                isAuthenticated={isLoggedIn}
+                isBookmarkPending={toggleBookmarkMutation.isPending}
               />
             );
           })}

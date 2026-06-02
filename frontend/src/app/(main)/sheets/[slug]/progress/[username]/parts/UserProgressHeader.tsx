@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { FiCalendar, FiClock, FiCheckCircle, FiShare2 } from 'react-icons/fi';
+import { FiCalendar, FiClock, FiCheckCircle, FiShare2, FiBookmark, FiLogIn } from 'react-icons/fi';
+import { FaBookmark } from 'react-icons/fa';
 import { Avatar } from '@/shared/components/Avatar';
 import Button from '@/shared/components/Button';
+import Tooltip from '@/shared/components/Tooltip';
 import { toast } from '@/shared/components/Toast';
 import { useUser } from '@/features/user';
 import { ROUTES } from '@/shared/config';
@@ -14,13 +16,22 @@ import styles from './UserProgressHeader.module.css';
 interface UserProgressHeaderProps {
   username: string;
   sheetSlug: string;
-  sheetName: string;           
+  sheetName: string;
   joinedAt: string;
   targetDate: string;
   completedAt: string | null;
   isFullyCompleted: boolean;
   stats: UserProgress['stats'];
   shareLink: string;
+  // Bookmark & Join props
+  isAuthenticated: boolean;
+  hasJoinedSheet: boolean;
+  isBookmarked: boolean;
+  bookmarkCount: number;
+  onToggleBookmark: () => void;
+  onJoinSheet: () => void;
+  isJoining?: boolean;
+  isBookmarkPending?: boolean;
 }
 
 export default function UserProgressHeader({
@@ -33,6 +44,14 @@ export default function UserProgressHeader({
   isFullyCompleted,
   stats,
   shareLink,
+  isAuthenticated,
+  hasJoinedSheet,
+  isBookmarked,
+  bookmarkCount,
+  onToggleBookmark,
+  onJoinSheet,
+  isJoining = false,
+  isBookmarkPending = false,
 }: UserProgressHeaderProps) {
   const { user: currentUser } = useUser();
   const isOwnProfile = currentUser?.username === username;
@@ -58,25 +77,50 @@ export default function UserProgressHeader({
     : 0;
   const overallPercentage = (solvedPercentage + revisionPercentage) / 2;
 
-  // Profile link: /user/u/:username for own profile, /user/:username for others
   const profileUrl = isOwnProfile
     ? ROUTES.USER_PROFILE.OWN(username)
     : ROUTES.USER_PROFILE.PUBLIC(username);
 
   return (
     <div className={styles.header}>
-      {/* Top row: sheet name + share button */}
+      {/* Top row: sheet name + share + bookmark + join */}
       <div className={styles.topRow}>
         <h1 className={styles.sheetName}>{sheetName}</h1>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleShare}
-          leftIcon={<FiShare2 />}
-          className={styles.shareButton}
-        >
-          Share Progress
-        </Button>
+        <div className={styles.actionButtons}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleShare}
+            leftIcon={<FiShare2 />}
+            className={styles.shareButton}
+          >
+            Share Progress
+          </Button>
+          {isAuthenticated && (
+            <Tooltip content={isBookmarked ? 'Remove bookmark' : 'Bookmark this sheet'}>
+              <button
+                onClick={onToggleBookmark}
+                disabled={isBookmarkPending}
+                className={`${styles.bookmarkButton} ${isBookmarked ? styles.bookmarked : ''}`}
+                aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark this sheet'}
+              >
+                {isBookmarked ? <FaBookmark /> : <FiBookmark />}
+                {bookmarkCount > 0 && <span className={styles.bookmarkCount}>{bookmarkCount}</span>}
+              </button>
+            </Tooltip>
+          )}
+          {isAuthenticated && !hasJoinedSheet && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={onJoinSheet}
+              isLoading={isJoining}
+              leftIcon={<FiLogIn />}
+            >
+              Join Sheet
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* User row: avatar + name + profile link */}

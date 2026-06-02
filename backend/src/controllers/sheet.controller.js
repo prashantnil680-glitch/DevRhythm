@@ -126,7 +126,6 @@ const leaveSheet = async (req, res, next) => {
 const getMyProgress = async (req, res, next) => {
   try {
     const { slug } = req.params;
-    // First, fetch sheet data with current user to check membership
     const sheetData = await SheetService.getSheetBySlug(slug, req.user._id);
     if (!sheetData.hasJoined) {
       throw new AppError('You have not joined this sheet', 403);
@@ -141,13 +140,16 @@ const getMyProgress = async (req, res, next) => {
 
 /**
  * Get another user's progress in a sheet.
- * GET /api/v1/sheets/:slug/progress/:userId
+ * GET /api/v1/sheets/:slug/progress/:username
  */
 const getUserProgress = async (req, res, next) => {
   try {
     const { slug, username } = req.params;
-    const result = await SheetService.getUserProgress(slug, req.user._id, username);
-    res.json(formatResponse('User progress retrieved', result));
+    if (username === 'Anonymous User') {
+      throw new AppError('The original creator has been anonymised and their progress is no longer publicly available.', 404);
+    }
+    const progress = await SheetService.getUserProgress(slug, req.user._id, username);
+    res.json(formatResponse('User progress retrieved', progress));
   } catch (error) {
     next(error);
   }
@@ -175,6 +177,9 @@ const getMyProgressChart = async (req, res, next) => {
 const getUserProgressChart = async (req, res, next) => {
   try {
     const { slug, username } = req.params;
+    if (username === 'Anonymous User') {
+      throw new AppError('The original creator has been anonymised and their progress is no longer publicly available.', 404);
+    }
     const chartData = await SheetService.getUserProgressChart(slug, req.user._id, username);
     res.json(formatResponse('Chart data retrieved', chartData));
   } catch (error) {
@@ -216,7 +221,6 @@ const deleteSheet = async (req, res, next) => {
  * POST /api/v1/sheets/import
  */
 const importSheet = async (req, res, next) => {
-  // Set a timeout to prevent hanging indefinitely (e.g., 30 seconds)
   const timeout = setTimeout(() => {
     if (!res.headersSent) {
       return res.status(504).json({
@@ -235,7 +239,6 @@ const importSheet = async (req, res, next) => {
       clearTimeout(timeout);
       throw new AppError('No file uploaded', 400);
     }
-
     const { sheetName, description, targetDate, specialTag, originalSourceName, originalSourceUrl } = req.body;
     const { parseExcelFile } = require('../services/excelParser.service');
     const parsedRows = await parseExcelFile(req.file.buffer, req.file.originalname);
@@ -286,7 +289,6 @@ const importSheet = async (req, res, next) => {
         error: null,
       });
     }
-    // Generic error fallback
     console.error('[ImportSheet] Error:', error);
     next(error);
   }
@@ -307,6 +309,34 @@ const updateTargetDate = async (req, res, next) => {
   }
 };
 
+/**
+ * Toggle bookmark for a sheet.
+ * POST /api/v1/sheets/:slug/bookmark
+ */
+const toggleBookmark = async (req, res, next) => {
+  try {
+    const { slug } = req.params;
+    const result = await SheetService.toggleBookmark(req.user._id, slug);
+    res.json(formatResponse(result.isBookmarked ? 'Sheet bookmarked' : 'Sheet unbookmarked', result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get user's bookmarked sheets, most recent first.
+ * GET /api/v1/sheets/bookmarks
+ */
+const getBookmarkedSheets = async (req, res, next) => {
+  try {
+    const { page, limit, search } = req.query;
+    const result = await SheetService.getBookmarkedSheets(req.user._id, { page, limit }, search);
+    res.json(formatResponse('Bookmarked sheets retrieved', result.sheets, { pagination: result.pagination }));
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createSheet,
   getSheets,
@@ -321,4 +351,6 @@ module.exports = {
   deleteSheet,
   importSheet,
   updateTargetDate,
+  toggleBookmark,
+  getBookmarkedSheets,
 };

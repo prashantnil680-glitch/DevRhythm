@@ -171,6 +171,10 @@ export default function ManualTab({
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className={styles.form}>
+      <div className={styles.topActions}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancel</Button>
+        <Button type="submit" disabled={isSubmitting || selectedQuestions.length === 0}>{submitButtonText}</Button>
+      </div>
       {/* The JSX remains identical, but we must ensure the target date field uses the same conditional */}
       <div className={styles.columns}>
         <div className={styles.leftPanel}>
@@ -276,10 +280,7 @@ export default function ManualTab({
           </div>
         </div>
       </div>
-      <div className={styles.actions}>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancel</Button>
-        <Button type="submit" disabled={isSubmitting || selectedQuestions.length === 0}>{submitButtonText}</Button>
-      </div>
+      
     </form>
   );
 }

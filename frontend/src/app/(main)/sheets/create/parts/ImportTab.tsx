@@ -5,7 +5,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
-import { FiCalendar, FiTag, FiLink, FiUpload } from 'react-icons/fi';
+import { FiCalendar, FiTag, FiLink, FiUpload, FiAlertCircle, FiAlertOctagon } from 'react-icons/fi'; 
 import Input from '@/shared/components/Input';
 import Button from '@/shared/components/Button';
 import DatePicker from '@/shared/components/DatePicker';
@@ -182,6 +182,10 @@ export default function ImportTab({
   return (
     <>
       <form onSubmit={handleSubmit(handleFormSubmit)} className={styles.form}>
+        <div className={styles.topActions}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancel</Button>
+          <Button type="submit" disabled={isSubmitDisabled}>Import Sheet</Button>
+        </div>
         <div className={styles.columns}>
           <div className={styles.leftPanel}>
             <div className={styles.sourceCard}>
@@ -233,14 +237,23 @@ export default function ImportTab({
                   {storedFileName && !file && <p className={styles.warning}>Previously selected file: {storedFileName}. Please re-upload.</p>}
                   {fileError && <p className={styles.error}>{fileError}</p>}
                   <p className={styles.hint}>Supported formats: .xlsx, .xls, .csv, .json</p>
+                  <div className={styles.platformWarning}>
+                    <div className={styles.warningHeader}>
+                      <FiAlertOctagon className={styles.warningIcon} />
+                      <span className={styles.warningBadge}>IMPORTANT NOTE</span>
+                    </div>
+                    <div className={styles.warningContent}>
+                      <p className={styles.warningTitle}>Only LeetCode problems are supported for import at this time.</p>
+                      <p className={styles.warningDescription}>
+                        If your file contains problems from other platforms (Codeforces, HackerRank, etc.), they will be skipped.
+                        Please ensure your sheet only includes LeetCode problem exact titles.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </section>
             </div>
           </div>
-        </div>
-        <div className={styles.actions}>
-          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancel</Button>
-          <Button type="submit" disabled={isSubmitDisabled}>Import Sheet</Button>
         </div>
       </form>
 

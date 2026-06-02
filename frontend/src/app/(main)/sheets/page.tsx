@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FiPlus } from 'react-icons/fi';
-import { useSheets, useBookmarkedSheets, useToggleBookmark, useJoinSheet } from '@/features/sheets';
+import { useSheets, useBookmarkedSheets, useToggleBookmark, useJoinSheet, useSheetsCount } from '@/features/sheets';
 import { useUser } from '@/features/user';
 import { ROUTES } from '@/shared/config';
 import Button from '@/shared/components/Button';
@@ -26,6 +26,10 @@ export default function SheetsListingPage() {
   const { user } = useUser();
   const isLoggedIn = !!user;
 
+  // Fetch total sheet count to determine if any sheets exist
+  const { data: sheetsCountData, isLoading: countLoading } = useSheetsCount();
+  const hasSheets = (sheetsCountData?.count ?? 0) > 0;
+
   // Filter state
   const [search, setSearch] = useState('');
   const [viewFilter, setViewFilter] = useState<'all' | 'mine' | 'bookmarked'>('all');
@@ -33,6 +37,18 @@ export default function SheetsListingPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const limit = 10;
+
+  // Reset filters when there are no sheets (avoid invalid 'bookmarked' or bookmark sort)
+  useEffect(() => {
+    if (!hasSheets && !countLoading) {
+      // Reset to safe defaults
+      if (viewFilter === 'bookmarked') setViewFilter('all');
+      if (sortBy === 'bookmarkCount') {
+        setSortBy('createdAt');
+        setSortOrder('desc');
+      }
+    }
+  }, [hasSheets, countLoading, viewFilter, sortBy]);
 
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -47,10 +63,8 @@ export default function SheetsListingPage() {
     scrollToTop();
   }, [debouncedSearch, viewFilter, sortBy, sortOrder]);
 
-  // Determine which data hook to use
   const useBookmarks = viewFilter === 'bookmarked';
 
-  // Query params for regular sheets
   const params = useBookmarks
     ? undefined
     : {
@@ -84,7 +98,7 @@ export default function SheetsListingPage() {
       : undefined
   );
 
-  const isLoading = useBookmarks ? bookmarksLoading : sheetsLoading;
+  const isLoading = (useBookmarks ? bookmarksLoading : sheetsLoading) || countLoading;
   const error = useBookmarks ? bookmarksError : sheetsError;
   const data = useBookmarks ? bookmarksData : sheetsData;
   const sheets = data?.sheets || [];
@@ -106,7 +120,6 @@ export default function SheetsListingPage() {
     await joinSheetMutation.mutateAsync({ slug: selectedSheetSlug, targetDate });
     setJoinModalOpen(false);
     setSelectedSheetSlug(null);
-    // Refetch both lists to update participant counts
     refetchSheets();
     if (useBookmarks) refetchBookmarks();
     router.push(ROUTES.SHEETS.DETAIL(selectedSheetSlug));
@@ -114,7 +127,6 @@ export default function SheetsListingPage() {
 
   const handleToggleBookmark = async (slug: string) => {
     await toggleBookmarkMutation.mutateAsync(slug);
-    // Refetch current view to sync counts
     if (useBookmarks) {
       refetchBookmarks();
     } else {
@@ -177,6 +189,7 @@ export default function SheetsListingPage() {
           sortOrder={sortOrder}
           onSortOrderChange={setSortOrder}
           isLoggedIn={isLoggedIn}
+          hasSheets={hasSheets}
         />
       </div>
 

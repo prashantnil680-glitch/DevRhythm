@@ -1,7 +1,8 @@
+// frontend/src/app/(main)/sheets/parts/SheetFilterBar.tsx
+
 'use client';
 
 import { useCallback } from 'react';
-import { FiSearch } from 'react-icons/fi';
 import SearchBar from '@/shared/components/SearchBar';
 import Select from '@/shared/components/Select';
 import SortDropdown from '@/shared/components/SortDropdown';
@@ -11,30 +12,43 @@ import styles from './SheetFilterBar.module.css';
 interface SheetFilterBarProps {
   search: string;
   onSearchChange: (value: string) => void;
-  viewFilter: 'all' | 'mine' | 'bookmarked';  // changed from ownerFilter
+  viewFilter: 'all' | 'mine' | 'bookmarked';
   onViewFilterChange: (value: 'all' | 'mine' | 'bookmarked') => void;
-  sortBy: 'createdAt' | 'name' | 'updatedAt' | 'bookmarkCount'; // added bookmarkCount
+  sortBy: 'createdAt' | 'name' | 'updatedAt' | 'bookmarkCount';
   onSortByChange: (value: 'createdAt' | 'name' | 'updatedAt' | 'bookmarkCount') => void;
   sortOrder: 'asc' | 'desc';
   onSortOrderChange: (value: 'asc' | 'desc') => void;
   isLoggedIn: boolean;
+  hasSheets: boolean; // NEW: indicates if any sheets exist in the database
   className?: string;
 }
 
-const SORT_OPTIONS = [
-  { value: 'bookmarkCount_desc', label: 'Most bookmarked' },
-  { value: 'bookmarkCount_asc', label: 'Least bookmarked' },
+// Full list of sort options (used when sheets exist)
+const FULL_SORT_OPTIONS = [
+  { value: 'bookmarkCount_desc', label: 'Most Bookmarked' },
+  { value: 'bookmarkCount_asc', label: 'Least Bookmarked' },
   { value: 'createdAt_desc', label: 'Newest' },
   { value: 'createdAt_asc', label: 'Oldest' },
-  { value: 'name_asc', label: 'Name (A-Z)' },
-  { value: 'name_desc', label: 'Name (Z-A)' },
+  // { value: 'name_asc', label: 'Name (A-Z)' },
+  // { value: 'name_desc', label: 'Name (Z-A)' },
 ];
 
-const VIEW_OPTIONS = [
+// Filtered sort options (without bookmark-related) when no sheets exist
+const NO_SHEETS_SORT_OPTIONS = FULL_SORT_OPTIONS.filter(
+  option => !option.value.startsWith('bookmarkCount')
+);
+
+// Full list of view options
+const FULL_VIEW_OPTIONS = [
   { value: 'all', label: 'All Sheets' },
   { value: 'mine', label: 'My Sheets' },
-  { value: 'bookmarked', label: 'Bookmarks' },
+  { value: 'bookmarked', label: 'Bookmarked' },
 ];
+
+// Filtered view options (without 'bookmarked') when no sheets exist
+const NO_SHEETS_VIEW_OPTIONS = FULL_VIEW_OPTIONS.filter(
+  option => option.value !== 'bookmarked'
+);
 
 export default function SheetFilterBar({
   search,
@@ -46,6 +60,7 @@ export default function SheetFilterBar({
   onSortByChange,
   onSortOrderChange,
   isLoggedIn,
+  hasSheets,
   className,
 }: SheetFilterBarProps) {
   const handleSortChange = useCallback((selectedValue: string) => {
@@ -55,6 +70,12 @@ export default function SheetFilterBar({
   }, [onSortByChange, onSortOrderChange]);
 
   const currentSortValue = `${sortBy}_${sortOrder}`;
+  const sortOptions = hasSheets ? FULL_SORT_OPTIONS : NO_SHEETS_SORT_OPTIONS;
+  const viewOptions = isLoggedIn ? (hasSheets ? FULL_VIEW_OPTIONS : NO_SHEETS_VIEW_OPTIONS) : [];
+
+  // Ensure current viewFilter is valid if it's 'bookmarked' but no sheets exist
+  // (This should be handled by the parent, but we can also guard here)
+  const effectiveViewFilter = (!hasSheets && viewFilter === 'bookmarked') ? 'all' : viewFilter;
 
   return (
     <div className={clsx(styles.filterBar, className)}>
@@ -72,18 +93,18 @@ export default function SheetFilterBar({
       </div>
 
       <div className={styles.filterControls}>
-        {isLoggedIn && (
+        {isLoggedIn && viewOptions.length > 0 && (
           <Select
-            value={viewFilter}
+            value={effectiveViewFilter}
             onChange={(value) => onViewFilterChange(value as 'all' | 'mine' | 'bookmarked')}
-            options={VIEW_OPTIONS}
+            options={viewOptions}
             className={styles.filterSelect}
             aria-label="Filter sheets"
           />
         )}
 
         <SortDropdown
-          options={SORT_OPTIONS}
+          options={sortOptions}
           value={currentSortValue}
           onChange={handleSortChange}
           label="Sort by"

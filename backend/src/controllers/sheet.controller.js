@@ -337,6 +337,20 @@ const getBookmarkedSheets = async (req, res, next) => {
   }
 };
 
+/**
+ * Get total count of active sheets.
+ * GET /api/v1/sheets/count
+ */
+const getSheetsCount = async (req, res, next) => {
+  try {
+    const Sheet = require('../models/Sheet');
+    const count = await Sheet.countDocuments({ isActive: true });
+    res.json(formatResponse('Total sheets count retrieved', { count }));
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createSheet,
   getSheets,
@@ -353,4 +367,5 @@ module.exports = {
   updateTargetDate,
   toggleBookmark,
   getBookmarkedSheets,
+  getSheetsCount,
 };

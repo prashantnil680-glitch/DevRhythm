@@ -155,4 +155,5 @@ export const sheetsKeys = {
   progress: (slug: string, username?: string) => [...sheetsKeys.detail(slug), 'progress', username ?? 'me'] as const,
   chart: (slug: string, username?: string) => [...sheetsKeys.detail(slug), 'chart', username ?? 'me'] as const,
   bookmarks: (params?: Record<string, any>) => [...sheetsKeys.all, 'bookmarks', params] as const,
+  count: () => [...sheetsKeys.all, 'count'] as const,
 };

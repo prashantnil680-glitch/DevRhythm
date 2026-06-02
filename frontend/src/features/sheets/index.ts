@@ -23,3 +23,4 @@ export { useCreateSheet } from './hooks/useCreateSheet';
 export { useImportSheet } from './hooks/useImportSheet';
 export { useUpdateSheet } from './hooks/useUpdateSheet';
 export { useDeleteSheet } from './hooks/useDeleteSheet';
+export { useSheetsCount } from './hooks/useSheetsCount';

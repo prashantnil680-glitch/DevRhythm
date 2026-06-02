@@ -191,4 +191,8 @@ export const sheetService = {
     );
     return response.data;
   },
+  async getSheetsCount(): Promise<{ count: number }> {
+    const response = await apiClient.get('/sheets/count');
+    return response.data;
+  },
 };

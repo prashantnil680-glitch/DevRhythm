@@ -67,6 +67,8 @@ router.post(
   sheetController.importSheet
 );
 
+router.get('/count', rateLimiters.publicLimiter, cache(300, 'sheets:count'), sheetController.getSheetsCount);
+
 // ========== Dynamic routes (with slug parameter) ==========
 router.get(
   '/:slug',

@@ -1,92 +1,250 @@
 .container {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
   width: 100%;
+  animation: fadeIn 0.3s ease-out;
 }
 
+/* Hero section (unchanged from previous, keep as is) */
 .heroSkeleton {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  border-bottom: 1px solid var(--divider);
+  padding: 0.5rem 0 0.75rem 0;
+  margin-bottom: 1.5rem;
 }
-
-.metadataSkeleton {
+.topRowSkeleton {
   display: flex;
-  gap: 1rem;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
 }
-
-.participantsSkeleton {
-  border-top: 1px solid var(--divider);
-  padding-top: 1rem;
+.kebabSkeleton {
+  border-radius: 50%;
 }
-
-.avatarGroupSkeleton {
+.metadataRowSkeleton {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.ownerSkeleton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.separatorSkeleton {
+  width: 4px;
+  height: 4px;
+  background-color: var(--text-muted);
+  border-radius: 50%;
+  display: inline-block;
+}
+.descriptionSkeleton {
+  margin: 0.5rem 0;
+}
+.bottomRowSkeleton {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
   margin-top: 0.5rem;
 }
+.participantsSkeleton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.avatarGroupSkeleton {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.avatarSkeleton {
+  border-radius: 50% !important;
+}
+.targetDateSkeleton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-elevated);
+  border-radius: 40px;
+  padding: 0.2rem 0.6rem;
+}
 
+/* Progress chart skeleton */
 .chartSkeleton {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+.metricsSkeleton {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
+}
+.metricItemSkeleton {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px dashed var(--divider);
+  padding-bottom: 0.25rem;
+}
+.chartCircleSkeleton {
+  flex-shrink: 0;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+}
+
+/* Questions section skeleton */
+.questionsSectionSkeleton {
+  margin: 1.5rem 0;
+}
+.sectionHeaderSkeleton {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--divider);
+}
+.viewAllSkeleton {
+  text-align: right;
+}
+.timelineSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.questionItemSkeleton {
+  display: flex;
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+.leftColumnSkeleton {
+  position: relative;
+  width: 28px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.nodeDotSkeleton {
+  border-radius: 50%;
+  margin-top: 0.2rem;
+}
+.verticalLineSkeleton {
+  position: absolute;
+  top: 14px;
+  bottom: -0.5rem;
+  width: 2px;
+  background-color: var(--divider);
+  left: 50%;
+  transform: translateX(-50%);
+}
+.rightColumnSkeleton {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--divider);
+}
+.titleSkeleton {
+  margin-bottom: 0.25rem;
+}
+.branchRowSkeleton {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: 0.25rem;
+}
+.branchSymbolSkeleton {
+  font-family: monospace;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  width: 20px;
+  flex-shrink: 0;
+}
+.branchContentSkeleton {
+  flex: 1;
+}
+.metadataRowSkeleton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.tagsSkeleton {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.statusRowSkeleton {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 1rem;
 }
 
-.statsRowSkeleton {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  flex-wrap: wrap;
+/* Participants section skeleton */
+.participantsSectionSkeleton {
+  margin-top: 1.5rem;
 }
-
-.chartCircle {
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  background: var(--bg-elevated);
+.sectionTitleSkeleton {
+  margin-bottom: 1rem;
 }
-
-.groupsSkeleton {
-  display: flex;
-  flex-direction: column;
+.participantsGridSkeleton {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1rem;
 }
-
-.groupSkeleton {
+.participantCardSkeleton {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  border-radius: 12px;
 }
-
-.questionSkeleton {
+.participantInfoSkeleton {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--divider);
+  gap: 0.25rem;
 }
 
 /* Responsive */
-@media (max-width: 767px) {
-  .heroSkeleton {
-    padding: 1rem;
+@media (max-width: 768px) {
+  .chartSkeleton {
+    flex-direction: column;
+    align-items: center;
   }
-  .chartCircle {
-    width: 150px;
-    height: 150px;
+  .chartCircleSkeleton {
+    width: 200px;
+    height: 200px;
   }
+  .leftColumnSkeleton {
+    display: none;
+  }
+  .branchSymbolSkeleton {
+    display: none;
+  }
+  .branchRowSkeleton {
+    margin-left: 0;
+  }
+  .participantsGridSkeleton {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Pulse animation */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.skeletonLoader {
+  animation: pulse 1.5s ease-in-out infinite;
 }

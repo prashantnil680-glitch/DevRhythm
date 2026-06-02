@@ -117,7 +117,7 @@ export const QuestionsPageClient: React.FC = () => {
 
   // Pagination – read from URL
   const page = parseInt(searchParams.get('page') || '1');
-  const limit = 10;
+  const limit = 20;
 
   // --- Store current page in sessionStorage whenever it changes (including page 1) ---
   useEffect(() => {

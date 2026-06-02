@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useUserProgress, useSheetChart } from '@/features/sheets';
+import { useUserProgress, useSheetChart, useSheet } from '@/features/sheets';
 import { ROUTES } from '@/shared/config';
 import Breadcrumb from '@/shared/components/Breadcrumb';
 import type { BreadcrumbItem } from '@/shared/components/Breadcrumb';
@@ -16,10 +16,14 @@ import styles from './page.module.css';
 export default function UserProgressPage() {
   const { slug, username } = useParams<{ slug: string; username: string }>();
 
+  // Fetch sheet details to get sheet name
+  const { data: sheetData, isLoading: sheetLoading } = useSheet(slug);
+  const sheetName = sheetData?.sheet?.name || '';
+
   const { data: progressData, isLoading, error } = useUserProgress(slug, username);
   const { data: chartData } = useSheetChart(slug, username);
 
-  if (isLoading) return <UserProgressSkeleton />;
+  if (isLoading || sheetLoading) return <UserProgressSkeleton />;
   if (error || !progressData) {
     return (
       <NotFoundPage
@@ -47,7 +51,7 @@ export default function UserProgressPage() {
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: 'Home', href: ROUTES.DASHBOARD },
     { label: 'Sheets', href: ROUTES.SHEETS.ROOT },
-    { label: 'Sheet', href: ROUTES.SHEETS.DETAIL(slug) },
+    { label: sheetName || 'Sheet', href: ROUTES.SHEETS.DETAIL(slug) },
     { label: `Progress of ${username}` },
   ];
 
@@ -63,6 +67,7 @@ export default function UserProgressPage() {
       <UserProgressHeader
         username={username}
         sheetSlug={slug}
+        sheetName={sheetName}
         joinedAt={joinedAt}
         targetDate={targetDate}
         completedAt={completedAt}

@@ -477,42 +477,22 @@ class SheetService {
       _id: { $in: sheet.questions },
       isActive: true,
     })
-      .select('_id title problemLink platform platformQuestionId difficulty tags pattern')
+      .select('_id title problemLink platform platformQuestionId difficulty tags')
       .lean();
 
+    // Preserve original order and add tagsSlugs
     const orderedQuestions = sheet.questions
-      .map(qid => questions.find(q => q._id.toString() === qid.toString()))
+      .map(qid => {
+        const q = questions.find(qq => qq._id.toString() === qid.toString());
+        if (!q) return null;
+        // Compute tagsSlugs from tags array
+        const tagsSlugs = (q.tags || []).map(tag => slugify(tag));
+        return {
+          ...q,
+          tagsSlugs,
+        };
+      })
       .filter(Boolean);
-
-    // Tag grouping with deduplication
-    const tagToQuestions = new Map();
-    for (const q of orderedQuestions) {
-      const tags = q.tags && q.tags.length ? q.tags : ['Uncategorized'];
-      for (const tag of tags) {
-        if (!tagToQuestions.has(tag)) tagToQuestions.set(tag, []);
-        tagToQuestions.get(tag).push(q);
-      }
-    }
-
-    const tagSignature = new Map();
-    for (const [tag, qs] of tagToQuestions.entries()) {
-      const questionIds = qs.map(q => q._id.toString()).sort();
-      const signature = questionIds.join('|');
-      tagSignature.set(tag, signature);
-    }
-
-    const groups = new Map();
-    for (const [tag, signature] of tagSignature.entries()) {
-      if (!groups.has(signature)) {
-        groups.set(signature, { tags: [], questions: tagToQuestions.get(tag) });
-      }
-      groups.get(signature).tags.push(tag);
-    }
-
-    const tagGroups = Array.from(groups.values()).map(group => ({
-      tags: group.tags.sort(),
-      questions: group.questions,
-    }));
 
     // Participants list
     const memberships = await SheetMembership.find({ sheetId: sheet._id })
@@ -576,7 +556,6 @@ class SheetService {
       const owner = await User.findById(sheet.ownerId).select('displayName username').lean();
       ownerDisplayName = owner?.displayName || owner?.username || 'Anonymous User';
     }
-    
 
     return {
       sheet: {
@@ -594,7 +573,6 @@ class SheetService {
         updatedAt: sheet.updatedAt,
       },
       questions: orderedQuestions,
-      tagGroups,
       participants,
       stats: {
         totalParticipants,
@@ -640,7 +618,7 @@ class SheetService {
       _id: { $in: sheet.questions },
       isActive: true,
     })
-      .select('_id title problemLink platform platformQuestionId difficulty tags pattern')
+      .select('_id title problemLink platform platformQuestionId difficulty tags')
       .lean();
 
     const orderedProgress = sheet.questions.map(qid => {

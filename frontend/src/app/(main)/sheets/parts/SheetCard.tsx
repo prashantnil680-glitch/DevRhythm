@@ -15,7 +15,7 @@ import styles from './SheetCard.module.css';
 interface SheetCardProps {
   sheet: SheetWithStats;
   isOwner: boolean;
-  isJoined: boolean;   // NEW: whether current user has joined this sheet
+  isJoined: boolean;
   onJoin: () => void;
   className?: string;
 }
@@ -33,17 +33,19 @@ export default function SheetCard({ sheet, isOwner, isJoined, onJoin, className 
     originalSourceName,
     originalSourceUrl,
   } = sheet;
+
   const formattedDate = format(new Date(createdAt), 'MMM d, yyyy');
 
-  const ownerParticipant = ownerId ? participants.find(p => p.userId === ownerId) : null;
-  const ownerName = ownerParticipant?.username ||  'Anonymous User';
+  const ownerParticipant = participants.find(p => p.userId === ownerId);
+  const ownerName = ownerParticipant?.username || 'Anonymous User';
   const displayName = ownerParticipant?.displayName || ownerName;
   const ownerAvatar = ownerParticipant?.avatarUrl;
 
-  const displayParticipants = participants.slice(0, 4);
-  const remainingCount = Math.max(0, participantCount - 4);
+  // Exclude owner from participant display to avoid duplication (owner is already shown separately)
+  const otherParticipants = participants.filter(p => p.userId !== ownerId);
+  const displayParticipants = otherParticipants.slice(0, 4);
+  const remainingCount = Math.max(0, participantCount - 1 - 4); // subtract owner and shown ones
 
-  // Show "View" if owner or already joined, otherwise "Join"
   const showViewButton = isOwner || isJoined;
   const buttonText = showViewButton ? 'View' : 'Join';
   const buttonVariant = showViewButton ? 'outline' : 'primary';
@@ -56,39 +58,92 @@ export default function SheetCard({ sheet, isOwner, isJoined, onJoin, className 
     }
   };
 
+  // Determine if metadata row should be shown (any of participants, tag, source)
+  const hasParticipants = otherParticipants.length > 0;
+  const hasTag = !!specialTag;
+  const hasSource = !!originalSourceName;
+  const showMetadata = hasParticipants || hasTag || hasSource;
+
   return (
     <Card className={clsx(styles.card, className)} noHover>
       <div className={styles.cardContent}>
-        <div className={styles.cardHeader}>
-          <div className={styles.titleSection}>
-            <h3 className={styles.sheetTitle}>
-              <Link href={ROUTES.SHEETS.DETAIL(slug)} className={styles.titleLink}>
-                {name}
-              </Link>
-            </h3>
-            <Button
-              variant={buttonVariant}
-              size="sm"
-              onClick={handleAction}
-              className={styles.actionButton}
-            >
-              {buttonText}
-            </Button>
-          </div>
-          <p className={styles.description}>{description}</p>
+        {/* Top row: title + action */}
+        <div className={styles.topRow}>
+          <h3 className={styles.sheetTitle}>
+            <Link href={ROUTES.SHEETS.DETAIL(slug)} className={styles.titleLink}>
+              {name}
+            </Link>
+          </h3>
+          <Button
+            variant={buttonVariant}
+            size="sm"
+            onClick={handleAction}
+            className={styles.actionButton}
+          >
+            {buttonText}
+          </Button>
         </div>
 
-        {(specialTag || originalSourceName) && (
-          <div className={styles.tagsRow}>
-            {specialTag && (
+        {/* Owner + date row (always shown) */}
+        <div className={styles.ownerRow}>
+          {ownerName !== 'Anonymous User' ? (
+            <Link
+              href={ROUTES.SHEETS.PROGRESS(slug, ownerName)}
+              className={styles.ownerLink}
+              title={`View ${ownerName}'s progress`}
+            >
+              <Avatar src={ownerAvatar} name={ownerName} size="xs" className={styles.ownerAvatar} />
+              <span className={styles.ownerName}>{displayName}</span>
+            </Link>
+          ) : (
+            <div className={styles.ownerAvatarWrapper}>
+              <Avatar src={ownerAvatar} name={ownerName} size="xs" className={styles.ownerAvatar} />
+              <span className={styles.ownerName}>{displayName}</span>
+            </div>
+          )}
+          <span className={styles.separator}>•</span>
+          <span>
+            <FiCalendar size={12} style={{ display: 'inline', marginRight: '0.25rem' }} />
+            {formattedDate}
+          </span>
+        </div>
+
+        {/* Description – only if present */}
+        {description && <p className={styles.description}>{description}</p>}
+
+        {/* Metadata row – only if at least one of participants, tag, source exists */}
+        {showMetadata && (
+          <div className={styles.metadataRow}>
+            {/* Participant avatars – only if there are participants besides owner */}
+            {hasParticipants && (
+              <div className={styles.participantGroup}>
+                <FiUsers size={12} style={{ marginRight: '0.25rem' }} />
+                {displayParticipants.map((p, idx) => (
+                  <Link
+                    key={p.userId}
+                    href={ROUTES.SHEETS.PROGRESS(slug, p.username)}
+                    className={styles.avatarLink}
+                    title={`View ${p.username}'s progress`}
+                  >
+                    <Avatar src={p.avatarUrl} name={p.username} size="xs" />
+                  </Link>
+                ))}
+                {remainingCount > 0 && <span className={styles.extraCount}>+{remainingCount}</span>}
+              </div>
+            )}
+
+            {/* Special tag */}
+            {hasTag && (
               <Badge variant="info" size="sm" className={styles.specialTag}>
                 <FiTag className={styles.tagIcon} />
                 {specialTag}
               </Badge>
             )}
-            {originalSourceName && (
+
+            {/* Source badge */}
+            {hasSource && (
               <div className={styles.sourceBadge}>
-                <span>Source: </span>
+                <span>Source:</span>
                 {originalSourceUrl ? (
                   <a
                     href={originalSourceUrl}
@@ -97,66 +152,15 @@ export default function SheetCard({ sheet, isOwner, isJoined, onJoin, className 
                     className={styles.sourceLink}
                   >
                     {originalSourceName}
-                    <FiExternalLink className={styles.externalIcon} />
+                    <FiExternalLink size={10} style={{ marginLeft: '0.25rem' }} />
                   </a>
                 ) : (
-                  <span className={styles.sourceName}>{originalSourceName}</span>
+                  <span>{originalSourceName}</span>
                 )}
               </div>
             )}
           </div>
         )}
-
-        <div className={styles.ownerInfo}>
-          <span className={styles.ownerLabel}>Created by:</span>
-          {ownerName !== 'Anonymous User' ? (
-            <Link
-              href={ROUTES.SHEETS.PROGRESS(slug, ownerName)}
-              className={styles.ownerLink}
-              title={`View ${ownerName}'s progress`}
-            >
-              <div className={styles.ownerAvatarWrapper}>
-                <div className={styles.ownerAvatarContainer}>
-                  <Avatar src={ownerAvatar} name={ownerName} size="xs" className={styles.ownerAvatar} />
-                </div>
-                <span className={styles.ownerName}>{displayName || ownerName}</span>
-              </div>
-            </Link>
-          ) : (
-            <div className={styles.ownerAvatarWrapper}>
-              <div className={styles.ownerAvatarContainer}>
-                <Avatar src={ownerAvatar} name={ownerName} size="xs" className={styles.ownerAvatar} />
-              </div>
-              <span className={styles.ownerName}>{displayName || ownerName}</span>
-            </div>
-          )}
-        </div>
-
-        <div className={styles.participantsSection}>
-          <div className={styles.participantHeader}>
-            <FiUsers className={styles.participantIcon} />
-            <span className={styles.participantCount}>
-              Participants ({participantCount})
-            </span>
-          </div>
-          <div className={styles.avatarGroupWrapper}>
-            {displayParticipants.map((p, idx) => (
-              <Link
-                key={p.userId}
-                href={ROUTES.SHEETS.PROGRESS(slug, p.username)}
-                className={clsx(styles.avatarLink, idx === 0 && styles.firstAvatar)}
-                title={`View ${p.username}'s progress`}
-              >
-                <Avatar src={p.avatarUrl} name={p.username} size="sm" />
-              </Link>
-            ))}
-            {remainingCount > 0 && (
-              <div className={styles.extraBadge}>
-                +{remainingCount}
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     </Card>
   );

@@ -47,6 +47,7 @@ export interface SheetQuestion {
   platformQuestionId: string;
   difficulty: Difficulty;
   tags: string[];
+  tagsSlugs: string[];
 }
 
 // ===== Tag Grouping =====

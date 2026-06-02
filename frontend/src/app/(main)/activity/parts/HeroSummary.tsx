@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, addDays, subDays } from 'date-fns';
-import { FiStar, FiArrowLeft, FiArrowRight, FiCalendar, FiEye } from 'react-icons/fi';
+import { FiArrowLeft, FiArrowRight, FiCalendar, FiEye, FiStar } from 'react-icons/fi';
 import { useTodayActivity, useDayActivity } from '@/features/activity/hooks/useActivityData';
 import Tooltip from '@/shared/components/Tooltip';
 import styles from './HeroSummary.module.css';
@@ -18,10 +18,8 @@ export default function HeroSummary({ date }: HeroSummaryProps) {
   const dayQuery = useDayActivity(date || '');
   const { data, isLoading, error } = date ? dayQuery : todayQuery;
 
-  // console.log("================ Data : ", data);
   const isDayPage = !!date;
 
-  // Compute previous and next day dates (only on day page and when data loaded)
   let prevDate = null;
   let nextDate = null;
   if (isDayPage && data?.date) {
@@ -32,71 +30,15 @@ export default function HeroSummary({ date }: HeroSummaryProps) {
 
   const handlePrevDay = () => {
     if (prevDate) {
-      const prevDateStr = format(prevDate, 'yyyy-MM-dd');
-      router.push(`/activity/${prevDateStr}`);
+      router.push(`/activity/${format(prevDate, 'yyyy-MM-dd')}`);
     }
   };
 
   const handleNextDay = () => {
     if (nextDate) {
-      const nextDateStr = format(nextDate, 'yyyy-MM-dd');
-      router.push(`/activity/${nextDateStr}`);
+      router.push(`/activity/${format(nextDate, 'yyyy-MM-dd')}`);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.header}>
-          <div className={styles.skeletonDate} />
-          <div className={styles.skeletonAction} />
-        </div>
-        <div className={styles.statsGrid}>
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className={styles.statItem}>
-              <div className={styles.skeletonValue} />
-              <div className={styles.skeletonLabel} />
-            </div>
-          ))}
-        </div>
-        <div className={styles.goalRow}>
-          <div className={styles.skeletonProgress} />
-          <div className={styles.skeletonProgress} />
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.header}>
-          <h3 className={styles.title}>{date ? `Activity for ${date}` : "Today's Activity"}</h3>
-          {isDayPage ? (
-            <div className={styles.dayNavButtons}>
-              <button className={styles.navButton} onClick={handlePrevDay} disabled={!prevDate}>
-                <FiArrowLeft size={14} /> Prev
-              </button>
-              <button className={styles.navButton} onClick={handleNextDay} disabled={!nextDate}>
-                Next <FiArrowRight size={14} />
-              </button>
-            </div>
-          ) : (
-            <Link href="/progress" className={styles.viewAllLink}>
-              View All →
-            </Link>
-          )}
-        </div>
-        <div className={styles.errorState}>
-          <Tooltip content={error?.message || 'Unable to load activity data'}>
-            <span>Could not load activity{date ? ` for ${date}` : ' today'}</span>
-          </Tooltip>
-        </div>
-      </div>
-    );
-  }
-
-  const formattedDate = format(new Date(data.date), 'EEEE, MMMM d, yyyy');
 
   const formatStudyTime = (minutes: number) => {
     if (minutes >= 60) {
@@ -107,94 +49,115 @@ export default function HeroSummary({ date }: HeroSummaryProps) {
     return `${minutes}m`;
   };
 
-  const isHighStudyTime = data.studyTimeMinutes >= 120;
+  if (isLoading) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.headerRow}>
+          <div className={styles.skeletonDate} />
+          <div className={styles.skeletonActions} />
+        </div>
+        <div className={styles.statsRow}>
+          <div className={styles.skeletonStat} />
+          <div className={styles.skeletonStat} />
+          <div className={styles.skeletonStat} />
+          <div className={styles.skeletonStat} />
+        </div>
+        <div className={styles.skeletonProgress} />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    const errorMessage = error?.message || 'Unable to load activity data';
+    return (
+      <div className={styles.container}>
+        <div className={styles.headerRow}>
+          <h3 className={styles.title}>{date ? `Activity for ${date}` : "Today's Activity"}</h3>
+        </div>
+        <div className={styles.errorState}>
+          <Tooltip content={errorMessage}>
+            <span>Could not load activity{date ? ` for ${date}` : ' today'}</span>
+          </Tooltip>
+        </div>
+      </div>
+    );
+  }
+
+  const formattedDate = format(new Date(data.date), 'EEEE, MMMM d, yyyy');
+  const studyTime = formatStudyTime(data.studyTimeMinutes);
+  const goalPercent = data.goalCompletion || 0;
+
+  // Progress highlighting thresholds
   const isHighProblems = data.problemsSolved >= 5;
+  const isHighStudyTime = data.studyTimeMinutes >= 120;
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <div className={styles.titleGroup}>
+      {/* Header row */}
+      <div className={styles.headerRow}>
+        <div className={styles.dateGroup}>
           <FiCalendar className={styles.calendarIcon} />
-          <Link href={`/activity/${data.date}`} className={styles.titleLink}>
-            <h2 className={styles.title}>{formattedDate}</h2>
-          </Link>
+          {isDayPage ? (
+            <span className={styles.title}>{formattedDate}</span>
+          ) : (
+            <Link href={`/activity/${data.date}`} className={styles.titleLink}>
+              <span className={styles.title}>{formattedDate}</span>
+            </Link>
+          )}
         </div>
-        {isDayPage ? (
-          <div className={styles.dayNavButtons}>
-            <button className={styles.navButton} onClick={handlePrevDay} disabled={!prevDate}>
-              <FiArrowLeft size={14} /> Prev
-            </button>
-            <button className={styles.navButton} onClick={handleNextDay} disabled={!nextDate}>
-              Next <FiArrowRight size={14} />
-            </button>
-          </div>
-        ) : (
-          <Link href={`/activity/${data.date}`} className={styles.viewDayLink}>
-            <FiEye size={14} /> Full Day View <FiArrowRight size={14} />
-          </Link>
-        )}
-      </div>
-
-      <div className={styles.statsGrid}>
-        {/* Problems Solved */}
-        <div className={styles.statItem}>
-          <div className={styles.statValueWrapper}>
-            <span className={styles.statValue}>{data.problemsSolved}</span>
-            {isHighProblems && (
-              <Tooltip content="Amazing! 5+ problems solved today! 🎉">
-                <span className={styles.starBadge}>
-                  <FiStar size={16} />
-                </span>
-              </Tooltip>
-            )}
-          </div>
-          <span className={styles.statLabel}>Problems Solved</span>
-        </div>
-
-        {/* Revisions Completed */}
-        <div className={styles.statItem}>
-          <span className={styles.statValue}>{data.revisionsCompleted}</span>
-          <span className={styles.statLabel}>Revisions</span>
-        </div>
-
-        {/* Study Time */}
-        <div className={styles.statItem}>
-          <div className={styles.statValueWrapper}>
-            <span className={styles.statValue}>{formatStudyTime(data.studyTimeMinutes)}</span>
-            {isHighStudyTime && (
-              <Tooltip content="Great focus! 2+ hours of study today! 💪">
-                <span className={styles.starBadge}>
-                  <FiStar size={16} />
-                </span>
-              </Tooltip>
-            )}
-          </div>
-          <span className={styles.statLabel}>Today Study Time</span>
-        </div>
-
-        {/* Goal Completion */}
-        <div className={styles.statItem}>
-          <div className={styles.goalProgressWrapper}>
-            <span className={styles.statValue}>{data.goalCompletion}%</span>
-            <span className={styles.statLabel}>Daily Goal</span>
-          </div>
-          <div className={styles.progressContainer}>
-            <div
-              className={styles.progressFill}
-              style={{ width: `${data.goalCompletion}%` }}
-            />
-            <span className={styles.progressCount}>
-              {data.problemsSolved}/{data.goalTarget}
-            </span>
-          </div>
+        <div className={styles.actions}>
+          {isDayPage ? (
+            <div className={styles.dayNavButtons}>
+              <button onClick={handlePrevDay} disabled={!prevDate} className={styles.navButton}>
+                <FiArrowLeft size={14} /> Prev
+              </button>
+              <button onClick={handleNextDay} disabled={!nextDate} className={styles.navButton}>
+                Next <FiArrowRight size={14} />
+              </button>
+            </div>
+          ) : (
+            <Link href={`/activity/${data.date}`} className={styles.viewDayLink}>
+              <FiEye size={14} /> Full Day View <FiArrowRight size={14} />
+            </Link>
+          )}
         </div>
       </div>
 
-      {data.goalAchieved && (
-        <div className={styles.goalAchievedBadge}>
-          <span className={styles.badge}>🎯 Goal achieved</span>
+      {/* Stats row (inline with separators) */}
+      <div className={styles.statsRow}>
+        <span className={styles.stat}>
+          <strong>{data.problemsSolved}</strong> problems solved
+          {isHighProblems && (
+            <Tooltip content="Great progress! 5+ problems solved today! 🎉">
+              <FiStar className={styles.starIcon} />
+            </Tooltip>
+          )}
+        </span>
+        <span className={styles.separator}>•</span>
+        <span className={styles.stat}>
+          <strong>{data.revisionsCompleted}</strong> revisions completed
+        </span>
+        <span className={styles.separator}>•</span>
+        <span className={styles.stat}>
+          <strong>{studyTime}</strong> study time
+          {isHighStudyTime && (
+            <Tooltip content="Amazing focus! 2+ hours of study today! 💪">
+              <FiStar className={styles.starIcon} />
+            </Tooltip>
+          )}
+        </span>
+        {/* Goal percent is commented out as requested */}
+      </div>
+
+      {/* Progress bar (commented out – uncomment if needed) */}
+      {/* <div className={styles.progressWrapper}>
+        <div className={styles.progressBar}>
+          <div className={styles.progressFill} style={{ width: `${goalPercent}%` }} />
         </div>
-      )}
+        <span className={styles.progressLabel}>
+          {data.problemsSolved}/{data.goalTarget} problems completed today
+        </span>
+      </div> */}
     </div>
   );
 }

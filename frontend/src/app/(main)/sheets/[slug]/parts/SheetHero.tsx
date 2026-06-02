@@ -1,12 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { FiCalendar, FiEdit2, FiTrash2, FiLogOut, FiLogIn, FiClock, FiUsers } from 'react-icons/fi';
-import clsx from 'clsx';
-import Card from '@/shared/components/Card';
-import Button from '@/shared/components/Button';
+import { FiUsers, FiCalendar, FiEdit2, FiTrash2, FiLogOut, FiLogIn, FiClock, FiMoreVertical } from 'react-icons/fi';
 import { Avatar } from '@/shared/components/Avatar';
+import Button from '@/shared/components/Button';
 import Badge from '@/shared/components/Badge';
 import { ROUTES } from '@/shared/config';
 import type { Sheet, Participant } from '@/features/sheets';
@@ -39,13 +38,21 @@ export default function SheetHero({
   onEdit,
   onDelete,
 }: SheetHeroProps) {
+  const [showMenu, setShowMenu] = useState(false);
+
   const { name, description, ownerId, createdAt, specialTag, originalSourceName, originalSourceUrl, slug } = sheet;
   const formattedCreatedAt = format(new Date(createdAt), 'MMM d, yyyy');
 
-  const ownerParticipant = ownerId ? participants.find(p => p.userId === ownerId) : null;
-  const ownerName = ownerParticipant?.username ||  'Anonymous User';
+  const ownerParticipant = participants.find(p => p.userId === ownerId);
+  const ownerName = ownerParticipant?.username || 'Anonymous User';
   const ownerAvatar = ownerParticipant?.avatarUrl;
   const ownerDisplayName = ownerParticipant?.displayName || ownerName;
+
+  // Participants excluding owner
+  const otherParticipants = participants.filter(p => p.userId !== ownerId);
+  const otherParticipantsCount = otherParticipants.length;
+  const displayParticipants = otherParticipants.slice(0, 4);
+  const remainingParticipants = otherParticipantsCount - displayParticipants.length;
 
   const targetDateObj = targetDate ? new Date(targetDate) : null;
   const isOverdue = targetDateObj && targetDateObj < new Date();
@@ -53,149 +60,146 @@ export default function SheetHero({
     ? Math.ceil((targetDateObj.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
     : null;
 
-  // Stacked avatars: show up to 6, with negative margin
-  const displayParticipants = participants.slice(0, 6);
-  const remainingCount = Math.max(0, totalParticipants - 6);
+  const toggleMenu = () => setShowMenu(prev => !prev);
+  const closeMenu = () => setShowMenu(false);
+
+  const handleMenuAction = (callback: () => void) => {
+    callback();
+    closeMenu();
+  };
 
   return (
-    <Card className={styles.hero} noHover>
-      <div className={styles.heroContent}>
-        <div className={styles.header}>
-          <h1 className={styles.title}>{name}</h1>
-          {isOwner && (
-            <div className={styles.ownerActions}>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onEdit}
-                leftIcon={<FiEdit2 />}
-                className={styles.actionBtn}
-              >
-                Edit
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onDelete}
-                leftIcon={<FiTrash2 />}
-                className={styles.actionBtn}
-              >
-                Delete
-              </Button>
-            </div>
-          )}
-        </div>
-
-        <p className={styles.description}>{description}</p>
-
-        {(specialTag || originalSourceName) && (
-          <div className={styles.tagsRow}>
-            {specialTag && (
-              <Badge variant="info" size="md" className={styles.specialTag}>
-                {specialTag}
-              </Badge>
-            )}
-            {originalSourceName && (
-              <div className={styles.sourceBadge}>
-                <span>Source:</span>
-                {originalSourceUrl ? (
-                  <a
-                    href={originalSourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.sourceLink}
-                  >
-                    {originalSourceName}
-                  </a>
-                ) : (
-                  <span className={styles.sourceName}>{originalSourceName}</span>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-      <div className={styles.ownerInfo}>
-        <span className={styles.metaLabel}>Created by:</span>
-        {ownerName !== 'Anonymous User' ? (
-          <Link
-            href={ROUTES.SHEETS.PROGRESS(slug, ownerName)}
-            className={styles.ownerLink}
-            title={`View ${ownerName}'s progress`}
-          >
-            <div className={styles.ownerAvatarWrapper}>
-              <Avatar src={ownerAvatar} name={ownerDisplayName || ownerName} size="sm" className={styles.ownerAvatar} />
-              <span className={styles.ownerName}>{ownerDisplayName || ownerName}</span>
-            </div>
-          </Link>
-        ) : (
-          <div className={styles.ownerAvatarWrapper}>
-            <Avatar src={ownerAvatar} name={ownerDisplayName || ownerName} size="sm" className={styles.ownerAvatar} />
-            <span className={styles.ownerName}>{ownerDisplayName || ownerName}</span>
-          </div>
-        )}
-      </div>
-
-        {/* Participants section – stacked avatars */}
-        <div className={styles.participantsRow}>
-          <div className={styles.participantAvatars}>
-            {displayParticipants.map((p, idx) => (
-              <Link
-                key={p.userId}
-                href={ROUTES.SHEETS.PROGRESS(slug, p.username)}
-                className={clsx(styles.avatarLink, idx === 0 && styles.firstAvatar)}
-                title={`View ${p.username}'s progress`}
-              >
-                <Avatar src={p.avatarUrl} name={p.username} size="md" />
-              </Link>
-            ))}
-            {remainingCount > 0 && (
-              <div className={styles.extraCount}>
-                +{remainingCount}
-              </div>
-            )}
-          </div>
-          <div className={styles.participantStats}>
-            <FiUsers className={styles.usersIcon} />
-            <span>{totalParticipants} participants</span>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className={styles.actionsRow}>
+    <div className={styles.hero}>
+      {/* Top row: title + primary action + kebab menu */}
+      <div className={styles.topRow}>
+        <h1 className={styles.title}>{name}</h1>
+        <div className={styles.actions}>
           {!hasJoined && !isOwner && (
-            <Button variant="primary" size="md" onClick={onJoin} leftIcon={<FiLogIn />}>
-              Join Sheet
+            <Button variant="primary" size="sm" onClick={onJoin} leftIcon={<FiLogIn />}>
+              Join
             </Button>
           )}
           {hasJoined && !isOwner && (
-            <Button variant="outline" size="md" onClick={onLeave} leftIcon={<FiLogOut />}>
-              Leave Sheet
+            <Button variant="outline" size="sm" onClick={onLeave} leftIcon={<FiLogOut />}>
+              Leave
             </Button>
           )}
-          {hasJoined && targetDate && (
-            <div className={styles.targetDateWrapper}>
-              <div className={styles.targetDateInfo}>
-                <FiClock className={styles.targetIcon} />
-                <span>Target: {format(new Date(targetDate), 'MMM d, yyyy')}</span>
-                {isOverdue && <Badge variant="error" size="sm">Overdue</Badge>}
-                {daysLeft !== null && daysLeft >= 0 && !isOverdue && (
-                  <Badge variant="success" size="sm">{daysLeft} days left</Badge>
-                )}
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onUpdateTargetDate}
-                leftIcon={<FiEdit2 />}
-                className={styles.updateTargetBtn}
-              >
-                Update
-              </Button>
+          {(isOwner || hasJoined) && (
+            <div className={styles.menuWrapper}>
+              <button className={styles.kebabButton} onClick={toggleMenu} aria-label="More actions">
+                <FiMoreVertical />
+              </button>
+              {showMenu && (
+                <div className={styles.menuDropdown}>
+                  {isOwner && (
+                    <>
+                      <button onClick={() => handleMenuAction(onEdit)} className={styles.menuItem}>
+                        <FiEdit2 /> Edit Sheet
+                      </button>
+                      <button onClick={() => handleMenuAction(onDelete)} className={styles.menuItem}>
+                        <FiTrash2 /> Delete Sheet
+                      </button>
+                    </>
+                  )}
+                  {hasJoined && !isOwner && (
+                    <button onClick={() => handleMenuAction(onLeave)} className={styles.menuItem}>
+                      <FiLogOut /> Leave Sheet
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
-    </Card>
+
+      {/* Metadata row (owner, date, tags, source) */}
+      <div className={styles.metadataRow}>
+        <div className={styles.ownerInfo}>
+          {ownerName !== 'Anonymous User' ? (
+            <Link href={ROUTES.SHEETS.PROGRESS(slug, ownerName)} className={styles.ownerLink}>
+              <Avatar src={ownerAvatar} name={ownerDisplayName} size="xs" className={styles.ownerAvatar} />
+              <span>{ownerDisplayName}</span>
+            </Link>
+          ) : (
+            <div className={styles.ownerInfo}>
+              <Avatar src={ownerAvatar} name={ownerDisplayName} size="xs" className={styles.ownerAvatar} />
+              <span>{ownerDisplayName}</span>
+            </div>
+          )}
+        </div>
+        <span className={styles.separator}>•</span>
+        <span className={styles.date}>
+          <FiCalendar size={12} /> {formattedCreatedAt}
+        </span>
+        {specialTag && (
+          <>
+            <span className={styles.separator}>•</span>
+            <Badge variant="info" size="sm" className={styles.specialTag}>
+              {specialTag}
+            </Badge>
+          </>
+        )}
+        {originalSourceName && (
+          <>
+            <span className={styles.separator}>•</span>
+            <div className={styles.sourceBadge}>
+              <span>Source:</span>
+              {originalSourceUrl ? (
+                <a href={originalSourceUrl} target="_blank" rel="noopener noreferrer">
+                  {originalSourceName}
+                </a>
+              ) : (
+                <span>{originalSourceName}</span>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Description (optional) */}
+      {description && <p className={styles.description}>{description}</p>}
+
+      {/* Bottom row: participants + target date */}
+      <div className={styles.bottomRow}>
+        {otherParticipantsCount > 0 && (
+          <div className={styles.participants}>
+            <FiUsers className={styles.participantsIcon} />
+            <span className={styles.participantCount}>
+              {otherParticipantsCount} participant{otherParticipantsCount !== 1 && 's'}
+            </span>
+            <div className={styles.avatarGroup}>
+              {displayParticipants.map((p, idx) => (
+                <Link
+                  key={p.userId}
+                  href={ROUTES.SHEETS.PROGRESS(slug, p.username)}
+                  className={styles.avatarLink}
+                  title={`View ${p.username}'s progress`}
+                >
+                  <Avatar src={p.avatarUrl} name={p.username} size="xs" />
+                </Link>
+              ))}
+              {remainingParticipants > 0 && <span className={styles.extraCount}>+{remainingParticipants}</span>}
+            </div>
+          </div>
+        )}
+
+        {hasJoined && targetDate && (
+          <div className={styles.targetDateWrapper}>
+            <FiClock className={styles.targetIcon} />
+            <span className={styles.targetDate}>
+              Target: {format(new Date(targetDate), 'MMM d, yyyy')}
+            </span>
+            {isOverdue && <Badge variant="error" size="sm">Overdue</Badge>}
+            {daysLeft !== null && daysLeft >= 0 && !isOverdue && (
+              <Badge variant="success" size="sm">{daysLeft} days left</Badge>
+            )}
+            <button onClick={onUpdateTargetDate} className={styles.updateTargetBtn} title="Update target date">
+              <FiEdit2 size={12} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

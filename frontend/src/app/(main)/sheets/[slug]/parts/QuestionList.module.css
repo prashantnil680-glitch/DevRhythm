@@ -1,0 +1,222 @@
+.container {
+  width: 100%;
+}
+
+.questionItem {
+  display: flex;
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+
+/* Left column: dot and vertical line */
+.leftColumn {
+  position: relative;
+  width: 28px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.nodeDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--border);
+  transition: all 0.2s ease;
+  z-index: 2;
+  position: relative;
+  margin-top: 0.2rem;
+}
+
+.nodeSolved {
+  background-color: var(--accent-moss);
+  box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px rgba(108, 122, 110, 0.2);
+}
+
+.verticalLine {
+  position: absolute;
+  top: 14px;
+  bottom: -0.5rem;
+  width: 2px;
+  background-color: var(--divider);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Right column */
+.rightColumn {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--divider);
+}
+
+.titleRow {
+  margin-bottom: 0.25rem;
+}
+
+.questionTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.questionTitle:hover {
+  color: var(--accent-moss);
+  /* text-decoration: underline; */
+}
+
+.branchRow {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: 0.25rem;
+}
+
+.branchSymbol {
+  font-family: monospace;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  user-select: none;
+  flex-shrink: 0;
+  width: 20px;
+}
+
+.branchContent {
+  flex: 1;
+}
+
+.metadataRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.platform {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+}
+
+.questionTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Make platform and difficulty links consistent */
+.difficultyLink,
+.platformLink {
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.difficultyLink:hover,
+.platformLink:hover {
+  opacity: 0.8;
+}
+
+/* Ensure the platform span inside the link retains its original style */
+.platformLink .platform {
+  cursor: pointer;
+}
+
+.tagLink {
+  font-size: 0.7rem;
+  color: var(--accent-moss);
+  background: rgba(108, 122, 110, 0.12);
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.tagLink:hover {
+  background: rgba(108, 122, 110, 0.25);
+  text-decoration: underline;
+}
+
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.75rem;
+}
+
+.userStatus {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.statusIcon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--text-muted);
+}
+
+.statusIcon.solved {
+  color: #2e7d32;
+}
+
+.statusIcon.revised {
+  color: var(--accent-moss);
+}
+
+.notJoined {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.lockIcon {
+  font-size: 0.8rem;
+}
+
+.participantStats {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  padding: 0.2rem 0.5rem;
+  border-radius: 20px;
+}
+
+.usersIcon {
+  font-size: 0.8rem;
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .leftColumn {
+    display: none;
+  }
+  .branchRow {
+    margin-left: 0;
+  }
+  .branchSymbol {
+    display: none;
+  }
+  .titleRow {
+    margin-bottom: 0.5rem;
+  }
+  .metadataRow {
+    flex-wrap: wrap;
+  }
+  .statusRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}

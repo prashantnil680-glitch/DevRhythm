@@ -1,44 +1,42 @@
 .card {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 12px;         /* slightly smaller radius */
   overflow: hidden;
 }
 
 .card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px var(--shadow);
   border-color: var(--accent-moss);
 }
 
 .cardContent {
-  padding: 1.25rem;
+  padding: 0.75rem 1rem;       /* compact padding */
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;                 /* tight internal spacing */
 }
 
-.cardHeader {
-  margin-bottom: 1rem;
-}
-
-.titleSection {
+/* Top row: title + action button */
+.topRow {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
-  margin-bottom: 0.5rem;
 }
 
 .sheetTitle {
   font-family: var(--font-heading);
-  font-size: 1.25rem;
+  font-size: 1.3rem;
   font-weight: 600;
   margin: 0;
   line-height: 1.3;
+  color: var(--text-primary);
 }
 
 .titleLink {
   text-decoration: none;
-  color: var(--text-primary);
+  color: inherit;
   transition: color 0.2s ease;
 }
 
@@ -51,47 +49,13 @@
   white-space: nowrap;
 }
 
-.description {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  line-height: 1.5;
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.metadata {
+/* Owner + date row */
+.ownerRow {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1rem;
   font-size: 0.8rem;
   color: var(--text-muted);
-}
-
-.ownerInfo {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.ownerLabel {
-  font-weight: 500;
-}
-.ownerLink {
-  text-decoration: none;
-  color: inherit;
-  display: inline-flex;
-  transition: opacity 0.2s ease;
-}
-
-.ownerLink:hover {
-  opacity: 0.8;
 }
 
 .ownerAvatarWrapper {
@@ -100,233 +64,184 @@
   gap: 0.25rem;
 }
 
-.ownerAvatarContainer {
-  display: inline-flex;
-}
-
 .ownerAvatar {
   border-radius: 50% !important;
   border: 1px solid var(--border);
 }
 
 .ownerName {
-  color: var(--text-secondary);
   font-family: var(--font-code);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
 }
 
-.ownerName {
-  color: var(--text-secondary);
-  font-family: var(--font-code);
+.ownerLink {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: inherit;
 }
 
-.dateInfo {
+.ownerLink:hover .ownerName {
+  color: var(--accent-moss);
+}
+
+.separator {
+  color: var(--text-muted);
+  margin: 0 0.25rem;
+}
+
+/* Description */
+.description {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Metadata row (participants, tags, source) */
+.metadataRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Participant avatars – circular, overlapping */
+.participantGroup {
   display: flex;
   align-items: center;
   gap: 0.25rem;
 }
 
-.dateIcon {
-  font-size: 0.85rem;
-}
-
-.participantsSection {
-  border-top: 1px solid var(--divider);
-  padding-top: 0.75rem;
-  margin-top: 0.25rem;
-}
-
-.participantHeader {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.5rem;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.participantIcon {
-  font-size: 0.9rem;
-}
-
-.participantCount {
-  font-weight: 500;
-}
-
-/* Avatar group wrapper – stacking with overlap */
-.avatarGroupWrapper {
-  display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
-}
-
-/* Each avatar link – overlapping */
 .avatarLink {
   display: inline-flex;
   text-decoration: none;
+  margin-left: -6px;
   transition: transform 0.2s ease;
-  margin-left: -8px;
 }
 
-.firstAvatar {
+.avatarLink:first-of-type {
   margin-left: 0;
 }
 
-/* Force avatars to be circular and add border */
-.avatarLink :global(.avatar),
-.avatarLink img,
-.ownerAvatarContainer :global(.avatar),
-.ownerAvatarContainer img {
-  border-radius: 50% !important;
-  border: 2px solid var(--bg-surface);
-  background-color: var(--bg-elevated);
-  object-fit: cover;
-}
-
-/* Hover effect */
 .avatarLink:hover {
   transform: translateY(-2px);
   z-index: 2;
 }
 
-/* Extra badge (+N) – styled like an avatar in the stack */
-.extraBadge {
-  margin-left: -8px;
+/* Force all avatars to be circular */
+.avatarLink :global(.avatar),
+.avatarLink img,
+.ownerAvatar :global(.avatar),
+.ownerAvatar img {
+  border-radius: 50% !important;
+  object-fit: cover;
+  border: 2px solid var(--bg-surface);
+}
+
+.extraCount {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 40px;
+  padding: 0 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  line-height: 1.8;
+  white-space: nowrap;
+}
+
+/* Tag & source chips */
+.specialTag {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  background-color: var(--bg-elevated);
-  border-radius: 50%;
-  border: 2px solid var(--bg-surface);
-  color: var(--text-secondary);
+  gap: 0.25rem;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border-radius: 40px;
+  padding: 0.2rem 0.6rem;
   font-size: 0.7rem;
-  font-weight: 600;
-  transition: transform 0.2s ease;
-  cursor: default;
+  font-weight: 500;
 }
 
-.extraBadge:hover {
-  transform: translateY(-2px);
-  z-index: 2;
+.tagIcon {
+  font-size: 0.7rem;
 }
 
-/* Tablet adjustments */
-@media (max-width: 939px) {
+.sourceBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--bg-elevated);
+  border-radius: 40px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+  border: 1px solid var(--border);
+}
+
+.sourceLink {
+  color: var(--accent-moss);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.sourceLink:hover {
+  text-decoration: underline;
+}
+
+/* Make the action button (View/Join) more visible */
+.actionButton {
+  transition: all 0.2s ease;
+}
+
+/* Specifically target the outline variant (View) */
+.actionButton:global(.btn-outline) {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--accent-moss);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.actionButton:global(.btn-outline):hover {
+  background-color: var(--accent-moss);
+  border-color: var(--accent-moss);
+  color: var(--primary-text-on-action);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px var(--shadow);
+}
+
+/* Ensure the primary variant (Join) already looks prominent – add a hover lift */
+.actionButton:global(.btn-primary):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px var(--shadow);
+}
+
+/* Responsive */
+@media (max-width: 767px) {
   .cardContent {
-    padding: 1rem;
+    padding: 0.6rem 0.75rem;
   }
   .sheetTitle {
     font-size: 1.1rem;
   }
-  .titleSection {
+  .topRow {
     flex-wrap: wrap;
   }
   .actionButton {
     width: 100%;
     justify-content: center;
   }
-}
-
-/* Mobile adjustments */
-@media (max-width: 767px) {
-  .metadata {
+  .metadataRow {
     flex-direction: column;
     align-items: flex-start;
+    gap: 0.4rem;
   }
-  .participantsSection {
-    margin-top: 0.5rem;
-  }
-  .avatarLink,
-  .extraBadge {
-    margin-left: -6px;
-  }
-  .firstAvatar {
-    margin-left: 0;
-  }
-}
-
-
-
-/* Tags row - colorful and vibrant */
-.tagsRow {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin: 0.5rem 0 1rem 0;
-}
-
-/* Special tag - vibrant gradient + bold */
-.specialTag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  color: white;
-  border: none;
-  border-radius: 40px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  padding: 0.35rem 1rem;
-  letter-spacing: 0.3px;
-  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
-  transition: all 0.2s ease;
-}
-
-.specialTag:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(245, 158, 11, 0.4);
-}
-
-.tagIcon {
-  font-size: 0.9rem;
-  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.1));
-}
-
-/* Source badge - colorful capsule with accent border */
-.sourceBadge {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: #1e293b;
-  background: linear-gradient(135deg, #e0f2fe, #bae6fd);
-  border: 1px solid #38bdf8;
-  border-radius: 40px;
-  padding: 0.35rem 1rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-
-.sourceBadge span {
-  color: #0f172a;
-  font-weight: 500;
-  margin-right: 0.2rem;
-}
-
-.sourceLink {
-  color: #0284c7;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-weight: 700;
-  transition: all 0.2s;
-}
-
-.sourceLink:hover {
-  color: #0369a1;
-  text-decoration: underline;
-  transform: translateX(2px);
-}
-
-.externalIcon {
-  font-size: 0.8rem;
-}
-
-.sourceName {
-  color: #0284c7;
-  font-weight: 700;
 }

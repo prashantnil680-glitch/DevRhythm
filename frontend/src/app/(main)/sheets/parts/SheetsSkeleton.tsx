@@ -12,23 +12,40 @@ export default function SheetsSkeleton({ count = 5 }: SheetsSkeletonProps) {
     <div className={styles.container}>
       {Array.from({ length: count }).map((_, index) => (
         <div key={index} className={styles.skeletonCard}>
-          <div className={styles.skeletonHeader}>
+          {/* Top row: title + action button */}
+          <div className={styles.topRowSkeleton}>
             <SkeletonLoader variant="text" width="60%" height={24} />
             <SkeletonLoader variant="custom" width={80} height={32} />
           </div>
-          <SkeletonLoader variant="text" width="90%" height={40} />
-          <div className={styles.skeletonMetadata}>
-            <SkeletonLoader variant="text" width="40%" height={16} />
-            <SkeletonLoader variant="text" width="30%" height={16} />
-          </div>
-          <div className={styles.skeletonParticipants}>
-            <SkeletonLoader variant="text" width="30%" height={16} />
-            <div className={styles.skeletonAvatars}>
-              <SkeletonLoader variant="custom" width={32} height={32} />
-              <SkeletonLoader variant="custom" width={32} height={32} />
-              <SkeletonLoader variant="custom" width={32} height={32} />
-              <SkeletonLoader variant="custom" width={32} height={32} />
+
+          {/* Owner + date row */}
+          <div className={styles.ownerRowSkeleton}>
+            <div className={styles.ownerInfoSkeleton}>
+              <SkeletonLoader variant="custom" width={24} height={24} className={styles.avatarSkeleton} />
+              <SkeletonLoader variant="text" width="100px" height={16} />
             </div>
+            <span className={styles.separatorSkeleton} />
+            <SkeletonLoader variant="text" width="120px" height={16} />
+          </div>
+
+          {/* Description (2 lines) */}
+          <div className={styles.descriptionSkeleton}>
+            <SkeletonLoader variant="text" width="100%" height={16} />
+            <SkeletonLoader variant="text" width="80%" height={16} />
+          </div>
+
+          {/* Metadata row: participants, tag, source */}
+          <div className={styles.metadataRowSkeleton}>
+            <div className={styles.participantsSkeleton}>
+              <SkeletonLoader variant="custom" width={16} height={16} />
+              <div className={styles.avatarGroupSkeleton}>
+                <SkeletonLoader variant="custom" width={24} height={24} className={styles.avatarSkeleton} />
+                <SkeletonLoader variant="custom" width={24} height={24} className={styles.avatarSkeleton} />
+                <SkeletonLoader variant="custom" width={24} height={24} className={styles.avatarSkeleton} />
+              </div>
+            </div>
+            <SkeletonLoader variant="text" width="60px" height={20} className={styles.tagSkeleton} />
+            <SkeletonLoader variant="text" width="80px" height={20} className={styles.sourceSkeleton} />
           </div>
         </div>
       ))}

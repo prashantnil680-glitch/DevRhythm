@@ -16,9 +16,9 @@ interface QuestionListProps {
 export const QuestionList: React.FC<QuestionListProps> = ({ questions, isLoading }) => {
   if (isLoading) {
     return (
-      <div className={styles.grid}>
+      <div className={styles.list}>
         {Array.from({ length: 6 }).map((_, i) => (
-          <SkeletonLoader key={i} variant="custom" className={styles.skeletonCard} />
+          <SkeletonLoader key={i} variant="custom" className={styles.skeletonItem} />
         ))}
       </div>
     );
@@ -35,7 +35,7 @@ export const QuestionList: React.FC<QuestionListProps> = ({ questions, isLoading
   }
 
   return (
-    <div className={styles.grid}>
+    <div className={styles.list}>
       {questions.map(question => (
         <QuestionCard key={question._id} question={question} />
       ))}

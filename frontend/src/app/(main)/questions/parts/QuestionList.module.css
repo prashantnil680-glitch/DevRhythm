@@ -1,17 +1,18 @@
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.25rem;
+.list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
 }
 
-.skeletonCard {
-  height: 200px;
+.skeletonItem {
+  height: 48px;
   background: var(--bg-elevated);
-  border-radius: 8px;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  animation: pulse 1.5s infinite;
 }
 
-@media (max-width: 767px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }

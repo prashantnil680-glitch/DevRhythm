@@ -15,7 +15,7 @@ import DeleteSheetModal from './parts/DeleteSheetModal';
 import LeaveSheetModal from './parts/LeaveSheetModal';
 import SheetHero from './parts/SheetHero';
 import ProgressChart from './parts/ProgressChart';
-import QuestionGroupList from './parts/QuestionGroupList';
+import QuestionList from './parts/QuestionList';
 import ParticipantList from './parts/ParticipantList';
 import SheetDetailSkeleton from './parts/SheetDetailSkeleton';
 import styles from './page.module.css';
@@ -50,6 +50,7 @@ export default function SheetDetailPage() {
 
   const {
     sheet,
+    questions,
     tagGroups,
     participants,
     stats,
@@ -142,20 +143,25 @@ export default function SheetDetailPage() {
         </div>
       )}
 
-      <div className={styles.questionGroupsSection}>
-        <h2 className={styles.sectionTitle}>Questions by Tag</h2>
-        {tagGroups.length === 0 ? (
-          <p className={styles.emptyState}>No questions in this sheet yet.</p>
-        ) : (
-          <QuestionGroupList
-            groups={tagGroups}
-            perQuestionParticipantCounts={stats.perQuestionParticipantCounts}
-            perQuestionSolvedCounts={stats.perQuestionSolvedCounts}
-            userProgressDetails={currentUserProgress?.details}
-            isJoined={hasJoined}
-          />
-        )}
+    <div className={styles.questionGroupsSection}>
+      <div className={styles.sectionHeader}>
+        <h2 className={styles.sectionTitle}>Questions</h2>
+        <Link href="/questions" className={styles.viewAllLink}>
+          View All →
+        </Link>
       </div>
+      {questions.length === 0 ? (
+        <p className={styles.emptyState}>No questions in this sheet yet.</p>
+      ) : (
+        <QuestionList
+          questions={questions}
+          perQuestionParticipantCounts={stats.perQuestionParticipantCounts}
+          perQuestionSolvedCounts={stats.perQuestionSolvedCounts}
+          userProgressDetails={currentUserProgress?.details}
+          isJoined={hasJoined}
+        />
+      )}
+    </div>
 
       <div className={styles.participantsSection}>
         <h2 className={styles.sectionTitle}>Participants</h2>

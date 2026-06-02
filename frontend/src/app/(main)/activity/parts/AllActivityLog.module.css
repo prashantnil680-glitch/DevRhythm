@@ -1,21 +1,13 @@
-/* AllActivityLog.module.css – Left-aligned vertical timeline */
+/* AllActivityLog.module.css – Compact, card‑based timeline */
 
 .container {
   width: 100%;
-  transition: box-shadow 0.2s ease;
-  display: flex;
-  flex-direction: column;
 }
-.container:hover {
-  box-shadow: 0 2px 8px var(--shadow);
-}
+
 .header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   margin-bottom: 1rem;
-  flex-shrink: 0;
 }
+
 .title {
   font-size: 0.9rem;
   font-weight: 500;
@@ -26,11 +18,12 @@
 /* Tabs */
 .tabs {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.25rem;
   border-bottom: 1px solid var(--divider);
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
   flex-wrap: wrap;
 }
+
 .tab {
   background: none;
   border: none;
@@ -42,306 +35,347 @@
   transition: all 0.2s ease;
   border-bottom: 2px solid transparent;
 }
-.tab:hover { color: var(--accent-moss); }
+
+.tab:hover {
+  color: var(--accent-moss);
+}
+
 .tab.active {
   color: var(--accent-moss);
   border-bottom-color: var(--accent-moss);
 }
 
-/* ========== Timeline Card (each question/goal/group) ========== */
-.timelineCard {
+/* Card (each activity block) */
+.card {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 1rem 1rem 1rem 0;
-  margin-bottom: 1.5rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
   transition: box-shadow 0.2s ease;
 }
-.timelineCard:hover {
+
+.card:hover {
   box-shadow: 0 2px 8px var(--shadow);
 }
 
-/* Card header (title, meta) */
+/* Card header */
 .cardHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-bottom: 1rem;
-  padding-left: 44px;   /* aligns header text with timeline labels */
+  margin-bottom: 0.75rem;
 }
+
 .cardTitle {
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary);
   text-decoration: none;
 }
+
 .cardTitle:hover {
   color: var(--accent-moss);
 }
+
 .cardMeta {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+
 .patternBadge {
   font-size: 0.7rem;
   color: var(--text-muted);
-  background: var(--bg-surface);
+  background: var(--bg-elevated);
   padding: 0.125rem 0.5rem;
   border-radius: 12px;
   border: 1px solid var(--border);
   text-decoration: none;
   transition: all 0.2s ease;
 }
+
 .patternBadge:hover {
   background: var(--hover-surface);
   color: var(--accent-moss);
   border-color: var(--accent-moss);
 }
 
-/* ========== Vertical Timeline (left axis) ========== */
-.timeline {
-  position: relative;
-  padding: 0.25rem 0;
-  margin: 0;
-  --fill-height: 0px;
-}
-
-/* Base vertical line (static) */
-.timelineBase {
-  position: absolute;
-  left: 28px;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--border);
-  border-radius: 1px;
-  z-index: 0;
-}
-
-/* Fill line (animated on hover) */
-.timelineFill {
-  position: absolute;
-  left: 28px;
-  width: 2px;
-  top: 0;
-  height: var(--fill-height);
-  background: var(--accent-moss);
-  border-radius: 1px;
-  z-index: 1;
-  transition: height 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
-  pointer-events: none;
-}
-
-/* Container for timeline items */
-.timelineItems {
-  position: relative;
-  z-index: 2;
+/* Timeline list inside card */
+.timelineList {
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
 }
 
-/* Individual timeline item (dot + label) */
+/* Single timeline row */
 .timelineItem {
   display: flex;
   align-items: center;
-  min-height: 48px;
-  position: relative;
-  cursor: pointer;
+  gap: 0.75rem;
+  font-size: 0.8rem;
 }
 
-/* Dot – centred on the vertical line */
 .timelineDot {
-  position: absolute;
-  left: 28px;
-  transform: translateX(-50%);
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: var(--accent-moss);
-  border: 2px solid var(--bg-surface);
-  box-shadow: 0 0 0 1px var(--accent-moss);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  z-index: 3;
-}
-.timelineItem:hover .timelineDot {
-  transform: translateX(-50%) scale(1.4);
-  box-shadow: 0 0 0 2px var(--accent-moss);
+  flex-shrink: 0;
 }
 
-/* Overdue revision dot */
-.timelineDot.warning {
-  background: var(--toast-warning);
-  box-shadow: 0 0 0 1px var(--toast-warning);
+.dotGreen {
+  background-color: #2e7d32;
+}
+.dotGold {
+  background-color: #f59e0b;
+}
+.dotBlue {
+  background-color: #3b82f6;
+}
+.dotOrange {
+  background-color: #f97316;
+}
+.dotGray {
+  background-color: var(--text-muted);
 }
 
-/* Failed goal dot (hollow) */
-.timelineDot.failed {
-  background: transparent;
-  border: 2px solid var(--text-muted);
-  box-shadow: none;
-}
-
-/* Group event diamond */
-.timelineDot.diamond {
-  width: 14px;
-  height: 14px;
-  background: var(--accent-sand);
-  transform: translateX(-50%) rotate(45deg);
-  border-radius: 2px;
-  box-shadow: 0 0 0 1px var(--accent-sand);
-}
-.timelineItem:hover .timelineDot.diamond {
-  transform: translateX(-50%) rotate(45deg) scale(1.2);
-}
-
-/* Label – placed to the right of the axis */
 .timelineLabel {
-  margin-left: 48px;
-  padding: 0.25rem 0;
-  line-height: 1.4;
   flex: 1;
-}
-.timelineDate {
-  font-weight: 500;
-  color: var(--text-primary);
-}
-.timelineDetail {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
   flex-wrap: wrap;
-  margin-top: 2px;
-}
-.duration {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-.firstBadge {
-  font-size: 0.65rem;
-  background: #d4a373;
-  color: white;
-  padding: 1px 6px;
-  border-radius: 10px;
-}
-.overdueBadge {
-  font-size: 0.65rem;
-  background: var(--toast-warning);
-  color: white;
-  padding: 1px 6px;
-  border-radius: 10px;
-}
-.goalProgressInline {
-  margin-top: 4px;
-  width: 100%;
-  max-width: 200px;
-}
-.goalProgressBar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-}
-.tooltipContent {
-  font-size: 0.75rem;
-  line-height: 1.4;
+  align-items: baseline;
+  gap: 0.5rem;
 }
 
 .dateLink {
   font-weight: 500;
   color: var(--text-primary);
   text-decoration: none;
-  transition: color 0.2s ease;
-}
-.dateLink:hover {
-  color: var(--accent-moss);
-   /* text-decoration: underline; */
 }
 
-/* ========== Revisions Tab: Two‑column grid ========== */
+.dateLink:hover {
+  color: var(--accent-moss);
+}
+
+.timelineDetail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.duration,
+.extraText {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.firstBadge,
+.overdueBadge {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.firstBadge {
+  background: #d4a373;
+  color: white;
+}
+
+.overdueBadge {
+  background: #f97316;
+  color: white;
+}
+
+/* Goal progress */
+.goalProgressWrapper {
+  margin-top: 0.5rem;
+  padding-left: 1.5rem;
+}
+
+.goalDateRange {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+  display: block;
+}
+
+/* Revisions two‑column grid */
 .revisionsGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-}
-.revisionsColumn {
-  min-width: 0; /* prevent overflow */
+  gap: 1rem;
 }
 
-/* ========== Empty & Loading States ========== */
+.revisionsColumn {
+  min-width: 0;
+}
+
+.columnHeader {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--text-secondary);
+}
+
+/* Skeleton & empty states */
 .skeletonList {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
+
 .skeletonItem {
-  height: 60px;
+  height: 80px;
   background: var(--bg-elevated);
-  border-radius: 6px;
+  border-radius: 12px;
   animation: pulse 1.5s infinite;
 }
+
 .emptyState {
   text-align: center;
-  padding: 2rem;
+  padding: 1.5rem;
   color: var(--text-muted);
   font-style: italic;
+  background: var(--bg-surface);
+  border-radius: 12px;
+  border: 1px solid var(--border);
 }
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
 
-/* ========== Disclaimer message (revisions tab)  ========== */
+/* Pagination & Load more */
+.paginationWrapper {
+  margin-top: 1.5rem;          
+  margin-bottom: 0.5rem;       
+  padding-bottom: 0.5rem;
+  overflow-x: auto;
+  display: flex;
+  justify-content: center;
+  scrollbar-width: thin;      
+}
+
+/* Custom scrollbar styling (Webkit) */
+.paginationWrapper::-webkit-scrollbar {
+  height: 0px;
+}
+
+.paginationWrapper::-webkit-scrollbar-track {
+  background: var(--bg-elevated);
+  border-radius: 3px;
+}
+
+.paginationWrapper::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.paginationWrapper::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-moss);
+}
+
+.loadMore {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+/* Disclaimer message */
 .disclaimerMessage {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 1.5rem;
-  padding: 0.75rem 1rem;
+  margin-top: 1.25rem;
+  padding: 0.5rem 0.75rem;
   background: var(--bg-elevated);
   border-radius: 8px;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   border: 1px solid var(--border);
 }
+
 .disclaimerMessage svg {
-  flex-shrink: 0;
   color: var(--accent-moss);
 }
 
-/* ========== Pagination ========== */
-.paginationWrapper {
-  margin-top: 1.5rem;
-  display: flex;
-  justify-content: center;
-}
-.loadMore {
-  display: flex;
-  justify-content: center;
-  margin-top: 1rem;
+/* Tooltip content */
+.tooltipContent {
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
 
-/* ========== Responsive ========== */
+
+.platformLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  text-decoration: none;
+  color: inherit;
+  transition: opacity 0.2s;
+}
+
+.platformLink:hover {
+  opacity: 0.8;
+}
+
+.platformText {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.difficultyLink {
+  text-decoration: none;
+}
+
+.patternsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.patternBadge {
+  font-size: 0.65rem;
+  color: var(--accent-moss);
+  background: rgba(108, 122, 110, 0.12);
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.patternBadge:hover {
+  background: rgba(108, 122, 110, 0.25);
+  text-decoration: underline;
+}
+
+/* Responsive */
 @media (max-width: 768px) {
   .revisionsGrid {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
   .cardHeader {
-    padding-left: 36px;
+    flex-direction: column;
+    align-items: flex-start;
   }
-  .timelineBase,
-  .timelineFill {
-    left: 20px;
-  }
-  .timelineDot {
-    left: 20px;
+  .timelineItem {
+    flex-wrap: wrap;
   }
   .timelineLabel {
-    margin-left: 36px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
   }
 }

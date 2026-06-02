@@ -34,8 +34,16 @@
   padding: 1.5rem;
 }
 
+.panelTitleSkeleton {
+  margin-bottom: 1.5rem;
+}
+
 .field {
   margin-bottom: 1.25rem;
+}
+
+.field:last-child {
+  margin-bottom: 0;
 }
 
 .searchSkeleton {
@@ -49,7 +57,15 @@
 }
 
 .selectedItemSkeleton {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.removeBtnSkeleton {
+  border-radius: 50%;
 }
 
 .actions {
@@ -60,6 +76,7 @@
   border-top: 1px solid var(--border);
 }
 
+/* Responsive */
 @media (max-width: 768px) {
   .columns {
     flex-direction: column;
@@ -68,5 +85,8 @@
   .leftPanel {
     flex: auto;
     width: 100%;
+  }
+  .card {
+    padding: 1rem;
   }
 }

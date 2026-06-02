@@ -38,8 +38,8 @@
 .sheetsList {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  margin: 1.5rem 0;
+  gap: 0.5rem;        /* was 1rem – tighter between cards */
+  margin: 1rem 0;     /* reduced margin */
 }
 
 .paginationWrapper {
@@ -103,8 +103,6 @@
 }
 
 
-
-/* Add these new rules to the existing CSS */
 
 /* Sentinel – hidden element for scroll detection */
 .sentinel {

@@ -48,14 +48,34 @@
   margin: 2rem 0;
 }
 
+/* frontend/src/app/(main)/sheets/[slug]/page.module.css */
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--divider);
+}
+
 .sectionTitle {
   font-family: var(--font-heading);
   font-size: 1.3rem;
   font-weight: 500;
   color: var(--text-primary);
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px dashed var(--divider);
+  margin: 0;
+}
+
+.viewAllLink {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.viewAllLink:hover {
+  color: var(--accent-moss);
 }
 
 .emptyState {

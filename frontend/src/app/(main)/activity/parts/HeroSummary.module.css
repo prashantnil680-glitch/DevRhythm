@@ -1,30 +1,20 @@
-/* HeroSummary.module.css – Modern, clean, engaging */
 .container {
-  width: 100%;
-  padding: 1.5rem 1.8rem;
-  background: linear-gradient(145deg, var(--bg-surface) 0%, var(--bg-elevated) 100%);
-  border-radius: 28px;
+  border-bottom: 1px solid var(--divider);
+  padding: 0.75rem 0 1rem 0;
   margin-bottom: 1.5rem;
-  transition: all 0.2s ease;
 }
 
-/* No heavy shadows – only a soft glow on hover */
-.container:hover {
-  background: var(--bg-surface);
-  box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.08);
-}
-
-/* Header */
-.header {
+/* Header row: date + actions */
+.headerRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.8rem;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
 }
 
-.titleGroup {
+.dateGroup {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -35,214 +25,45 @@
   font-size: 1.2rem;
 }
 
+.title {
+  font-family: var(--font-heading);
+  font-size: 1.4rem;        /* increased from 1.1rem */
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
 .titleLink {
   text-decoration: none;
   color: inherit;
 }
 
-.title {
-  font-family: var(--font-heading);
-  font-size: 1.4rem;
-  font-weight: 450;
-  letter-spacing: -0.02em;
-  color: var(--text-primary);
-  margin: 0;
-  line-height: 1.2;
+.titleLink:hover .title {
+  color: var(--accent-moss);
 }
 
-/* "View All" link */
+/* Actions */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .viewDayLink {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  padding: 0.3rem 0.9rem;
-  border-radius: 30px;
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--accent-moss);
   text-decoration: none;
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
 .viewDayLink:hover {
-  background: var(--accent-moss);
-  border-color: var(--accent-moss);
-  color: white;
-}
-/* Next Day button */
-.nextDayButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  padding: 0.3rem 0.9rem;
-  border-radius: 30px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: all 0.2s ease;
+  opacity: 0.8;
 }
 
-.nextDayButton:hover:not(:disabled) {
-  background: var(--accent-moss);
-  border-color: var(--accent-moss);
-  color: white;
-}
-
-.nextDayButton:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Stats grid – 4 columns */
-.statsGrid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-  margin-bottom: 1.2rem;
-}
-
-.statItem {
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.statValueWrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.3rem;
-}
-
-.statValue {
-  font-size: 2.2rem;
-  font-weight: 650;
-  font-family: var(--font-code);
-  color: var(--text-primary);
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-
-.statLabel {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.35px;
-  font-weight: 500;
-  color: var(--text-muted);
-}
-
-.starBadge {
-  cursor: help;
-  color: #f5b042;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.1));
-  transition: transform 0.1s ease;
-}
-
-.starBadge:hover {
-  transform: scale(1.1);
-}
-
-/* Goal section */
-.goalProgressWrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
-  margin-bottom: 0.25rem;
-}
-
-.progressContainer {
-  width: 100%;
-  background: var(--bg-elevated);
-  border-radius: 30px;
-  height: 6px;
-  overflow: hidden;
-  position: relative;
-  margin-top: 0.2rem;
-}
-
-.progressFill {
-  background: var(--accent-moss);
-  height: 100%;
-  border-radius: 30px;
-  transition: width 0.3s ease;
-}
-
-.progressCount {
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  margin-top: 0.25rem;
-  display: inline-block;
-}
-
-/* Goal achieved badge */
-.goalAchievedBadge {
-  display: flex;
-  justify-content: center;
-  margin-top: 0.75rem;
-}
-
-.badge {
-  background: var(--bg-elevated);
-  padding: 0.2rem 1rem;
-  border-radius: 40px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--accent-moss);
-  border: 1px solid var(--border);
-}
-
-/* Skeleton loading */
-.skeletonDate, .skeletonAction, .skeletonValue, .skeletonLabel, .skeletonProgress {
-  background: var(--bg-elevated);
-  border-radius: 8px;
-  animation: pulse 1.5s infinite;
-}
-
-.skeletonDate { width: 200px; height: 24px; }
-.skeletonAction { width: 80px; height: 32px; border-radius: 30px; }
-.skeletonValue { width: 60px; height: 32px; margin: 0 auto; }
-.skeletonLabel { width: 70px; height: 12px; margin: 0 auto; }
-.skeletonProgress { height: 6px; width: 80%; margin: 0 auto; background: var(--bg-elevated); }
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-/* Error state */
-.errorState {
-  text-align: center;
-  padding: 1rem;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-}
-
-/* Responsive */
-@media (max-width: 767px) {
-  .container {
-    padding: 1rem 1.2rem;
-  }
-  .statsGrid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-  }
-  .statValue {
-    font-size: 1.6rem;
-  }
-  .title {
-    font-size: 1.2rem;
-  }
-}
-
-/* Day navigation buttons (Prev / Next) */
 .dayNavButtons {
   display: flex;
   gap: 0.5rem;
@@ -251,14 +72,14 @@
 .navButton {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  background: var(--bg-elevated);
+  gap: 0.25rem;
+  background: none;
   border: 1px solid var(--border);
-  padding: 0.3rem 0.9rem;
+  padding: 0.3rem 0.8rem;
   border-radius: 30px;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -270,6 +91,153 @@
 }
 
 .navButton:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Stats row (inline) – larger numbers */
+.statsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  font-size: 1rem;           /* increased from 0.85rem */
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-code);
+  color: var(--text-primary);
+}
+
+.stat strong {
+  font-weight: 700;
+  font-size: 1.2rem;        /* larger bold numbers */
+  color: var(--text-primary);
+}
+
+.separator {
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+/* Star icon for great progress */
+.starIcon {
+  color: #f5b042;
+  font-size: 1rem;
+  cursor: help;
+  transition: transform 0.1s ease;
+}
+
+.starIcon:hover {
+  transform: scale(1.1);
+}
+
+/* Progress bar (optional, currently commented out) */
+.progressWrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.progressBar {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--accent-moss);
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.progressLabel {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Skeleton (adjusted for larger text) */
+.skeletonDate {
+  width: 240px;
+  height: 28px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  animation: pulse 1.5s infinite;
+}
+
+.skeletonActions {
+  width: 140px;
+  height: 36px;
+  background: var(--bg-elevated);
+  border-radius: 30px;
+  animation: pulse 1.5s infinite;
+}
+
+.skeletonStat {
+  width: 100px;
+  height: 24px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  animation: pulse 1.5s infinite;
+}
+
+.skeletonProgress {
+  height: 6px;
+  width: 100%;
+  background: var(--bg-elevated);
+  border-radius: 6px;
+  margin-top: 0.5rem;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Error state */
+.errorState {
+  text-align: center;
+  padding: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .container {
+    padding: 0.6rem 0 0.8rem 0;
+  }
+  .title {
+    font-size: 1.2rem;
+  }
+  .statsRow {
+    font-size: 0.85rem;
+    gap: 0.5rem;
+  }
+  .stat strong {
+    font-size: 1rem;
+  }
+  .progressWrapper {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+  .progressBar {
+    width: 100%;
+  }
+  .progressLabel {
+    font-size: 0.7rem;
+  }
 }

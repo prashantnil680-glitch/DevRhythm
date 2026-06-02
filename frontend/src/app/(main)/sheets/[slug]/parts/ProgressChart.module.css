@@ -1,108 +1,90 @@
+/* frontend/src/app/(main)/sheets/[slug]/parts/ProgressChart.module.css */
+
 .container {
-  width: 100%;
-  padding: 1.5rem;
-  transition: box-shadow 0.2s ease;
-}
-
-.container:hover {
-  box-shadow: 0 2px 8px var(--shadow);
-}
-
-.header {
-  margin-bottom: 1rem;
-}
-
-.title {
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.statsRow {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: center;
+  justify-content: space-between;
+  align-items: flex-start;
   gap: 0.75rem;
-  margin-bottom: 1.5rem;
-  background: var(--bg-elevated);
-  border-radius: 40px;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--border);
+  margin: 0; /* no outer margin, relies on parent */
+  padding: 0; /* no inner padding */
 }
 
-.statItem {
+/* Left column */
+.metrics {
+  flex: 1;
+  min-width: 120px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
+  gap: 0.5rem;
 }
 
-.statValue {
-  font-size: 1.25rem;
-  font-weight: 700;
+.metricItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.85rem;
+  line-height: 1.3;
+  border-bottom: 1px dashed var(--divider);
+  padding-bottom: 0.25rem;
+}
+
+.metricLabel {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.metricValue {
   color: var(--text-primary);
+  font-weight: 600;
   font-family: var(--font-code);
+  font-size: 0.9rem;
 }
 
-.statLabel {
+.percentage {
   font-size: 0.7rem;
+  font-weight: normal;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  margin-left: 0.25rem;
 }
 
-.statPercentage {
-  font-size: 0.7rem;
-  color: var(--accent-moss);
-  font-weight: 600;
-  margin-top: 0.25rem;
-}
-
-.statDivider {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
+/* Right column – chart */
 .chartWrapper {
-  max-width: 280px;
-  margin: 0 auto;
-  position: relative;
+  flex: 0 0 auto;
+  width: 260px;
+  height: 260px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 /* Responsive */
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .container {
-    padding: 1rem;
-  }
-  .statsRow {
     flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
+    align-items: stretch;
+    gap: 1rem;
   }
-  .statDivider {
-    display: none;
-  }
-  .statItem {
-    width: 100%;
-    flex-direction: row;
-    justify-content: space-between;
-    gap: 0.5rem;
-    border-bottom: 1px solid var(--divider);
-    padding: 0.5rem 0;
-  }
-  .statItem:last-child {
-    border-bottom: none;
-  }
-  .statValue {
-    font-size: 1rem;
-  }
-  .statPercentage {
-    margin-left: auto;
-  }
+
   .chartWrapper {
+    width: 100%;
+    height: auto;
     max-width: 200px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .metrics {
+    gap: 0.4rem;
+  }
+  .metricItem {
+    font-size: 0.8rem;
+  }
+  .metricValue {
+    font-size: 0.85rem;
+  }
+  .percentage {
+    font-size: 0.65rem;
   }
 }

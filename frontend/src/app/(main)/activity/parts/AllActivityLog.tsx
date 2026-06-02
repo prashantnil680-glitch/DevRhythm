@@ -13,7 +13,6 @@ import {
   FiStar,
   FiInfo,
 } from 'react-icons/fi';
-import Card from '@/shared/components/Card';
 import Badge from '@/shared/components/Badge';
 import PlatformIcon from '@/shared/components/PlatformIcon';
 import ProgressBar from '@/shared/components/ProgressBar';
@@ -64,44 +63,77 @@ const getPatternSlug = (pattern?: string[], patternSlugs?: string[]): string | n
   return null;
 };
 
-// ========== Generic Timeline Item Renderer ==========
+// ========== Timeline Item (single row) ==========
 interface TimelineItemProps {
-  dotClass: string;
-  labelContent: React.ReactNode;
-  tooltipContent: React.ReactNode;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
+  dotColor: 'green' | 'gold' | 'blue' | 'orange' | 'gray';
+  dateTime: string;
+  dateUrl: string;
+  timeSpent?: number;
+  isFirst?: boolean;
+  isOverdue?: boolean;
+  confidence?: number | null;
+  scheduledDate?: string;
+  extraText?: string;
 }
 
-function TimelineItem({ dotClass, labelContent, tooltipContent, onMouseEnter, onMouseLeave }: TimelineItemProps) {
+function TimelineItem({
+  dotColor,
+  dateTime,
+  dateUrl,
+  timeSpent,
+  isFirst,
+  isOverdue,
+  confidence,
+  scheduledDate,
+  extraText,
+}: TimelineItemProps) {
+  const tooltipContent = (
+    <div className={styles.tooltipContent}>
+      <div>{dateTime}</div>
+      {timeSpent ? <div>Time: {formatTimeSpent(timeSpent)}</div> : null}
+      {isFirst ? <div>First solve</div> : null}
+      {isOverdue && scheduledDate ? (
+        <div>Overdue (scheduled {formatDateTime(scheduledDate)})</div>
+      ) : null}
+      {!isOverdue && scheduledDate ? <div>On‑time revision</div> : null}
+      {confidence !== undefined && confidence !== null ? (
+        <div>Confidence: {confidence}/5</div>
+      ) : null}
+      {extraText ? <div>{extraText}</div> : null}
+    </div>
+  );
+
+  const dotClass = styles[`dot${dotColor.charAt(0).toUpperCase() + dotColor.slice(1)}`];
+
   return (
-    <div className={styles.timelineItem} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
+    <div className={styles.timelineItem}>
       <Tooltip content={tooltipContent} placement="right" delay={200}>
         <div className={`${styles.timelineDot} ${dotClass}`} />
       </Tooltip>
-      <div className={styles.timelineLabel}>{labelContent}</div>
+      <div className={styles.timelineLabel}>
+        <Link href={dateUrl} className={styles.dateLink}>
+          {dateTime}
+        </Link>
+        <div className={styles.timelineDetail}>
+          {timeSpent ? <span className={styles.duration}>{formatTimeSpent(timeSpent)}</span> : null}
+          {isFirst && (
+            <span className={styles.firstBadge}>
+              <FiStar size={10} /> first
+            </span>
+          )}
+          {isOverdue && (
+            <span className={styles.overdueBadge}>
+              <FiAlertCircle size={10} /> overdue
+            </span>
+          )}
+          {extraText && <span className={styles.extraText}>{extraText}</span>}
+        </div>
+      </div>
     </div>
   );
 }
 
-// ========== Timeline Wrapper ==========
-interface TimelineWrapperProps {
-  children: React.ReactNode;
-  containerRef: React.RefObject<HTMLDivElement>;
-  fillHeight: number;
-}
-
-function TimelineWrapper({ children, containerRef, fillHeight }: TimelineWrapperProps) {
-  return (
-    <div ref={containerRef} className={styles.timeline} style={{ '--fill-height': `${fillHeight}px` } as React.CSSProperties}>
-      <div className={styles.timelineBase} />
-      <div className={styles.timelineFill} />
-      <div className={styles.timelineItems}>{children}</div>
-    </div>
-  );
-}
-
-// ========== Question Card (Solved / Mastered / Revisions) ==========
+// ========== Question Card ==========
 interface QuestionCardProps {
   question: {
     _id: string;
@@ -117,197 +149,111 @@ interface QuestionCardProps {
 }
 
 function QuestionCard({ question, timeline, type }: QuestionCardProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [fillHeight, setFillHeight] = useState(0);
-  const sortedTimeline = [...timeline].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-  const handleItemHover = (index: number) => {
-    const container = containerRef.current;
-    if (!container) return;
-    const items = container.querySelectorAll(`.${styles.timelineItem}`);
-    if (items[index]) {
-      const rect = items[index].getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
-      const height = rect.top + rect.height / 2 - containerRect.top;
-      setFillHeight(height);
-    }
-  };
-  const handleLeave = () => setFillHeight(0);
-
-  const patternSlug = getPatternSlug(question.pattern, question.patternSlugs);
-  // fallback for missing difficulty
+  const sortedTimeline = [...timeline].sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
   const difficulty = question.difficulty?.toLowerCase() ?? 'easy';
 
   return (
-    <div className={styles.timelineCard}>
+    <div className={styles.card}>
       <div className={styles.cardHeader}>
         <Link href={`/questions/${question.platformQuestionId}`} className={styles.cardTitle}>
           {question.title}
         </Link>
         <div className={styles.cardMeta}>
-          <PlatformIcon platform={question.platform} size="sm" />
-          <Badge variant={difficulty as 'easy' | 'medium' | 'hard'} size="sm">
-            {question.difficulty || 'Easy'}
-          </Badge>
-          {patternSlug && (
-            <Link href={`/patterns/${patternSlug}`} className={styles.patternBadge}>
-              #{question.pattern?.[0] || patternSlug}
-            </Link>
+          <Link href={`/questions?platform=${encodeURIComponent(question.platform)}&page=1`} className={styles.platformLink}>
+            <PlatformIcon platform={question.platform} size="sm" />
+            <span className={styles.platformText}>{question.platform}</span>
+          </Link>
+          <Link href={`/questions?difficulty=${question.difficulty}&page=1`} className={styles.difficultyLink}>
+            <Badge variant={difficulty as 'easy' | 'medium' | 'hard'} size="sm">
+              {question.difficulty}
+            </Badge>
+          </Link>
+          {/* Display ALL patterns as clickable badges */}
+          {question.pattern && question.pattern.length > 0 && (
+            <div className={styles.patternsList}>
+              {question.pattern.map((p, idx) => {
+                const slug = question.patternSlugs?.[idx] || slugify(p);
+                return (
+                  <Link key={p} href={`/patterns/${slug}`} className={styles.patternBadge}>
+                    #{p}
+                  </Link>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
-
-      <TimelineWrapper containerRef={containerRef} fillHeight={fillHeight}>
-        {sortedTimeline.map((entry, idx) => {
+      <div className={styles.timelineList}>
+        {sortedTimeline.map((entry) => {
           const isSolveEntry = 'isFirstSolve' in entry;
           const isRevisionEntry = 'overdueCompleted' in entry;
           const isOverdue = isRevisionEntry && (entry as RevisionTimelineEntry).overdueCompleted;
-          let dotClass = '';
-          if (isRevisionEntry && isOverdue) dotClass = styles.warning;
-
-          const tooltipContent = (
-            <div className={styles.tooltipContent}>
-              <div>{formatDateTime(entry.timestamp)}</div>
-              {entry.timeSpent > 0 && <div>Time: {formatTimeSpent(entry.timeSpent)}</div>}
-              {isSolveEntry && (entry as SolveTimelineEntry).isFirstSolve && <div>First solve</div>}
-              {isRevisionEntry && isOverdue && (
-                <div>Overdue (scheduled {formatDateTime((entry as RevisionTimelineEntry).scheduledDate)})</div>
-              )}
-              {isRevisionEntry && !isOverdue && <div>On-time revision</div>}
-              {isRevisionEntry && (entry as RevisionTimelineEntry).confidenceAfter && (
-                <div>Confidence: {(entry as RevisionTimelineEntry).confidenceAfter}/5</div>
-              )}
-            </div>
-          );
-
-          // Link to the specific day of the event
-          const eventDate = format(new Date(entry.timestamp), 'yyyy-MM-dd');
-          const dateUrl = `/activity/${eventDate}`;
-
-          const labelContent = (
-            <>
-              <Link href={dateUrl} className={styles.dateLink}>
-                {formatDateTime(entry.timestamp)}
-              </Link>
-              <div className={styles.timelineDetail}>
-                {entry.timeSpent > 0 && <span className={styles.duration}>{formatTimeSpent(entry.timeSpent)}</span>}
-                {isSolveEntry && (entry as SolveTimelineEntry).isFirstSolve && (
-                  <span className={styles.firstBadge}><FiStar size={10} /> first</span>
-                )}
-                {isRevisionEntry && isOverdue && (
-                  <span className={styles.overdueBadge}><FiAlertCircle size={10} /> overdue</span>
-                )}
-              </div>
-            </>
-          );
+          const dotColor = isOverdue ? 'orange' : type === 'solve' ? 'green' : type === 'mastered' ? 'gold' : 'blue';
+          const dateUrl = `/activity/${format(new Date(entry.timestamp), 'yyyy-MM-dd')}`;
 
           return (
             <TimelineItem
               key={`${entry._id}_${entry.timestamp}`}
-              dotClass={dotClass}
-              labelContent={labelContent}
-              tooltipContent={tooltipContent}
-              onMouseEnter={() => handleItemHover(idx)}
-              onMouseLeave={handleLeave}
+              dotColor={dotColor}
+              dateTime={formatDateTime(entry.timestamp)}
+              dateUrl={dateUrl}
+              timeSpent={entry.timeSpent}
+              isFirst={isSolveEntry && (entry as SolveTimelineEntry).isFirstSolve}
+              isOverdue={isOverdue}
+              confidence={isRevisionEntry ? (entry as RevisionTimelineEntry).confidenceAfter : undefined}
+              scheduledDate={isRevisionEntry ? (entry as RevisionTimelineEntry).scheduledDate : undefined}
             />
           );
         })}
-      </TimelineWrapper>
+      </div>
     </div>
   );
 }
 
 // ========== Goal Card ==========
 function GoalCard({ goal, status }: { goal: GoalAchievedItem; status: 'completed' | 'failed' }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [fillHeight, setFillHeight] = useState(0);
-  const itemRef = useRef<HTMLDivElement>(null);
-
-  const handleMouseEnter = () => {
-    const container = containerRef.current;
-    const it = itemRef.current;
-    if (!container || !it) return;
-    const containerRect = container.getBoundingClientRect();
-    const itemRect = it.getBoundingClientRect();
-    const height = itemRect.top + itemRect.height / 2 - containerRect.top;
-    setFillHeight(height);
-  };
-  const handleMouseLeave = () => setFillHeight(0);
-
   const isCompleted = status === 'completed';
-  const dotClass = isCompleted ? '' : styles.failed;
-  const tooltipContent = `${isCompleted ? 'Completed' : 'Failed'} goal: ${goal.goalType} – ${goal.completionPercentage}%`;
-
-  // Link to the day the goal was achieved (or end date if failed)
+  const dotColor = isCompleted ? 'green' : 'gray';
   const goalDate = goal.achievedAt || goal.endDate;
   const dateUrl = `/activity/${format(new Date(goalDate), 'yyyy-MM-dd')}`;
-
-  const labelContent = (
-    <>
-      <Link href={dateUrl} className={styles.dateLink}>
-        {formatDateTime(goalDate)}
-      </Link>
-      <div className={styles.timelineDetail}>
-        <span>{goal.completedCount}/{goal.targetCount} completed</span>
-        <div className={styles.goalProgressInline}>
-          <ProgressBar value={goal.completionPercentage} max={100} size="sm" showValue={false} rounded />
-        </div>
-        <span className={styles.goalProgressBar}>
-          {formatDateOnly(goal.startDate)} – {formatDateOnly(goal.endDate)}
-        </span>
-      </div>
-    </>
-  );
+  const progressPercent = Math.min(100, goal.completionPercentage || 0);
 
   return (
-    <div className={styles.timelineCard}>
+    <div className={styles.card}>
       <div className={styles.cardHeader}>
-        <div className={styles.cardTitle}>{isCompleted ? 'Completed Goal' : 'Failed Goal'}</div>
+        <div className={styles.cardTitle}>
+          {isCompleted ? '✓ Completed Goal' : '❌ Failed Goal'}
+        </div>
       </div>
-      <div ref={itemRef}>
-        <TimelineWrapper containerRef={containerRef} fillHeight={fillHeight}>
-          <TimelineItem
-            dotClass={dotClass}
-            labelContent={labelContent}
-            tooltipContent={tooltipContent}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-          />
-        </TimelineWrapper>
+      <div className={styles.timelineList}>
+        <TimelineItem
+          dotColor={dotColor}
+          dateTime={formatDateTime(goalDate)}
+          dateUrl={dateUrl}
+          extraText={`${goal.goalType}: ${goal.completedCount}/${goal.targetCount} completed`}
+        />
+        <div className={styles.goalProgressWrapper}>
+          <ProgressBar value={progressPercent} max={100} size="sm" showValue rounded />
+          <span className={styles.goalDateRange}>
+            {formatDateOnly(goal.startDate)} – {formatDateOnly(goal.endDate)}
+          </span>
+        </div>
       </div>
     </div>
   );
 }
 
-// ========== Group Card ==========
+// ========== Group Card (single card, multiple items) ==========
 function GroupCard({ items }: { items: any[] }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [fillHeight, setFillHeight] = useState(0);
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-
-  const handleItemHover = (index: number) => {
-    if (!containerRef.current) return;
-    const itemsDOM = containerRef.current.querySelectorAll(`.${styles.timelineItem}`);
-    if (itemsDOM[index]) {
-      const rect = itemsDOM[index].getBoundingClientRect();
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const height = rect.top + rect.height / 2 - containerRect.top;
-      setFillHeight(height);
-    }
-    setHoveredIndex(index);
-  };
-  const handleLeave = () => {
-    setFillHeight(0);
-    setHoveredIndex(null);
-  };
-
   return (
-    <div className={styles.timelineCard}>
+    <div className={styles.card}>
       <div className={styles.cardHeader}>
         <div className={styles.cardTitle}>Study Group Activity</div>
       </div>
-      <TimelineWrapper containerRef={containerRef} fillHeight={fillHeight}>
-        {items.map((item, idx) => {
+      <div className={styles.timelineList}>
+        {items.map((item) => {
           let icon = <FiUsers />;
           let text = '';
           if (item.action === 'group_goal_progress') {
@@ -323,32 +269,18 @@ function GroupCard({ items }: { items: any[] }) {
             icon = <FiAward />;
             text = `Challenge completed!`;
           }
-          const eventDate = format(new Date(item.timestamp), 'yyyy-MM-dd');
-          const dateUrl = `/activity/${eventDate}`;
-
-          const tooltipContent = `${item.action} at ${formatDateTime(item.timestamp)}`;
-          const labelContent = (
-            <>
-              <Link href={dateUrl} className={styles.dateLink}>
-                {formatDateTime(item.timestamp)}
-              </Link>
-              <div className={styles.timelineDetail}>
-                {icon} {text}
-              </div>
-            </>
-          );
+          const dateUrl = `/activity/${format(new Date(item.timestamp), 'yyyy-MM-dd')}`;
           return (
             <TimelineItem
               key={item._id}
-              dotClass={styles.diamond}
-              labelContent={labelContent}
-              tooltipContent={tooltipContent}
-              onMouseEnter={() => handleItemHover(idx)}
-              onMouseLeave={handleLeave}
+              dotColor="blue"
+              dateTime={formatDateTime(item.timestamp)}
+              dateUrl={dateUrl}
+              extraText={`${icon} ${text}`}
             />
           );
         })}
-      </TimelineWrapper>
+      </div>
     </div>
   );
 }
@@ -364,71 +296,45 @@ export default function AllActivityLog() {
   const [groupVisibleCount, setGroupVisibleCount] = useState(6);
   const limit = 6;
 
-  // Solved tab query
-  const solvedParams: ActivityLogsParams = {
-    action: 'question_solved',
-    page: pageSolved,
-    limit,
-  };
+  // Solved
+  const solvedParams: ActivityLogsParams = { action: 'question_solved', page: pageSolved, limit };
   const { data: solvedData, isLoading: solvedLoading, error: solvedError } = useAllActivityLogs(solvedParams);
   const solvedLogs = solvedData?.logs;
   const solvedPagination = solvedData?.pagination;
   const solvedTotalPages = solvedPagination?.pages || 1;
 
-  // Mastered tab query
-  const masteredParams: ActivityLogsParams = {
-    action: 'question_mastered',
-    page: pageMastered,
-    limit,
-  };
+  // Mastered
+  const masteredParams: ActivityLogsParams = { action: 'question_mastered', page: pageMastered, limit };
   const { data: masteredData, isLoading: masteredLoading, error: masteredError } = useAllActivityLogs(masteredParams);
   const masteredLogs = masteredData?.logs;
   const masteredPagination = masteredData?.pagination;
   const masteredTotalPages = masteredPagination?.pages || 1;
 
-  // Revisions: On‑time
-  const onTimeParams: ActivityLogsParams = {
-    action: 'revision_completed',
-    type: 'on_time',
-    page: pageRevisionsOnTime,
-    limit,
-  };
+  // Revisions: on‑time & overdue
+  const onTimeParams: ActivityLogsParams = { action: 'revision_completed', type: 'on_time', page: pageRevisionsOnTime, limit };
   const { data: onTimeData, isLoading: onTimeLoading, error: onTimeError } = useAllActivityLogs(onTimeParams);
   const onTimeLogs = onTimeData?.logs?.revision_completed?.on_time;
   const onTimePagination = onTimeData?.pagination;
   const onTimeTotalPages = onTimePagination?.pages || 1;
 
-  // Revisions: Overdue
-  const overdueParams: ActivityLogsParams = {
-    action: 'revision_completed',
-    type: 'overdue',
-    page: pageRevisionsOverdue,
-    limit,
-  };
+  const overdueParams: ActivityLogsParams = { action: 'revision_completed', type: 'overdue', page: pageRevisionsOverdue, limit };
   const { data: overdueData, isLoading: overdueLoading, error: overdueError } = useAllActivityLogs(overdueParams);
   const overdueLogs = overdueData?.logs?.revision_completed?.overdue;
   const overduePagination = overdueData?.pagination;
   const overdueTotalPages = overduePagination?.pages || 1;
 
-  // Fetch combined revisions data for disclaimer message
-  const messageParams: ActivityLogsParams = {
-    action: 'revision_completed',
-    limit: 1,
-  };
+  // Revisions disclaimer message
+  const messageParams: ActivityLogsParams = { action: 'revision_completed', limit: 1 };
   const { data: messageData } = useAllActivityLogs(messageParams);
   const revisionMessage = messageData?.logs?.revision_completed?.message;
 
-  // Goals tab query
-  const goalsParams: ActivityLogsParams = {
-    action: 'goal_achieved',
-    goalPage,
-    goalLimit: limit,
-  };
+  // Goals
+  const goalsParams: ActivityLogsParams = { action: 'goal_achieved', goalPage, goalLimit: limit };
   const { data: goalsData, isLoading: goalsLoading, error: goalsError } = useAllActivityLogs(goalsParams);
   const goalsLogs = goalsData?.logs?.goal_achieved;
   const goalsTotalPages = goalsLogs?.pagination?.pages || 1;
 
-  // Group tab query
+  // Group
   const { data: groupData, isLoading: groupLoading, error: groupError } = useAllActivityLogs(
     activeTab === 'group' ? { limit: 50 } : undefined
   );
@@ -444,78 +350,63 @@ export default function AllActivityLog() {
     setGroupVisibleCount(6);
   };
 
-  // ---- Solved Tab ----
+  // Render helpers
   const renderSolvedTab = () => {
     const groups = solvedLogs?.question_solved;
-    if (solvedLoading) return <React.Fragment key="solved-loading"><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></React.Fragment>;
-    if (solvedError || !groups || Object.keys(groups).length === 0) return <React.Fragment key="solved-empty"><div className={styles.emptyState}>No solved questions found</div></React.Fragment>;
-    
+    if (solvedLoading) return <div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div>;
+    if (solvedError || !groups || Object.keys(groups).length === 0) return <div className={styles.emptyState}>No solved questions found</div>;
     const cards = Object.values(groups).map((group: QuestionSolvedGroup) => (
       <QuestionCard key={group.question._id} question={group.question} timeline={group.solves_timeline} type="solve" />
     ));
-    const pagination = solvedTotalPages > 1 && (
-      <div key="pagination" className={styles.paginationWrapper}>
-        <Pagination currentPage={pageSolved} totalPages={solvedTotalPages} onPageChange={setPageSolved} showFirstLast showPrevNext size="md" />
-      </div>
-    );
     return (
-      <React.Fragment key="solved-tab">
+      <>
         {cards}
-        {pagination}
-      </React.Fragment>
+        {solvedTotalPages > 1 && (
+          <div className={styles.paginationWrapper}>
+            <Pagination currentPage={pageSolved} totalPages={solvedTotalPages} siblingCount={0} onPageChange={setPageSolved} showFirstLast showPrevNext size="md" />
+          </div>
+        )}
+      </>
     );
   };
 
-  // ---- Mastered Tab ----
   const renderMasteredTab = () => {
     const groups = masteredLogs?.question_mastered;
-    if (masteredLoading) return <React.Fragment key="mastered-loading"><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></React.Fragment>;
-    if (masteredError || !groups || Object.keys(groups).length === 0) return <React.Fragment key="mastered-empty"><div className={styles.emptyState}>No mastered questions found</div></React.Fragment>;
-    
+    if (masteredLoading) return <div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div>;
+    if (masteredError || !groups || Object.keys(groups).length === 0) return <div className={styles.emptyState}>No mastered questions found</div>;
     const cards = Object.values(groups).map((group: QuestionSolvedGroup) => (
       <QuestionCard key={group.question._id} question={group.question} timeline={group.solves_timeline} type="mastered" />
     ));
-    const pagination = masteredTotalPages > 1 && (
-      <div key="pagination" className={styles.paginationWrapper}>
-        <Pagination currentPage={pageMastered} totalPages={masteredTotalPages} onPageChange={setPageMastered} showFirstLast showPrevNext size="md" />
-      </div>
-    );
     return (
-      <React.Fragment key="mastered-tab">
+      <>
         {cards}
-        {pagination}
-      </React.Fragment>
+        {masteredTotalPages > 1 && (
+          <div className={styles.paginationWrapper}>
+            <Pagination currentPage={pageMastered} totalPages={masteredTotalPages} onPageChange={setPageMastered} showFirstLast showPrevNext size="md" />
+          </div>
+        )}
+      </>
     );
   };
 
-  // ---- Revisions Tab (two columns + message) ----
   const renderRevisionsTab = () => {
     if (onTimeLoading || overdueLoading) {
       return (
-        <React.Fragment key="revisions-loading">
-          <div className={styles.revisionsGrid}>
-            <div className={styles.revisionsColumn}><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></div>
-            <div className={styles.revisionsColumn}><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></div>
-          </div>
-        </React.Fragment>
+        <div className={styles.revisionsGrid}>
+          <div className={styles.revisionsColumn}><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></div>
+          <div className={styles.revisionsColumn}><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></div>
+        </div>
       );
     }
-
-    const onTimeGroups = onTimeLogs;
-    const overdueGroups = overdueLogs;
-
-    const hasOnTime = onTimeGroups && Object.keys(onTimeGroups).length > 0;
-    const hasOverdue = overdueGroups && Object.keys(overdueGroups).length > 0;
-
+    const hasOnTime = onTimeLogs && Object.keys(onTimeLogs).length > 0;
+    const hasOverdue = overdueLogs && Object.keys(overdueLogs).length > 0;
     return (
-      <React.Fragment key="revisions-tab">
+      <>
         <div className={styles.revisionsGrid}>
           <div className={styles.revisionsColumn}>
-            <div className={styles.cardHeader} style={{ paddingLeft: 0, marginBottom: '0.5rem' }}>
-              <span className={styles.cardTitle} style={{ fontSize: '0.9rem' }}><FiCheckCircle size={14} /> On‑time</span>
-            </div>
+            <div className={styles.columnHeader}><FiCheckCircle size={14} /> On‑time</div>
             {!hasOnTime && <div className={styles.emptyState}>No on‑time revisions</div>}
-            {hasOnTime && Object.values(onTimeGroups).map((group: RevisionCompletedGroup) => (
+            {hasOnTime && Object.values(onTimeLogs).map((group: RevisionCompletedGroup) => (
               <QuestionCard key={group.question._id} question={group.question} timeline={group.revision_timeline} type="revision" />
             ))}
             {onTimeTotalPages > 1 && (
@@ -524,13 +415,10 @@ export default function AllActivityLog() {
               </div>
             )}
           </div>
-
           <div className={styles.revisionsColumn}>
-            <div className={styles.cardHeader} style={{ paddingLeft: 0, marginBottom: '0.5rem' }}>
-              <span className={styles.cardTitle} style={{ fontSize: '0.9rem' }}><FiAlertCircle size={14} /> Overdue</span>
-            </div>
+            <div className={styles.columnHeader}><FiAlertCircle size={14} /> Overdue</div>
             {!hasOverdue && <div className={styles.emptyState}>No overdue revisions</div>}
-            {hasOverdue && Object.values(overdueGroups).map((group: RevisionCompletedGroup) => (
+            {hasOverdue && Object.values(overdueLogs).map((group: RevisionCompletedGroup) => (
               <QuestionCard key={group.question._id} question={group.question} timeline={group.revision_timeline} type="revision" />
             ))}
             {overdueTotalPages > 1 && (
@@ -546,18 +434,17 @@ export default function AllActivityLog() {
             <span>{revisionMessage}</span>
           </div>
         )}
-      </React.Fragment>
+      </>
     );
   };
 
-  // ---- Goals Tab ----
   const renderGoalsTab = () => {
     const completed = goalsLogs?.completed || [];
     const failed = goalsLogs?.failed || [];
-    if (goalsLoading) return <React.Fragment key="goals-loading"><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></React.Fragment>;
-    if (goalsError || (completed.length === 0 && failed.length === 0)) return <React.Fragment key="goals-empty"><div className={styles.emptyState}>No goals completed or failed</div></React.Fragment>;
+    if (goalsLoading) return <div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div>;
+    if (goalsError || (completed.length === 0 && failed.length === 0)) return <div className={styles.emptyState}>No goals completed or failed</div>;
     return (
-      <React.Fragment key="goals-tab">
+      <>
         {completed.map(goal => <GoalCard key={goal._id} goal={goal} status="completed" />)}
         {failed.map(goal => <GoalCard key={goal._id} goal={goal} status="failed" />)}
         {goalsTotalPages > 1 && (
@@ -565,11 +452,10 @@ export default function AllActivityLog() {
             <Pagination currentPage={goalPage} totalPages={goalsTotalPages} onPageChange={setGoalPage} showFirstLast showPrevNext size="md" />
           </div>
         )}
-      </React.Fragment>
+      </>
     );
   };
 
-  // ---- Group Tab ----
   const renderGroupTab = () => {
     const allItems = [
       ...(groupLogs?.group_goal_progress || []),
@@ -578,19 +464,17 @@ export default function AllActivityLog() {
       ...(groupLogs?.group_challenge_completed || []),
     ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     const visibleItems = allItems.slice(0, groupVisibleCount);
-
-    if (groupLoading) return <React.Fragment key="group-loading"><div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div></React.Fragment>;
-    if (groupError || allItems.length === 0) return <React.Fragment key="group-empty"><div className={styles.emptyState}>No group activity yet</div></React.Fragment>;
-
+    if (groupLoading) return <div className={styles.skeletonList}><div className={styles.skeletonItem} /><div className={styles.skeletonItem} /></div>;
+    if (groupError || allItems.length === 0) return <div className={styles.emptyState}>No group activity yet</div>;
     return (
-      <React.Fragment key="group-tab">
+      <>
         <GroupCard items={visibleItems} />
         {groupVisibleCount < allItems.length && (
           <div className={styles.loadMore}>
             <Button variant="outline" size="sm" onClick={() => setGroupVisibleCount(prev => prev + 6)}>Load More</Button>
           </div>
         )}
-      </React.Fragment>
+      </>
     );
   };
 
@@ -606,7 +490,7 @@ export default function AllActivityLog() {
   };
 
   return (
-    <Card className={styles.container}>
+    <div className={styles.container}>
       <div className={styles.header}>
         <h3 className={styles.title}>All Activity Log</h3>
       </div>
@@ -622,7 +506,7 @@ export default function AllActivityLog() {
         ))}
       </div>
       <div className={styles.content}>{renderContent()}</div>
-    </Card>
+    </div>
   );
 }
 

@@ -1,18 +1,21 @@
+// frontend/src/app/(main)/sheets/[slug]/parts/ProgressChart.tsx
+
 'use client';
 
 import { useMemo } from 'react';
 import { useTheme } from 'next-themes';
 import {
   Chart as ChartJS,
+  PolarAreaController,
   ArcElement,
+  RadialLinearScale,
   Tooltip,
   Legend,
 } from 'chart.js';
-import { Doughnut } from 'react-chartjs-2';
-import Card from '@/shared/components/Card';
+import { PolarArea } from 'react-chartjs-2';
 import styles from './ProgressChart.module.css';
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(PolarAreaController, ArcElement, RadialLinearScale, Tooltip, Legend);
 
 interface ProgressChartProps {
   solvedCount: number;
@@ -28,75 +31,88 @@ export default function ProgressChart({
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
-  const totalPossible = totalQuestions * 2;
-  const completed = solvedCount + revisionCompletedCount;
-  const remaining = totalPossible - completed;
-  const percentage = totalPossible > 0 ? (completed / totalPossible) * 100 : 0;
+  // Derived values
+  const unsolvedCount = totalQuestions - solvedCount;
+  const revisionPendingCount = totalQuestions - revisionCompletedCount;
+  const solvedPercentage = totalQuestions ? (solvedCount / totalQuestions) * 100 : 0;
+  const revisionPercentage = totalQuestions ? (revisionCompletedCount / totalQuestions) * 100 : 0;
+  const overallPercentage = (solvedPercentage + revisionPercentage) / 2;
 
   const chartData = useMemo(() => ({
-    labels: ['Completed', 'Remaining'],
+    labels: ['Solved', 'Unsolved', 'Revision Completed', 'Revision Pending'],
     datasets: [
       {
-        data: [completed, remaining],
-        backgroundColor: isDark ? ['#7C8B7A', '#3A3B36'] : ['#6C7A6E', '#DAD8D2'],
+        data: [solvedCount, unsolvedCount, revisionCompletedCount, revisionPendingCount],
+        backgroundColor: isDark
+          ? ['#4caf50', '#3a3b36', '#f59e0b', '#3a3b36']
+          : ['#4caf50', '#dad8d2', '#f59e0b', '#dad8d2'],
         borderWidth: 0,
-        hoverOffset: 4,
-        cutout: '65%',
+        hoverOffset: 8,
       },
     ],
-  }), [completed, remaining, isDark]);
+  }), [solvedCount, unsolvedCount, revisionCompletedCount, revisionPendingCount, isDark]);
 
   const chartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: true,
     plugins: {
-      legend: {
-        position: 'bottom' as const,
-        labels: {
-          color: isDark ? '#E6E5DF' : '#242424',
-          font: { size: 12 },
-          usePointStyle: true,
-          boxWidth: 8,
-        },
-      },
       tooltip: {
         callbacks: {
           label: (context: any) => {
+            const label = context.label || '';
             const value = context.raw;
-            const total = completed + remaining;
-            const percent = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-            return `${context.label}: ${value} (${percent}%)`;
+            const total = (label === 'Solved' || label === 'Unsolved')
+              ? totalQuestions
+              : totalQuestions;
+            const percentage = total ? ((value / total) * 100).toFixed(1) : 0;
+            return `${label}: ${value} (${percentage}%)`;
           },
         },
       },
+      legend: {
+        display: false,
+      },
     },
-  }), [isDark, completed, remaining]);
+    scales: {
+      r: {
+        ticks: { display: false },
+        grid: { display: false },
+        angleLines: { display: false },
+        startAngle: 0,
+      },
+    },
+  }), [totalQuestions]);
 
   return (
-    <Card className={styles.container} noHover>
-      <div className={styles.header}>
-        <h3 className={styles.title}>Your Overall Progress</h3>
+    <div className={styles.container}>
+      {/* Left column: metrics */}
+      <div className={styles.metrics}>
+        <div className={styles.metricItem}>
+          <span className={styles.metricLabel}>✓ Solved</span>
+          <span className={styles.metricValue}>
+            {solvedCount} / {totalQuestions}
+            <span className={styles.percentage}>({Math.round(solvedPercentage)}%)</span>
+          </span>
+        </div>
+        <div className={styles.metricItem}>
+          <span className={styles.metricLabel}>⟳ Revision</span>
+          <span className={styles.metricValue}>
+            {revisionCompletedCount} / {totalQuestions}
+            <span className={styles.percentage}>({Math.round(revisionPercentage)}%)</span>
+          </span>
+        </div>
+        <div className={styles.metricItem}>
+          <span className={styles.metricLabel}>Overall</span>
+          <span className={styles.metricValue}>
+            {Math.round(overallPercentage)}% complete
+          </span>
+        </div>
       </div>
-      <div className={styles.statsRow}>
-        <div className={styles.statItem}>
-          <span className={styles.statValue}>{solvedCount} / {totalQuestions}</span>
-          <span className={styles.statLabel}>Solved</span>
-        </div>
-        <div className={styles.statDivider}>+</div>
-        <div className={styles.statItem}>
-          <span className={styles.statValue}>{revisionCompletedCount} / {totalQuestions}</span>
-          <span className={styles.statLabel}>Revision Completed</span>
-        </div>
-        <div className={styles.statDivider}>=</div>
-        <div className={styles.statItem}>
-          <span className={styles.statValue}>{completed} / {totalPossible}</span>
-          <span className={styles.statLabel}>Combined</span>
-          <span className={styles.statPercentage}>({percentage.toFixed(1)}%)</span>
-        </div>
-      </div>
+
+      {/* Right column: polar area chart */}
       <div className={styles.chartWrapper}>
-        <Doughnut data={chartData} options={chartOptions} />
+        <PolarArea data={chartData} options={chartOptions} />
       </div>
-    </Card>
+    </div>
   );
 }

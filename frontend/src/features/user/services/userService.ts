@@ -92,5 +92,10 @@ export const userService = {
   async getUserHeatmap(userId: string, year: number): Promise<HeatmapData> {
     const response = await apiClient.get<HeatmapData>(`/users/${userId}/heatmap/${year}`);
     return response.data;
-  }
+  },
+  
+  async getTotalUsers(): Promise<{ total: number }> {
+    const response = await apiClient.get('/users/count');
+    return response.data;
+  },
 };

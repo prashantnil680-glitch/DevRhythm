@@ -31,78 +31,27 @@ const UserSchema = new mongoose.Schema({
   },
   avatarUrl: String,
   streak: {
-    current: {
-      type: Number,
-      default: 0
-    },
-    longest: {
-      type: Number,
-      default: 0
-    },
-    lastActiveDate: {
-      type: Date,
-      default: null
-    }
+    current: { type: Number, default: 0 },
+    longest: { type: Number, default: 0 },
+    lastActiveDate: { type: Date, default: null }
   },
   stats: {
-    totalSolved: {
-      type: Number,
-      default: 0
-    },
-    masteryRate: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 100
-    },
-    totalRevisions: {
-      type: Number,
-      default: 0
-    },
-    totalTimeSpent: {
-      type: Number,
-      default: 0
-    },
-    activeDays: {
-      type: Number,
-      default: 0
-    }
+    totalSolved: { type: Number, default: 0 },
+    masteryRate: { type: Number, default: 0, min: 0, max: 100 },
+    totalRevisions: { type: Number, default: 0 },
+    totalTimeSpent: { type: Number, default: 0 },
+    activeDays: { type: Number, default: 0 }
   },
   preferences: {
-    timezone: {
-      type: String,
-      // default: 'UTC'
-    },
+    timezone: { type: String },
     notifications: {
-      revisionReminders: {
-        type: Boolean,
-        default: true
-      },
-      goalTracking: {
-        type: Boolean,
-        default: true
-      },
-      socialInteractions: {
-        type: Boolean,
-        default: true
-      },
-      weeklyReports: {
-        type: Boolean,
-        default: true
-      }
+      revisionReminders: { type: Boolean, default: true },
+      goalTracking: { type: Boolean, default: true },
+      socialInteractions: { type: Boolean, default: true },
+      weeklyReports: { type: Boolean, default: true }
     },
-    dailyGoal: {
-      type: Number,
-      min: 1,
-      max: 50,
-      default: null
-    },
-    weeklyGoal: {
-      type: Number,
-      min: 5,
-      max: 100,
-      default: null
-    }
+    dailyGoal: { type: Number, min: 1, max: 50, default: null },
+    weeklyGoal: { type: Number, min: 5, max: 100, default: null }
   },
   lastOnline: {
     type: Date,
@@ -132,7 +81,19 @@ const UserSchema = new mongoose.Schema({
   lastDigestSentAt: {
     type: Date,
     default: null
-  }
+  },
+  isNewUser: {
+    type: Boolean,
+    default: true,
+  },
+  lastLoginAt: {
+    type: Date,
+    default: null,
+  },
+  lastWelcomeBackShownAt: {
+    type: Date,
+    default: null,
+  },
 }, {
   timestamps: true
 });

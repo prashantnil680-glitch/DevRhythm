@@ -59,9 +59,14 @@ const handleOAuthCallback = (provider) => (req, res, next) => {
         console.log(`Timezone set to ${detectedTz} for user ${user._id} based on IP ${req.ip}`);
       }
       
+      if (!user.lastLoginAt) {
+        user.lastLoginAt = new Date();
+        await user.save();
+      }
+
       const token = generateToken(user._id);
       const refreshToken = generateRefreshToken(user._id);
-      
+
       const code = crypto.randomBytes(32).toString('hex');
       const codeKey = `devrhythm:auth:code:${code}`;
       await redisClient.setEx(codeKey, 300, JSON.stringify({
@@ -69,7 +74,7 @@ const handleOAuthCallback = (provider) => (req, res, next) => {
         token,
         refreshToken
       }));
-      
+
       const redirectUrl = new URL(`${config.frontendUrl}/auth/callback`);
       redirectUrl.searchParams.set('code', code);
       res.redirect(redirectUrl.toString());
@@ -194,6 +199,22 @@ const exchangeCode = async (req, res, next) => {
     
     const { userId, token, refreshToken } = JSON.parse(stored);
     
+    // Fetch user to update lastLoginAt and compute welcome flags
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+    
+    // Update lastLoginAt (used for welcome-back detection)
+    const now = new Date();
+    user.lastLoginAt = now;
+    await user.save();
+    
+    // Compute welcome flags
+    const showWelcome = user.isNewUser === true;
+    const showWelcomeBack = !user.isNewUser && 
+      (user.lastWelcomeBackShownAt === null || user.lastWelcomeBackShownAt < user.lastLoginAt);
+    
     // Optionally set a secure HTTP‑only cookie for server‑side auth
     res.cookie('auth_token', token, {
       httpOnly: true,
@@ -205,7 +226,9 @@ const exchangeCode = async (req, res, next) => {
     res.json(formatResponse('Code exchanged successfully', {
       token,
       refreshToken,
-      userId
+      userId,
+      showWelcome,
+      showWelcomeBack,
     }));
   } catch (error) {
     next(error);

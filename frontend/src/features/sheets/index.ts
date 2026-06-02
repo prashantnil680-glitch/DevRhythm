@@ -11,6 +11,10 @@ export { useSheetProgress, sheetProgressKey } from './hooks/useSheetProgress';
 export { useUserProgress, userProgressKey } from './hooks/useUserProgress';
 export { useSheetChart, sheetChartKey } from './hooks/useSheetChart';
 
+// NEW: Bookmark hooks
+export { useBookmarkedSheets } from './hooks/useBookmarkedSheets';
+export { useToggleBookmark } from './hooks/useToggleBookmark';
+
 // Hooks - Mutations
 export { useJoinSheet } from './hooks/useJoinSheet';
 export { useLeaveSheet } from './hooks/useLeaveSheet';

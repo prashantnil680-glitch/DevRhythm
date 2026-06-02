@@ -30,7 +30,7 @@ const upload = multer({
   },
 });
 
-// Public routes (with optional auth for personalized data)
+// ========== Public routes (with optional auth) ==========
 router.get(
   '/',
   optionalAuth,
@@ -40,20 +40,20 @@ router.get(
   sheetController.getSheets
 );
 
+// ========== Authenticated routes (specific paths) ==========
 router.get(
-  '/:slug',
-  optionalAuth,
-  rateLimiters.publicLimiter,
-  cache(60, 'sheet'),
-  validate(sheetValidator.sheetIdParam, 'params'),
-  sheetController.getSheetBySlug
+  '/bookmarks',
+  auth,
+  rateLimiters.userLimiter,
+  cache(30, 'sheets:bookmarks'),
+  validate(sheetValidator.getSheets, 'query'),
+  sheetController.getBookmarkedSheets
 );
 
-// Authenticated routes
 router.post(
   '/',
   auth,
-  rateLimiters.groupCreateLimiter, // reuse group limiter (similar write intensity)
+  rateLimiters.groupCreateLimiter,
   validate(sheetValidator.createSheetManual),
   sheetController.createSheet
 );
@@ -65,6 +65,16 @@ router.post(
   upload.single('file'),
   validate(sheetValidator.importExcelPreview, 'body'),
   sheetController.importSheet
+);
+
+// ========== Dynamic routes (with slug parameter) ==========
+router.get(
+  '/:slug',
+  optionalAuth,
+  rateLimiters.publicLimiter,
+  cache(60, 'sheet'),
+  validate(sheetValidator.sheetIdParam, 'params'),
+  sheetController.getSheetBySlug
 );
 
 router.post(
@@ -140,8 +150,16 @@ router.patch(
   auth,
   rateLimiters.userLimiter,
   validate(sheetValidator.sheetIdParam, 'params'),
-  validate(sheetValidator.updateTargetDate, 'body'),
+  validate(sheetValidator.updateTargetDate),
   sheetController.updateTargetDate
+);
+
+router.post(
+  '/:slug/bookmark',
+  auth,
+  rateLimiters.userLimiter,
+  validate(sheetValidator.sheetIdParam, 'params'),
+  sheetController.toggleBookmark
 );
 
 module.exports = router;

@@ -11,10 +11,10 @@ import styles from './SheetFilterBar.module.css';
 interface SheetFilterBarProps {
   search: string;
   onSearchChange: (value: string) => void;
-  ownerFilter: 'all' | 'mine';
-  onOwnerFilterChange: (value: 'all' | 'mine') => void;
-  sortBy: 'createdAt' | 'name' | 'updatedAt';
-  onSortByChange: (value: 'createdAt' | 'name' | 'updatedAt') => void;
+  viewFilter: 'all' | 'mine' | 'bookmarked';  // changed from ownerFilter
+  onViewFilterChange: (value: 'all' | 'mine' | 'bookmarked') => void;
+  sortBy: 'createdAt' | 'name' | 'updatedAt' | 'bookmarkCount'; // added bookmarkCount
+  onSortByChange: (value: 'createdAt' | 'name' | 'updatedAt' | 'bookmarkCount') => void;
   sortOrder: 'asc' | 'desc';
   onSortOrderChange: (value: 'asc' | 'desc') => void;
   isLoggedIn: boolean;
@@ -22,22 +22,25 @@ interface SheetFilterBarProps {
 }
 
 const SORT_OPTIONS = [
+  { value: 'bookmarkCount_desc', label: 'Most bookmarked' },
+  { value: 'bookmarkCount_asc', label: 'Least bookmarked' },
   { value: 'createdAt_desc', label: 'Newest' },
   { value: 'createdAt_asc', label: 'Oldest' },
   { value: 'name_asc', label: 'Name (A-Z)' },
   { value: 'name_desc', label: 'Name (Z-A)' },
 ];
 
-const OWNER_OPTIONS = [
+const VIEW_OPTIONS = [
   { value: 'all', label: 'All Sheets' },
   { value: 'mine', label: 'My Sheets' },
+  { value: 'bookmarked', label: 'Bookmarks' },
 ];
 
 export default function SheetFilterBar({
   search,
   onSearchChange,
-  ownerFilter,
-  onOwnerFilterChange,
+  viewFilter,
+  onViewFilterChange,
   sortBy,
   sortOrder,
   onSortByChange,
@@ -47,7 +50,7 @@ export default function SheetFilterBar({
 }: SheetFilterBarProps) {
   const handleSortChange = useCallback((selectedValue: string) => {
     const [newSortBy, newSortOrder] = selectedValue.split('_');
-    onSortByChange(newSortBy as 'createdAt' | 'name' | 'updatedAt');
+    onSortByChange(newSortBy as 'createdAt' | 'name' | 'updatedAt' | 'bookmarkCount');
     onSortOrderChange(newSortOrder as 'asc' | 'desc');
   }, [onSortByChange, onSortOrderChange]);
 
@@ -71,11 +74,11 @@ export default function SheetFilterBar({
       <div className={styles.filterControls}>
         {isLoggedIn && (
           <Select
-            value={ownerFilter}
-            onChange={(value) => onOwnerFilterChange(value as 'all' | 'mine')}
-            options={OWNER_OPTIONS}
+            value={viewFilter}
+            onChange={(value) => onViewFilterChange(value as 'all' | 'mine' | 'bookmarked')}
+            options={VIEW_OPTIONS}
             className={styles.filterSelect}
-            aria-label="Filter by owner"
+            aria-label="Filter sheets"
           />
         )}
 

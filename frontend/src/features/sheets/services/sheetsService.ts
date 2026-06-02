@@ -14,28 +14,24 @@ import type {
   SheetWithStats,
 } from '../types/sheets.types';
 
-/**
- * Sheets API service.
- * All methods return the unwrapped data (apiClient interceptor handles ApiResponse format).
- */
 export const sheetService = {
   /**
    * Get paginated list of sheets with optional filters.
    * GET /api/v1/sheets
    */
-async getSheets(params?: GetSheetsParams): Promise<SheetsListResponse> {
-  const query = buildQueryString(params);
-  const response = await apiClient.get<SheetWithStats[]>(`/sheets${query}`) as ApiClientResponse<SheetWithStats[]>;
-  return {
-    sheets: response.data,
-    pagination: response.meta?.pagination || {
-      page: params?.page || 1,
-      limit: params?.limit || 20,
-      total: response.data.length,
-      pages: 1,
-    },
-  };
-},
+  async getSheets(params?: GetSheetsParams): Promise<SheetsListResponse> {
+    const query = buildQueryString(params);
+    const response = await apiClient.get<SheetWithStats[]>(`/sheets${query}`) as ApiClientResponse<SheetWithStats[]>;
+    return {
+      sheets: response.data,
+      pagination: response.meta?.pagination || {
+        page: params?.page || 1,
+        limit: params?.limit || 20,
+        total: response.data.length,
+        pages: 1,
+      },
+    };
+  },
 
   /**
    * Get a single sheet by slug.
@@ -158,6 +154,41 @@ async getSheets(params?: GetSheetsParams): Promise<SheetsListResponse> {
    */
   async deleteSheet(slug: string): Promise<{ warning?: string }> {
     const response = await apiClient.delete<{ warning?: string }>(`/sheets/${slug}`);
+    return response.data;
+  },
+
+  // ========== BOOKMARK METHODS ==========
+
+  /**
+   * Get user's bookmarked sheets, most recent first.
+   * GET /api/v1/sheets/bookmarks
+   */
+  async getBookmarkedSheets(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<SheetsListResponse> {
+    const query = buildQueryString(params);
+    const response = await apiClient.get<SheetWithStats[]>(`/sheets/bookmarks${query}`) as ApiClientResponse<SheetWithStats[]>;
+    return {
+      sheets: response.data,
+      pagination: response.meta?.pagination || {
+        page: params?.page || 1,
+        limit: params?.limit || 20,
+        total: response.data.length,
+        pages: 1,
+      },
+    };
+  },
+
+  /**
+   * Toggle bookmark for a sheet.
+   * POST /api/v1/sheets/:slug/bookmark
+   */
+  async toggleBookmark(slug: string): Promise<{ isBookmarked: boolean; bookmarkCount: number }> {
+    const response = await apiClient.post<{ isBookmarked: boolean; bookmarkCount: number }>(
+      `/sheets/${slug}/bookmark`
+    );
     return response.data;
   },
 };

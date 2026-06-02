@@ -58,9 +58,10 @@ const getSheets = Joi.object({
   ...paginationQuery,
   search: Joi.string().trim().min(1).max(100),
   ownerId: Joi.string().hex().length(24),
-  sortBy: Joi.string().valid('createdAt', 'name', 'updatedAt').default('createdAt'),
+  sortBy: Joi.string().valid('createdAt', 'name', 'updatedAt', 'bookmarkCount').default('bookmarkCount'),
   sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
   mySheets: Joi.boolean().default(false),
+  bookmarked: Joi.boolean().default(false),
 });
 
 const getUserProgress = Joi.object({

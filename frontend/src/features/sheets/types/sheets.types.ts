@@ -16,9 +16,11 @@ export interface Sheet {
   isActive: boolean;
   createdAt: ISODateString;
   updatedAt: ISODateString;
-  specialTag?: string;                 
-  originalSourceName?: string;        
-  originalSourceUrl?: string;          
+  specialTag?: string;
+  originalSourceName?: string;
+  originalSourceUrl?: string;
+  bookmarkCount: number;      
+  isBookmarked: boolean;      
 }
 
 export interface Participant {
@@ -180,7 +182,7 @@ export interface ProgressChartData {
 export interface GetSheetsParams {
   search?: string;
   ownerId?: string;
-  sortBy?: 'createdAt' | 'name' | 'updatedAt';
+  sortBy?: 'createdAt' | 'name' | 'updatedAt' | 'bookmarkCount'; 
   sortOrder?: 'asc' | 'desc';
   page?: number;
   limit?: number;

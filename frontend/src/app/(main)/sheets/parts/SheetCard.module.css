@@ -302,6 +302,15 @@
   transform: translateX(1px);
 }
 
+.avatarSkeleton {
+  border-radius: 50%;
+}
+
+.tagSkeleton,
+.sourceSkeleton {
+  border-radius: 40px;
+}
+
 /* Responsive adjustments */
 @media (max-width: 767px) {
   .cardContent {

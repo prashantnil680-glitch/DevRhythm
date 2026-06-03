@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { FiUsers, FiCalendar, FiExternalLink, FiTag, FiBookmark, FiLogIn } from 'react-icons/fi';
@@ -25,7 +26,7 @@ interface SheetCardProps {
   className?: string;
 }
 
-export default function SheetCard({
+function SheetCard({
   sheet,
   isOwner,
   isJoined,
@@ -58,8 +59,8 @@ export default function SheetCard({
 
   let ownerAvatar: string | undefined;
   if (ownerDisplayName && participants.length) {
-    const matchedParticipant = participants.find(p =>
-      p.displayName === ownerDisplayName || p.username === ownerDisplayName
+    const matchedParticipant = participants.find(
+      (p) => p.displayName === ownerDisplayName || p.username === ownerDisplayName
     );
     ownerAvatar = matchedParticipant?.avatarUrl;
   }
@@ -86,9 +87,10 @@ export default function SheetCard({
   const hasSource = !!originalSourceName;
   const showMetadata = hasParticipants || hasTag || hasSource;
 
-  const participantText = participantCount === 1
-    ? '1 participant joined this sheet'
-    : `${participantCount} participants joined this sheet`;
+  const participantText =
+    participantCount === 1
+      ? '1 participant joined this sheet'
+      : `${participantCount} participants joined this sheet`;
 
   return (
     <Card className={clsx(styles.card, className)} noHover>
@@ -210,3 +212,5 @@ export default function SheetCard({
     </Card>
   );
 }
+
+export default React.memo(SheetCard);

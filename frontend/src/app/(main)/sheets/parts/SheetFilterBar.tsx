@@ -1,5 +1,3 @@
-// frontend/src/app/(main)/sheets/parts/SheetFilterBar.tsx
-
 'use client';
 
 import { useCallback } from 'react';
@@ -19,36 +17,30 @@ interface SheetFilterBarProps {
   sortOrder: 'asc' | 'desc';
   onSortOrderChange: (value: 'asc' | 'desc') => void;
   isLoggedIn: boolean;
-  hasSheets: boolean; // NEW: indicates if any sheets exist in the database
   className?: string;
 }
 
-// Full list of sort options (used when sheets exist)
+// Full sort options (always shown for logged-in users)
 const FULL_SORT_OPTIONS = [
   { value: 'bookmarkCount_desc', label: 'Most Bookmarked' },
   { value: 'bookmarkCount_asc', label: 'Least Bookmarked' },
   { value: 'createdAt_desc', label: 'Newest' },
   { value: 'createdAt_asc', label: 'Oldest' },
-  // { value: 'name_asc', label: 'Name (A-Z)' },
-  // { value: 'name_desc', label: 'Name (Z-A)' },
+  { value: 'name_asc', label: 'Name (A-Z)' },
+  { value: 'name_desc', label: 'Name (Z-A)' },
 ];
 
-// Filtered sort options (without bookmark-related) when no sheets exist
-const NO_SHEETS_SORT_OPTIONS = FULL_SORT_OPTIONS.filter(
+// Sort options without bookmark (for non‑logged‑in users)
+const PUBLIC_SORT_OPTIONS = FULL_SORT_OPTIONS.filter(
   option => !option.value.startsWith('bookmarkCount')
 );
 
-// Full list of view options
-const FULL_VIEW_OPTIONS = [
+// View options always include "Bookmarked" for logged‑in users
+const VIEW_OPTIONS = [
   { value: 'all', label: 'All Sheets' },
   { value: 'mine', label: 'My Sheets' },
   { value: 'bookmarked', label: 'Bookmarked' },
 ];
-
-// Filtered view options (without 'bookmarked') when no sheets exist
-const NO_SHEETS_VIEW_OPTIONS = FULL_VIEW_OPTIONS.filter(
-  option => option.value !== 'bookmarked'
-);
 
 export default function SheetFilterBar({
   search,
@@ -60,7 +52,6 @@ export default function SheetFilterBar({
   onSortByChange,
   onSortOrderChange,
   isLoggedIn,
-  hasSheets,
   className,
 }: SheetFilterBarProps) {
   const handleSortChange = useCallback((selectedValue: string) => {
@@ -70,12 +61,11 @@ export default function SheetFilterBar({
   }, [onSortByChange, onSortOrderChange]);
 
   const currentSortValue = `${sortBy}_${sortOrder}`;
-  const sortOptions = hasSheets ? FULL_SORT_OPTIONS : NO_SHEETS_SORT_OPTIONS;
-  const viewOptions = isLoggedIn ? (hasSheets ? FULL_VIEW_OPTIONS : NO_SHEETS_VIEW_OPTIONS) : [];
+  const sortOptions = isLoggedIn ? FULL_SORT_OPTIONS : PUBLIC_SORT_OPTIONS;
+  const viewOptions = isLoggedIn ? VIEW_OPTIONS : [];
 
-  // Ensure current viewFilter is valid if it's 'bookmarked' but no sheets exist
-  // (This should be handled by the parent, but we can also guard here)
-  const effectiveViewFilter = (!hasSheets && viewFilter === 'bookmarked') ? 'all' : viewFilter;
+  // Safety guard: if viewFilter is 'bookmarked' but user not logged in, fallback to 'all'
+  const effectiveViewFilter = !isLoggedIn && viewFilter === 'bookmarked' ? 'all' : viewFilter;
 
   return (
     <div className={clsx(styles.filterBar, className)}>
@@ -91,7 +81,6 @@ export default function SheetFilterBar({
           className={styles.searchBar}
         />
       </div>
-
       <div className={styles.filterControls}>
         {isLoggedIn && viewOptions.length > 0 && (
           <Select
@@ -102,7 +91,6 @@ export default function SheetFilterBar({
             aria-label="Filter sheets"
           />
         )}
-
         <SortDropdown
           options={sortOptions}
           value={currentSortValue}

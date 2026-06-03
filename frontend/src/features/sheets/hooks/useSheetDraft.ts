@@ -1,3 +1,4 @@
+'use client'
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { sheetService } from '../services/sheetsService';
 import { useDebounceCallback } from '@/shared/hooks';

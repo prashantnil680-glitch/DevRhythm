@@ -53,6 +53,7 @@
   text-decoration: underline;
 }
 
+
 /* Tablet and mobile */
 @media (max-width: 939px) {
   .container {
@@ -71,3 +72,89 @@
     font-size: 1.1rem;
   }
 }
+
+/* General container – ensure no overflow clipping */
+.container {
+  overflow: visible !important;
+}
+
+/* Sentinel for sticky detection */
+.sentinel {
+  height: 1px;
+  margin-bottom: -1px;
+}
+
+/* Filter bar wrapper – normal state */
+.filterWrapper {
+  transition: box-shadow 0.2s ease, background 0.2s ease;
+}
+
+/* Sticky state – applied via JS scroll listener */
+.filterWrapper.sticky {
+  position: sticky;
+  top: 2rem;
+  z-index: 10;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 8px var(--shadow);
+  margin-bottom: 1rem;
+  padding-top: 0.2rem;
+  padding-bottom: 0.5rem;
+}
+
+/* Mobile adjustment for navbar height */
+@media (max-width: 768px) {
+  .filterWrapper.sticky {
+    top: 2rem;
+  }
+}
+
+/* Chart section spacing */
+.chartSection {
+  margin: 1.5rem 0;
+}
+
+/* Questions section spacing */
+.questionsSection {
+  margin: 1.5rem 0;
+}
+
+/* Section header with title (same as sheet detail page) */
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--divider);
+}
+
+.sectionTitle {
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--divider);
+}
+
+/* Empty state for filtered questions */
+.emptyState {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  font-style: italic;
+  background: var(--bg-surface);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+/* Pagination wrapper */
+.paginationWrapper {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+/* Optional: existing styles from original file (if any) – keep them unchanged */

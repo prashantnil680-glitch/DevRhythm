@@ -151,9 +151,17 @@ export interface UserProgress {
     solvedCount: number;
     revisionCompletedCount: number;
     totalQuestions: number;
-    completionPercentage: number; // (solved+revision) / (totalQuestions*2) * 100
+    completionPercentage: number;
   };
   shareLink: string;
+  pagination?: { 
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
 }
 
 // ===== Chart Data =====

@@ -157,3 +157,31 @@
     font-size: 1.1rem;
   }
 }
+
+/* Sticky filter bar */
+.sentinel {
+  height: 1px;
+  margin-bottom: 0px;
+}
+
+.filterWrapper {
+  transition: box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.filterWrapper.sticky {
+  position: sticky;
+  top: 2rem;
+  z-index: 10;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 8px var(--shadow);
+  margin-bottom: 1rem;
+  padding-top: 0.3rem;
+  padding-bottom: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .filterWrapper.sticky {
+    top: 2rem;
+  }
+}

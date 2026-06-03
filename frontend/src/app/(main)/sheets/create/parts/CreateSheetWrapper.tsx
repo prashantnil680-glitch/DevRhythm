@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCreateSheet, useImportSheet } from '@/features/sheets';
 import { ROUTES } from '@/shared/config';
@@ -12,10 +12,32 @@ import styles from './CreateSheetWrapper.module.css';
 
 export function CreateSheetWrapper() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'manual' | 'import'>('manual');
+  const searchParams = useSearchParams();
+
+  // Read tab from URL query parameter
+  const tabParam = searchParams.get('tab');
+  const initialTab = tabParam === 'import' ? 'import' : 'manual';
+  const [activeTab, setActiveTab] = useState<'manual' | 'import'>(initialTab);
 
   const createMutation = useCreateSheet();
   const importMutation = useImportSheet();
+
+  // Update URL when activeTab changes, but only if the URL doesn't already match
+  useEffect(() => {
+    const currentSearch = window.location.search;
+    const params = new URLSearchParams(currentSearch);
+    if (activeTab === 'manual') {
+      params.delete('tab');
+    } else {
+      params.set('tab', activeTab);
+    }
+    const newSearch = params.toString();
+    const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}`;
+    // Only replace if the URL would actually change
+    if (newUrl !== window.location.href) {
+      router.replace(newUrl, { scroll: false });
+    }
+  }, [activeTab, router]);
 
   const handleManualSubmit = async (data: any) => {
     const result = await createMutation.mutateAsync(data);

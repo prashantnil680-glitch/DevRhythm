@@ -1,28 +1,23 @@
 import { useQuery } from '@tanstack/react-query';
 import { sheetService } from '../services/sheetsService';
-import type { UserProgress } from '../types/sheets.types';
+import { sheetsKeys } from './useSheets';
 
-/**
- * Hook to fetch another user's progress within a sheet.
- * @param slug - The sheet slug
- * @param username - The username of the target user
- * @returns React Query result with data, isLoading, error, refetch
- */
-export function useUserProgress(slug: string, username: string) {
-  return useQuery({
-    queryKey: ['sheets', 'detail', slug, 'progress', username],
-    queryFn: () => sheetService.getUserProgress(slug, username),
-    enabled: !!slug && !!username,
-    staleTime: 1 * 60 * 1000, // 1 minute – progress updates frequently
-    gcTime: 3 * 60 * 1000,
-  });
+interface UseUserProgressParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: 'solved' | 'unsolved' | 'all';
+  revisionStatus?: 'completed' | 'pending' | 'all';
+  difficulty?: 'easy' | 'medium' | 'hard';
+  sortBy?: 'title' | 'difficulty' | 'lastUpdated' | 'solved' | 'revisionCompleted';
+  sortOrder?: 'asc' | 'desc';
 }
 
-// Re-export query key for invalidation
-export const userProgressKey = (slug: string, username: string) => [
-  'sheets',
-  'detail',
-  slug,
-  'progress',
-  username,
-];
+export function useUserProgress(slug: string, username: string, params?: UseUserProgressParams) {
+  return useQuery({
+    queryKey: [...sheetsKeys.detail(slug), 'progress', username, params],
+    queryFn: () => sheetService.getUserProgress(slug, username, params),
+    enabled: !!slug && !!username,
+    staleTime: 1 * 60 * 1000,
+  });
+}

@@ -94,6 +94,24 @@ export default function SheetDetailPage() {
     refetch();
   };
 
+  // Sticky filter logic (same as progress page)
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const filterWrapperRef = useRef<HTMLDivElement>(null);
+  const [isSticky, setIsSticky] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (sentinelRef.current) {
+        const sentinelRect = sentinelRef.current.getBoundingClientRect();
+        const newSticky = sentinelRect.bottom <= 0;
+        setIsSticky(prev => (prev === newSticky ? prev : newSticky));
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // initial check
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   const questionsSectionRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!isLoading && sheetData) {
@@ -225,14 +243,13 @@ export default function SheetDetailPage() {
         />
       </div>
 
-      <div ref={questionsSectionRef} className={styles.questionsSection}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Questions</h2>
-          <Link href="/questions" className={styles.viewAllLink}>
-            View All →
-          </Link>
-        </div>
+      {/* Sentinel for sticky detection */}
+      <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />
 
+      <div
+        ref={filterWrapperRef}
+        className={`${styles.filterWrapper} ${isSticky ? styles.sticky : ''}`}
+      >
         <QuestionsFilterBar
           search={search}
           onSearchChange={setSearch}
@@ -244,6 +261,15 @@ export default function SheetDetailPage() {
           onDifficultyChange={setDifficulty}
           onClearFilters={handleClearFilters}
         />
+      </div>
+
+      <div ref={questionsSectionRef} className={styles.questionsSection}>
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>Questions</h2>
+          <Link href="/questions" className={styles.viewAllLink}>
+            View All →
+          </Link>
+        </div>
 
         {questions.length === 0 ? (
           <p className={styles.emptyState}>No questions match your filters.</p>

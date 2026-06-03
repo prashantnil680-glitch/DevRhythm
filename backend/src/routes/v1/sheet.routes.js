@@ -190,6 +190,16 @@ router.get(
   rateLimiters.progressLimiter,
   validate(sheetValidator.sheetIdParam, 'params'),
   validate(sheetValidator.getUserProgress, 'params'),
+  validate(Joi.object({
+    page: Joi.number().integer().min(1).default(1),
+    limit: Joi.number().integer().min(1).max(100).default(20),
+    search: Joi.string().trim().max(100).empty('').optional(),
+    status: Joi.string().valid('solved', 'unsolved', 'all').empty('').default('all'),
+    revisionStatus: Joi.string().valid('completed', 'pending', 'all').empty('').default('all'),
+    difficulty: Joi.string().valid('easy', 'medium', 'hard').empty('').optional(),
+    sortBy: Joi.string().valid('title', 'difficulty', 'lastUpdated', 'solved', 'revisionCompleted').empty('').optional(),
+    sortOrder: Joi.string().valid('asc', 'desc').empty('').default('asc'),
+  }), 'query'),
   sheetController.getUserProgress
 );
 
@@ -206,7 +216,8 @@ router.get(
 router.get(
   '/:slug/rank',
   auth,
-  rateLimiters.userLimiter,
+  rateLimiters.rankParticipantsLimiter, 
+  cache(30, 'sheet:rank'),
   validate(sheetValidator.sheetIdParam, 'params'),
   sheetController.getSheetRank
 );
@@ -215,7 +226,8 @@ router.get(
 router.get(
   '/:slug/participants',
   auth,
-  rateLimiters.userLimiter,
+  rateLimiters.rankParticipantsLimiter, 
+  cache(30, 'sheet:participants'),
   validate(sheetValidator.sheetIdParam, 'params'),
   validate(Joi.object({
     page: Joi.number().integer().min(1).default(1),

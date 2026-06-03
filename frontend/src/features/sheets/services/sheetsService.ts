@@ -99,8 +99,18 @@ export const sheetService = {
    * Get another user's progress in a sheet.
    * GET /api/v1/sheets/:slug/progress/:username
    */
-  async getUserProgress(slug: string, username: string): Promise<UserProgress> {
-    const response = await apiClient.get<UserProgress>(`/sheets/${slug}/progress/${username}`);
+  async getUserProgress(slug: string, username: string, params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: 'solved' | 'unsolved' | 'all';
+    revisionStatus?: 'completed' | 'pending' | 'all';
+    difficulty?: 'easy' | 'medium' | 'hard';
+    sortBy?: 'title' | 'difficulty' | 'lastUpdated' | 'solved' | 'revisionCompleted';
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<UserProgress> {
+    const query = buildQueryString(params);
+    const response = await apiClient.get<UserProgress>(`/sheets/${slug}/progress/${username}${query}`);
     return response.data;
   },
 

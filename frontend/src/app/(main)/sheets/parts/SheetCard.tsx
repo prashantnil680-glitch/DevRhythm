@@ -39,6 +39,7 @@ export default function SheetCard({
     name,
     description,
     ownerId,
+    ownerDisplayName,
     createdAt,
     participantCount,
     participants,
@@ -52,15 +53,20 @@ export default function SheetCard({
 
   const formattedDate = format(new Date(createdAt), 'MMM d, yyyy');
 
-  const ownerParticipant = participants.find(p => p.userId === ownerId);
-  const ownerName = ownerParticipant?.username || 'Anonymous User';
-  const displayName = ownerParticipant?.displayName || ownerName;
-  const ownerAvatar = ownerParticipant?.avatarUrl;
+  const ownerName = ownerDisplayName || 'Anonymous User';
+  const displayName = ownerDisplayName || ownerName;
 
-  // Exclude owner from participant display
-  const otherParticipants = participants.filter(p => p.userId !== ownerId);
-  const displayParticipants = otherParticipants.slice(0, 4);
-  const remainingCount = Math.max(0, participantCount - 1 - 4);
+  let ownerAvatar: string | undefined;
+  if (ownerDisplayName && participants.length) {
+    const matchedParticipant = participants.find(p =>
+      p.displayName === ownerDisplayName || p.username === ownerDisplayName
+    );
+    ownerAvatar = matchedParticipant?.avatarUrl;
+  }
+
+  const otherParticipants = participants;
+  const displayParticipants = participants.slice(0, 4);
+  const remainingCount = Math.max(0, participantCount - 4);
 
   const showViewButton = isOwner || isJoined;
   const buttonText = showViewButton ? 'View' : 'Join';
@@ -75,12 +81,11 @@ export default function SheetCard({
     }
   };
 
-  const hasParticipants = otherParticipants.length > 0;
+  const hasParticipants = participants.length > 0;
   const hasTag = !!specialTag;
   const hasSource = !!originalSourceName;
   const showMetadata = hasParticipants || hasTag || hasSource;
 
-  // Participant count text (for accessibility and clarity)
   const participantText = participantCount === 1
     ? '1 participant joined this sheet'
     : `${participantCount} participants joined this sheet`;
@@ -130,12 +135,12 @@ export default function SheetCard({
               title={`View ${ownerName}'s progress`}
             >
               <Avatar src={ownerAvatar} name={ownerName} size="xs" className={styles.ownerAvatar} />
-              <span className={styles.ownerName}>{displayName}</span>
+              <span className={styles.ownerName}>{ownerName}</span>
             </Link>
           ) : (
             <div className={styles.ownerAvatarWrapper}>
               <Avatar src={ownerAvatar} name={ownerName} size="xs" className={styles.ownerAvatar} />
-              <span className={styles.ownerName}>{displayName}</span>
+              <span className={styles.ownerName}>{ownerName}</span>
             </div>
           )}
           <span className={styles.separator}>•</span>

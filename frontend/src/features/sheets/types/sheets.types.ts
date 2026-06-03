@@ -12,6 +12,7 @@ export interface Sheet {
   slug: string;
   description: string;
   ownerId: ID;
+  ownerDisplayName: string;
   questions: ID[];
   isActive: boolean;
   createdAt: ISODateString;
@@ -19,8 +20,8 @@ export interface Sheet {
   specialTag?: string;
   originalSourceName?: string;
   originalSourceUrl?: string;
-  bookmarkCount: number;      
-  isBookmarked: boolean;      
+  bookmarkCount: number;
+  isBookmarked: boolean;
   totalQuestions: number;
 }
 

@@ -954,13 +954,14 @@ class SheetService {
   }
 
   /**
-   * Get detailed progress of a specific user by username.
+   * Get detailed progress of a specific user by username, with pagination, filtering, sorting, and default values.
    * @param {string} sheetSlug
    * @param {string} currentUserId (for access control)
    * @param {string} username
+   * @param {Object} queryOptions - { page, limit, search, status, revisionStatus, difficulty, sortBy, sortOrder }
    * @returns {Promise<Object>}
    */
-  static async getUserProgress(sheetSlug, currentUserId, username) {
+  static async getUserProgress(sheetSlug, currentUserId, username, queryOptions = {}) {
     const targetUser = await User.findOne({ username }).select('_id').lean();
     if (!targetUser) {
       throw new AppError('User not found', 404);
@@ -978,56 +979,167 @@ class SheetService {
       throw new AppError('User has not joined this sheet', 404);
     }
 
-    const progress = await SheetProgress.find({
+    // Pagination defaults
+    const page = Math.max(1, parseInt(queryOptions.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(queryOptions.limit, 10) || 20));
+    const skip = (page - 1) * limit;
+
+    // Build match conditions for SheetProgress (user and sheet)
+    const progressMatch = { sheetId: sheet._id, userId: targetUserId };
+
+    // Apply status filters (solved / revisionCompleted)
+    if (queryOptions.status === 'solved') {
+      progressMatch.solved = true;
+    } else if (queryOptions.status === 'unsolved') {
+      progressMatch.solved = false;
+    }
+    if (queryOptions.revisionStatus === 'completed') {
+      progressMatch.revisionCompleted = true;
+    } else if (queryOptions.revisionStatus === 'pending') {
+      progressMatch.revisionCompleted = false;
+    }
+
+    // Aggregation pipeline
+    const pipeline = [
+      { $match: progressMatch },
+      {
+        $lookup: {
+          from: 'questions',
+          localField: 'questionId',
+          foreignField: '_id',
+          as: 'question',
+        },
+      },
+      { $unwind: '$question' },
+      { $match: { 'question.isActive': true } },
+    ];
+
+    // Apply search filter (title or platformQuestionId)
+    if (queryOptions.search) {
+      const searchRegex = new RegExp(queryOptions.search, 'i');
+      pipeline.push({
+        $match: {
+          $or: [
+            { 'question.title': searchRegex },
+            { 'question.platformQuestionId': searchRegex },
+          ],
+        },
+      });
+    }
+
+    // Apply difficulty filter
+    if (queryOptions.difficulty) {
+      const diff = queryOptions.difficulty.charAt(0).toUpperCase() + queryOptions.difficulty.slice(1).toLowerCase();
+      pipeline.push({ $match: { 'question.difficulty': diff } });
+    }
+
+    // Sorting
+    if (queryOptions.sortBy) {
+      let sortField;
+      const sortOrderValue = queryOptions.sortOrder === 'asc' ? 1 : -1;
+      switch (queryOptions.sortBy) {
+        case 'title':
+          sortField = 'question.title';
+          break;
+        case 'difficulty':
+          sortField = 'question.difficulty';
+          break;
+        case 'lastUpdated':
+          sortField = 'lastUpdated';
+          break;
+        case 'solved':
+          sortField = 'solved';
+          break;
+        case 'revisionCompleted':
+          sortField = 'revisionCompleted';
+          break;
+        default:
+          sortField = 'question.title';
+      }
+      pipeline.push({ $sort: { [sortField]: sortOrderValue } });
+    } else {
+      pipeline.push({
+        $addFields: {
+          originalIndex: { $indexOfArray: [sheet.questions, '$questionId'] },
+        },
+      });
+      pipeline.push({ $sort: { originalIndex: 1 } });
+    }
+
+    // Count total documents for pagination (before $skip/$limit)
+    const countPipeline = [...pipeline];
+    countPipeline.push({ $count: 'total' });
+    const countResult = await SheetProgress.aggregate(countPipeline);
+    const total = countResult[0]?.total || 0;
+
+    // Add pagination
+    pipeline.push({ $skip: skip });
+    pipeline.push({ $limit: limit });
+
+    // Execute main pipeline
+    const progressDocs = await SheetProgress.aggregate(pipeline);
+
+    // Transform to desired output format with default values
+    const orderedProgress = progressDocs.map(doc => ({
+      question: {
+        _id: doc.question?._id || null,
+        title: doc.question?.title || '',
+        problemLink: doc.question?.problemLink || '',
+        platform: doc.question?.platform || '',
+        platformQuestionId: doc.question?.platformQuestionId || '',
+        difficulty: doc.question?.difficulty || '',
+        tags: doc.question?.tags || [],
+        pattern: doc.question?.pattern || [],
+      },
+      solved: doc.solved === true,
+      revisionCompleted: doc.revisionCompleted === true,
+      lastUpdated: doc.lastUpdated || null,
+    }));
+
+    // Overall stats (unfiltered, based on all questions in the sheet)
+    const allProgress = await SheetProgress.find({
       sheetId: sheet._id,
       userId: targetUserId,
     }).lean();
-
-    const questions = await Question.find({
-      _id: { $in: sheet.questions },
-      isActive: true,
-    })
-      .select('_id title problemLink platform platformQuestionId difficulty tags')
-      .lean();
-
-    const orderedProgress = sheet.questions.map(qid => {
-      const q = questions.find(qq => qq._id.toString() === qid.toString());
-      const prog = progress.find(p => p.questionId.toString() === qid.toString());
-      return {
-        question: q,
-        solved: prog ? (prog.solved === true) : false,
-        revisionCompleted: prog ? (prog.revisionCompleted === true) : false,
-        lastUpdated: prog ? prog.lastUpdated : null,
-      };
-    });
-
-    const solvedCount = orderedProgress.filter(p => p.solved).length;
-    const revisionCompletedCount = orderedProgress.filter(p => p.revisionCompleted).length;
+    const solvedCount = allProgress.filter(p => p.solved).length;
+    const revisionCompletedCount = allProgress.filter(p => p.revisionCompleted).length;
     const totalQuestions = sheet.questions.length;
     const isFullyCompleted = solvedCount === totalQuestions && revisionCompletedCount === totalQuestions;
 
     const shareLink = `${config.frontendUrl}/sheets/${sheetSlug}/progress/${username}`;
 
+    // Pagination metadata (always present)
+    const totalPages = Math.max(1, Math.ceil(total / limit)) || 1;
+    const paginationMeta = {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
+    };
+
     return {
       userId: targetUserId,
-      joinedAt: membership.joinedAt,
-      targetDate: membership.targetDate,
-      completedAt: membership.completedAt,
-      isFullyCompleted,
-      progress: orderedProgress,
+      joinedAt: membership.joinedAt || null,
+      targetDate: membership.targetDate || null,
+      completedAt: membership.completedAt || null,
+      isFullyCompleted: isFullyCompleted || false,
+      progress: orderedProgress || [],
       stats: {
-        solvedCount,
-        revisionCompletedCount,
-        totalQuestions,
+        solvedCount: solvedCount || 0,
+        revisionCompletedCount: revisionCompletedCount || 0,
+        totalQuestions: totalQuestions || 0,
         completionPercentage: totalQuestions
           ? ((solvedCount + revisionCompletedCount) / (totalQuestions * 2)) * 100
           : 0,
       },
-      shareLink,
+      shareLink: shareLink || '',
+      pagination: paginationMeta,
     };
   }
 
-  /**
+   /**
    * Get chart‑ready progress data for a user.
    * @param {string} sheetSlug
    * @param {string} currentUserId
@@ -1035,8 +1147,9 @@ class SheetService {
    * @returns {Promise<Object>}
    */
   static async getUserProgressChart(sheetSlug, currentUserId, username) {
-    const progressData = await this.getUserProgress(sheetSlug, currentUserId, username);
-    const { stats, progress } = progressData;
+    // Get progress data without any filters (all questions)
+    const progressData = await this.getUserProgress(sheetSlug, currentUserId, username, {});
+    const { stats } = progressData;
     const totalQuestions = stats.totalQuestions;
     const solvedCount = stats.solvedCount;
     const revisionCompletedCount = stats.revisionCompletedCount;

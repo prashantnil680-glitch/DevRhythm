@@ -8,7 +8,7 @@ export { sheetService } from './services/sheetsService';
 export { useSheets, sheetsKeys } from './hooks/useSheets';
 export { useSheet, sheetDetailKey } from './hooks/useSheet';
 export { useSheetProgress, sheetProgressKey } from './hooks/useSheetProgress';
-export { useUserProgress, userProgressKey } from './hooks/useUserProgress';
+export { useUserProgress } from './hooks/useUserProgress';
 export { useSheetChart, sheetChartKey } from './hooks/useSheetChart';
 
 // Bookmark hooks

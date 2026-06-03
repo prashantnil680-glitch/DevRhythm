@@ -223,10 +223,20 @@ const getMyProgress = async (req, res, next) => {
 const getUserProgress = async (req, res, next) => {
   try {
     const { slug, username } = req.params;
+    const queryOptions = {
+      page: req.query.page,
+      limit: req.query.limit,
+      search: req.query.search,
+      status: req.query.status,           // 'solved' | 'unsolved' | 'all'
+      revisionStatus: req.query.revisionStatus, // 'completed' | 'pending' | 'all'
+      difficulty: req.query.difficulty,   // 'easy' | 'medium' | 'hard'
+      sortBy: req.query.sortBy,           // 'title', 'difficulty', 'lastUpdated', 'solved', 'revisionCompleted'
+      sortOrder: req.query.sortOrder,     // 'asc' | 'desc'
+    };
     if (username === 'Anonymous User') {
       throw new AppError('The original creator has been anonymised and their progress is no longer publicly available.', 404);
     }
-    const progress = await SheetService.getUserProgress(slug, req.user._id, username);
+    const progress = await SheetService.getUserProgress(slug, req.user._id, username, queryOptions);
     res.json(formatResponse('User progress retrieved', progress));
   } catch (error) {
     next(error);

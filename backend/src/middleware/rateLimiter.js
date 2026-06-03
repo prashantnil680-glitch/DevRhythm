@@ -117,6 +117,7 @@ const heatmapFilterLimiter = createRedisLimiter(60 * 60 * 1000, 500, 'heatmap:fi
 
 // Sheet
 const progressLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'progress');
+const rankParticipantsLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'rank-participants');
 
 module.exports = {
   oauthLimiter,
@@ -167,4 +168,5 @@ module.exports = {
   createMemoryLimiter,
   createRedisLimiter,
   progressLimiter,  
+  rankParticipantsLimiter,
 };

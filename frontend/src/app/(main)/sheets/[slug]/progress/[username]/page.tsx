@@ -1,61 +1,108 @@
 'use client';
 
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useUserProgress, useSheetChart, useSheet, useToggleBookmark, useJoinSheet } from '@/features/sheets';
+import { useUserProgress, useSheet } from '@/features/sheets';
 import { useUser } from '@/features/user';
 import { ROUTES } from '@/shared/config';
 import Breadcrumb from '@/shared/components/Breadcrumb';
 import type { BreadcrumbItem } from '@/shared/components/Breadcrumb';
+import Pagination from '@/shared/components/Pagination';
 import NotFoundPage from '@/shared/components/NotFoundPage';
-import UserProgressChart from './parts/UserProgressChart';
 import UserProgressHeader from './parts/UserProgressHeader';
 import UserQuestionList from './parts/UserQuestionList';
+import UserProgressChart from './parts/UserProgressChart';
 import UserProgressSkeleton from './parts/UserProgressSkeleton';
-import JoinSheetModal from '../../../parts/JoinSheetModal';
-import { useState } from 'react';
+import QuestionsFilterBar from '../../parts/QuestionsFilterBar';
 import styles from './page.module.css';
 
 export default function UserProgressPage() {
   const { slug, username } = useParams<{ slug: string; username: string }>();
   const router = useRouter();
   const { user } = useUser();
-  const isAuthenticated = !!user;
 
-  // Fetch sheet details to get sheet name and bookmark/join status
-  const { data: sheetData, isLoading: sheetLoading, refetch: refetchSheet } = useSheet(slug);
+  // Fetch sheet name separately
+  const { data: sheetData, isLoading: sheetLoading } = useSheet(slug);
   const sheetName = sheetData?.sheet?.name || '';
-  const isBookmarked = sheetData?.sheet?.isBookmarked || false;
-  const bookmarkCount = sheetData?.sheet?.bookmarkCount || 0;
-  const hasJoinedSheet = sheetData?.hasJoined || false;
 
-  const { data: progressData, isLoading, error, refetch: refetchProgress } = useUserProgress(slug, username);
-  const { data: chartData } = useSheetChart(slug, username);
+  // Filter & pagination state
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState<'solved' | 'unsolved' | 'all'>('all');
+  const [revisionStatus, setRevisionStatus] = useState<'completed' | 'pending' | 'all'>('all');
+  const [difficulty, setDifficulty] = useState<string>('');
+  const [sortBy, setSortBy] = useState<'title' | 'difficulty' | 'lastUpdated' | 'solved' | 'revisionCompleted'>('title');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const limit = 10;
 
-  const toggleBookmarkMutation = useToggleBookmark();
-  const joinSheetMutation = useJoinSheet();
+  // Debounced search
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  const [joinModalOpen, setJoinModalOpen] = useState(false);
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, status, revisionStatus, difficulty, sortBy, sortOrder]);
 
-  const handleToggleBookmark = async () => {
-    await toggleBookmarkMutation.mutateAsync(slug);
-    refetchSheet(); // refresh sheet data to update bookmark count and isBookmarked
+  // Query parameters
+  const queryParams = {
+    page,
+    limit,
+    search: debouncedSearch || undefined,
+    status: status === 'all' ? undefined : status,
+    revisionStatus: revisionStatus === 'all' ? undefined : revisionStatus,
+    difficulty: difficulty ? (difficulty as 'easy' | 'medium' | 'hard') : undefined,
+    sortBy,
+    sortOrder,
   };
 
-  const handleJoinSheet = (targetDate: string) => {
-    joinSheetMutation.mutate({ slug, targetDate }, {
-      onSuccess: () => {
-        setJoinModalOpen(false);
-        refetchSheet();
-        refetchProgress();
-      },
-    });
+  const { data, isLoading, error } = useUserProgress(slug, username, queryParams);
+
+  // Sticky filter logic using scroll event (optimised)
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const filterWrapperRef = useRef<HTMLDivElement>(null);
+  const [isSticky, setIsSticky] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (sentinelRef.current) {
+        const sentinelRect = sentinelRef.current.getBoundingClientRect();
+        const newSticky = sentinelRect.bottom <= 0;
+        setIsSticky(prev => (prev === newSticky ? prev : newSticky));
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // initial check
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const questionsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isLoading && data) {
+      questionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [page, debouncedSearch, status, revisionStatus, difficulty, sortBy, sortOrder, isLoading, data]);
+
+  const handleClearFilters = () => {
+    setSearch('');
+    setStatus('all');
+    setRevisionStatus('all');
+    setDifficulty('');
+    setSortBy('title');
+    setSortOrder('asc');
+    setPage(1);
   };
 
-  const openJoinModal = () => setJoinModalOpen(true);
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+  };
 
   if (isLoading || sheetLoading) return <UserProgressSkeleton />;
-  if (error || !progressData) {
+  if (error || !data) {
     return (
       <NotFoundPage
         title="Progress Not Found"
@@ -69,7 +116,6 @@ export default function UserProgressPage() {
   }
 
   const {
-    userId,
     joinedAt,
     targetDate,
     completedAt,
@@ -77,12 +123,13 @@ export default function UserProgressPage() {
     progress,
     stats,
     shareLink,
-  } = progressData;
+    pagination,
+  } = data;
 
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: 'Home', href: ROUTES.DASHBOARD },
     { label: 'Sheets', href: ROUTES.SHEETS.ROOT },
-    { label: sheetName || 'Sheet', href: ROUTES.SHEETS.DETAIL(slug) },
+    { label: 'Sheet', href: ROUTES.SHEETS.DETAIL(slug) },
     { label: `Progress of ${username}` },
   ];
 
@@ -105,14 +152,12 @@ export default function UserProgressPage() {
         isFullyCompleted={isFullyCompleted}
         stats={stats}
         shareLink={shareLink}
-        isAuthenticated={isAuthenticated}
-        hasJoinedSheet={hasJoinedSheet}
-        isBookmarked={isBookmarked}
-        bookmarkCount={bookmarkCount}
-        onToggleBookmark={handleToggleBookmark}
-        onJoinSheet={openJoinModal}
-        isJoining={joinSheetMutation.isPending}
-        isBookmarkPending={toggleBookmarkMutation.isPending}
+        isAuthenticated={!!user}
+        hasJoinedSheet={true}
+        isBookmarked={false}
+        bookmarkCount={0}
+        onToggleBookmark={() => {}}
+        onJoinSheet={() => {}}
       />
 
       <div className={styles.chartSection}>
@@ -123,17 +168,51 @@ export default function UserProgressPage() {
         />
       </div>
 
-      <div className={styles.questionsSection}>
-        <h2 className={styles.sectionTitle}>Questions</h2>
-        <UserQuestionList progress={progress} />
+      {/* Sentinel for sticky detection */}
+      <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />
+
+      <div
+        ref={filterWrapperRef}
+        className={`${styles.filterWrapper} ${isSticky ? styles.sticky : ''}`}
+      >
+        <QuestionsFilterBar
+          search={search}
+          onSearchChange={setSearch}
+          solveStatus={status}
+          onSolveStatusChange={(value) => setStatus(value as 'solved' | 'unsolved' | 'all')}
+          revisionStatus={revisionStatus}
+          onRevisionStatusChange={(value) => setRevisionStatus(value as 'completed' | 'pending' | 'all')}
+          difficulty={difficulty}
+          onDifficultyChange={setDifficulty}
+          onClearFilters={handleClearFilters}
+        />
       </div>
 
-      <JoinSheetModal
-        isOpen={joinModalOpen}
-        onClose={() => setJoinModalOpen(false)}
-        onConfirm={handleJoinSheet}
-        isLoading={joinSheetMutation.isPending}
-      />
+      <div ref={questionsRef} className={styles.questionsSection}>
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>Questions</h2>
+        </div>
+
+        {progress.length === 0 ? (
+          <p className={styles.emptyState}>No questions match your filters.</p>
+        ) : (
+          <>
+            <UserQuestionList progress={progress} />
+            {pagination && pagination.totalPages > 1 && (
+              <div className={styles.paginationWrapper}>
+                <Pagination
+                  currentPage={pagination.page}
+                  totalPages={pagination.totalPages}
+                  onPageChange={handlePageChange}
+                  showFirstLast
+                  showPrevNext
+                  size="md"
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

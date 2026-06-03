@@ -217,7 +217,7 @@ export default function SheetHero({
             <span className={styles.participantCount}>
               {otherParticipantsCount} participant{otherParticipantsCount !== 1 && 's'}
             </span>
-            <div className={styles.avatarGroup}>
+            {/* <div className={styles.avatarGroup}>
               {displayParticipants.map((p, idx) => (
                 <Link
                   key={p.userId}
@@ -229,7 +229,7 @@ export default function SheetHero({
                 </Link>
               ))}
               {remainingParticipants > 0 && <span className={styles.extraCount}>+{remainingParticipants}</span>}
-            </div>
+            </div> */}
           </div>
         )}
 

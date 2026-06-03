@@ -68,7 +68,6 @@ async function saveBasicQuestion(problem) {
     { upsert: true }
   );
 
-  // Return true if a new document was inserted
   return result.upsertedCount === 1;
 }
 
@@ -144,7 +143,6 @@ async function syncAllLeetCodeProblems(onlyNew = false) {
 
     for (const problem of problems) {
       try {
-        // If onlyNew mode and problem already exists, skip
         if (onlyNew && await problemExists(problem.titleSlug)) {
           totalSkippedExisting++;
           continue;
@@ -153,7 +151,6 @@ async function syncAllLeetCodeProblems(onlyNew = false) {
         const saved = await saveBasicQuestion(problem);
         if (saved) {
           totalProcessed++;
-          // Queue the full detail fetch
           await jobQueue.add('leetcode.fetch_details', {
             platformQuestionId: problem.titleSlug,
             url: problem.url,
@@ -215,14 +212,12 @@ async function refreshNewLeetCodeProblems() {
 
     for (const problem of problems) {
       try {
-        // Check if problem already exists in DB
         const existing = await Question.findOne({
           platform: 'LeetCode',
           platformQuestionId: problem.titleSlug,
         }).select('contentRef testCases').lean();
 
         if (!existing) {
-          // New problem – create basic and queue details
           const inserted = await saveBasicQuestion(problem);
           if (inserted) {
             totalNew++;
@@ -232,7 +227,6 @@ async function refreshNewLeetCodeProblems() {
             });
           }
         } else {
-          // Problem exists – check if details are missing
           const hasDetails = existing.contentRef && existing.contentRef.trim() !== '';
           if (!hasDetails) {
             totalMissingDetails++;
@@ -259,7 +253,60 @@ async function refreshNewLeetCodeProblems() {
   return { added: totalNew, missingDetailsRequeued: totalMissingDetails, duration };
 }
 
+/**
+ * Repair incomplete LeetCode questions (missing contentRef, testCases, starterCode).
+ * Queues fetch details jobs for each incomplete question.
+ * @returns {Promise<{totalIncomplete: number, queued: number}>}
+ */
+async function repairIncompleteQuestions() {
+  console.log('[LeetCodeSync] Scanning for incomplete questions...');
+
+  const incomplete = await Question.find({
+    platform: 'LeetCode',
+    isActive: true,
+    $or: [
+      // Missing or empty contentRef
+      { contentRef: { $exists: false } },
+      { contentRef: '' },
+      { contentRef: null },
+      // ContentRef is a URL or too short (< 200 chars)
+      { contentRef: { $regex: /^https?:\/\// } },
+      { contentRef: { $lt: 200 } },
+      // Missing test cases
+      { testCases: { $size: 0 } },
+      // Missing starter code
+      { starterCode: { $exists: false } },
+      { starterCode: {} },
+    ],
+  }).select('_id platformQuestionId problemLink').lean();
+
+  const totalIncomplete = incomplete.length;
+  if (totalIncomplete === 0) {
+    console.log('[LeetCodeSync] No incomplete questions found.');
+    return { totalIncomplete: 0, queued: 0 };
+  }
+
+  console.log(`[LeetCodeSync] Found ${totalIncomplete} incomplete questions. Queuing repairs...`);
+
+  let queued = 0;
+  for (const q of incomplete) {
+    try {
+      await jobQueue.add('leetcode.fetch_details', {
+        platformQuestionId: q.platformQuestionId,
+        url: q.problemLink,
+      });
+      queued++;
+    } catch (err) {
+      console.error(`[LeetCodeSync] Failed to queue repair for ${q.platformQuestionId}:`, err.message);
+    }
+  }
+
+  console.log(`[LeetCodeSync] Queued ${queued}/${totalIncomplete} repair jobs.`);
+  return { totalIncomplete, queued };
+}
+
 module.exports = {
   startInitialLeetcodeSync,
   refreshNewLeetCodeProblems,
+  repairIncompleteQuestions,
 };

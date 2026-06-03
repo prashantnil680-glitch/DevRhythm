@@ -4,31 +4,41 @@ const { extractTestCasesFromHtml } = require('./questionExtractTestCases.handler
 
 /**
  * Bull job handler to fetch full details for a LeetCode problem.
- * Expected job.data: { platformQuestionId, url }
+ * Expected job.data: { platformQuestionId, url (ignored, we use platformQuestionId) }
  */
 const handleFetchLeetcodeDetails = async (job) => {
   const { platformQuestionId, url } = job.data;
 
-  if (!platformQuestionId || !url) {
-    throw new Error('Missing platformQuestionId or url in job data');
+  if (!platformQuestionId) {
+    throw new Error('Missing platformQuestionId in job data');
   }
 
-  console.log(`[LeetCodeDetail] Fetching details for: ${platformQuestionId}`);
+  // Construct correct LeetCode URL from platformQuestionId
+  const correctUrl = `https://leetcode.com/problems/${platformQuestionId}/`;
+
+  console.log(`[LeetCodeDetail] Fetching details for: ${platformQuestionId} using ${correctUrl}`);
 
   try {
-    // Check if question already has details (contentRef not empty)
+    // Check if question already has good details
     const existing = await Question.findOne({
       platform: 'LeetCode',
       platformQuestionId: platformQuestionId,
-    }).select('contentRef starterCode testCases').lean();
+    }).select('contentRef starterCode testCases problemLink').lean();
 
-    if (existing && existing.contentRef && existing.contentRef.trim() !== '') {
-      console.log(`[LeetCodeDetail] Question ${platformQuestionId} already has details, skipping.`);
+    const hasValidContent = existing?.contentRef &&
+      existing.contentRef.trim().length > 200 &&
+      !existing.contentRef.startsWith('http');
+    const hasTestCases = existing?.testCases && existing.testCases.length > 0;
+    const hasStarterCode = existing?.starterCode && Object.keys(existing.starterCode).length > 0;
+    const hasValidProblemLink = existing?.problemLink === correctUrl;
+
+    if (hasValidContent && hasTestCases && hasStarterCode && hasValidProblemLink) {
+      console.log(`[LeetCodeDetail] Question ${platformQuestionId} already has complete details, skipping.`);
       return;
     }
 
-    // Fetch details from LeetCode (handles VIP internally)
-    const details = await leetcodeService.fetchProblemDetails(url);
+    // Fetch details from LeetCode using the correct URL
+    const details = await leetcodeService.fetchProblemDetails(correctUrl);
 
     if (!details || !details.description) {
       console.log(`[LeetCodeDetail] No description returned for ${platformQuestionId}, skipping.`);
@@ -51,7 +61,7 @@ const handleFetchLeetcodeDetails = async (job) => {
       }
     }
 
-    // Update the question document with fetched details
+    // Update the question document with fetched details and correct problem link
     const updateResult = await Question.updateOne(
       {
         platform: 'LeetCode',
@@ -62,9 +72,9 @@ const handleFetchLeetcodeDetails = async (job) => {
           contentRef: details.description,
           testCases: extractedTestCases,
           starterCode: starterCode,
-          // Optionally update tags/pattern if they are more complete
           tags: details.tags,
           pattern: details.tags,
+          problemLink: correctUrl,
         },
       }
     );
@@ -72,15 +82,13 @@ const handleFetchLeetcodeDetails = async (job) => {
     if (updateResult.modifiedCount === 0) {
       console.log(`[LeetCodeDetail] No question found to update for ${platformQuestionId}`);
     } else {
-      console.log(`[LeetCodeDetail] Successfully updated ${platformQuestionId} (${extractedTestCases.length} test cases, ${Object.keys(starterCode).length} languages)`);
+      console.log(`[LeetCodeDetail] Successfully updated ${platformQuestionId} (${extractedTestCases.length} test cases, ${Object.keys(starterCode).length} languages, problemLink fixed)`);
     }
   } catch (error) {
-    // If VIP error, do not retry – the question will remain without details (acceptable)
     if (error.code === 'VIP_QUESTION_NOT_ALLOWED') {
       console.log(`[LeetCodeDetail] Skipping VIP question: ${platformQuestionId}`);
       return;
     }
-    // For other errors, rethrow to let Bull retry (with backoff)
     console.error(`[LeetCodeDetail] Failed for ${platformQuestionId}:`, error.message);
     throw error;
   }

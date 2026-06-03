@@ -28,11 +28,12 @@ export function useToggleBookmark() {
       const previousDetail = queryClient.getQueryData<SheetDetailsResponse>(sheetDetailKey(slug));
       const previousBookmarks = queryClient.getQueryData(sheetsKeys.bookmarks());
 
-      // Optimistically update all sheets list caches
+      // Optimistically update all sheets list caches (with safety checks)
       queryClient.setQueriesData<{ sheets: SheetWithStats[] }>(
         { queryKey: sheetsKeys.lists() },
         (old) => {
-          if (!old) return old;
+          // Only update if old exists and has a valid sheets array
+          if (!old || !old.sheets || !Array.isArray(old.sheets)) return old;
           return {
             ...old,
             sheets: old.sheets.map((sheet) =>
@@ -50,11 +51,11 @@ export function useToggleBookmark() {
         }
       );
 
-      // Optimistically update bookmarks list cache
+      // Optimistically update bookmarks list cache (with safety checks)
       queryClient.setQueryData<{ sheets: SheetWithStats[] }>(
         sheetsKeys.bookmarks(),
         (old) => {
-          if (!old) return old;
+          if (!old || !old.sheets || !Array.isArray(old.sheets)) return old;
           const targetSheet = old.sheets.find((s) => s.slug === slug);
           if (!targetSheet) return old;
           // If bookmarking (isBookmarked becoming true), add to list at the beginning

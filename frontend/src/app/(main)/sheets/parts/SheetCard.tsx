@@ -41,6 +41,7 @@ function SheetCard({
     description,
     ownerId,
     ownerDisplayName,
+    ownerUsername,
     createdAt,
     participantCount,
     participants,
@@ -132,7 +133,7 @@ function SheetCard({
         <div className={styles.ownerRow}>
           {ownerName !== 'Anonymous User' ? (
             <Link
-              href={ROUTES.SHEETS.PROGRESS(slug, ownerName)}
+              href={ROUTES.SHEETS.PROGRESS(slug, ownerUsername)}
               className={styles.ownerLink}
               title={`View ${ownerName}'s progress`}
             >

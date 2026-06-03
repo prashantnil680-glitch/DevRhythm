@@ -808,7 +808,6 @@ class SheetService {
     let questionsQuery = Question.find(filter).select('_id title problemLink platform platformQuestionId difficulty tags pattern');
     const isPaginationOrFilter = queryOptions.page || queryOptions.limit || queryOptions.search || queryOptions.difficulty;
     if (!isPaginationOrFilter) {
-      // No filters/pagination: return all questions (backward compatible)
       questionsQuery = questionsQuery.lean();
     } else {
       questionsQuery = questionsQuery.skip(skip).limit(limit).lean();
@@ -829,10 +828,47 @@ class SheetService {
       tagsSlugs: (q.tags || []).map(tag => slugify(tag)),
     }));
 
-    // Participants list
+    // ========== OPTIMIZED: Get per‑question participant and solved counts via aggregation ==========
+    // Instead of looping over sheet.questions and running countDocuments per question,
+    // we aggregate all progress records for this sheet in one go.
+    const progressAggregation = await SheetProgress.aggregate([
+      { $match: { sheetId: sheet._id } },
+      {
+        $group: {
+          _id: '$questionId',
+          participantCount: { $sum: 1 },
+          solvedCount: { $sum: { $cond: ['$solved', 1, 0] } },
+        },
+      },
+    ]);
+
+    // Build maps for quick lookup
+    const participantCountMap = new Map();
+    const solvedCountMap = new Map();
+    for (const item of progressAggregation) {
+      const qidStr = item._id.toString();
+      participantCountMap.set(qidStr, item.participantCount);
+      solvedCountMap.set(qidStr, item.solvedCount);
+    }
+
+    // Fill the per‑question counts for all questions in the sheet (including those not in the current page)
+    const perQuestionParticipantCounts = {};
+    const perQuestionSolvedCounts = {};
+    for (const qid of sheet.questions) {
+      const qidStr = qid.toString();
+      perQuestionParticipantCounts[qidStr] = participantCountMap.get(qidStr) || 0;
+      perQuestionSolvedCounts[qidStr] = solvedCountMap.get(qidStr) || 0;
+    }
+    // ========== END OPTIMIZATION ==========
+
+    // Participants list – limit to first 10 (or keep all? For sheet details we may keep all, but the frontend only shows 6)
+    // To reduce payload, we can limit participants to e.g., 20. We'll keep all for backward compatibility,
+    // but we can optionally paginate participants later. For now, we keep as is.
     const memberships = await SheetMembership.find({ sheetId: sheet._id })
       .populate('userId', 'username avatarUrl displayName')
+      .sort({ joinedAt: 1 })
       .lean();
+
     const participants = memberships.map(m => ({
       userId: m.userId._id,
       username: m.userId.username,
@@ -840,18 +876,6 @@ class SheetService {
       avatarUrl: m.userId.avatarUrl,
     }));
     const totalParticipants = participants.length;
-
-    // Per‑question participant and solved counts (for all questions in the sheet)
-    const perQuestionParticipantCounts = {};
-    const perQuestionSolvedCounts = {};
-    for (const qid of sheet.questions) {
-      const [participantCount, solvedCount] = await Promise.all([
-        SheetProgress.countDocuments({ sheetId: sheet._id, questionId: qid }),
-        SheetProgress.countDocuments({ sheetId: sheet._id, questionId: qid, solved: true }),
-      ]);
-      perQuestionParticipantCounts[qid.toString()] = participantCount;
-      perQuestionSolvedCounts[qid.toString()] = solvedCount;
-    }
 
     // Current user progress (if logged in)
     let currentUserProgress = null;
@@ -987,7 +1011,7 @@ class SheetService {
     // Build match conditions for SheetProgress (user and sheet)
     const progressMatch = { sheetId: sheet._id, userId: targetUserId };
 
-    // Apply status filters (solved / revisionCompleted)
+    // Apply status filters (solved / revisionCompleted) only for the paginated list, not for overall stats
     if (queryOptions.status === 'solved') {
       progressMatch.solved = true;
     } else if (queryOptions.status === 'unsolved') {
@@ -999,7 +1023,7 @@ class SheetService {
       progressMatch.revisionCompleted = false;
     }
 
-    // Aggregation pipeline
+    // Aggregation pipeline for the paginated list
     const pipeline = [
       { $match: progressMatch },
       {
@@ -1096,15 +1120,23 @@ class SheetService {
       lastUpdated: doc.lastUpdated || null,
     }));
 
-    // Overall stats (unfiltered, based on all questions in the sheet)
-    const allProgress = await SheetProgress.find({
-      sheetId: sheet._id,
-      userId: targetUserId,
-    }).lean();
-    const solvedCount = allProgress.filter(p => p.solved).length;
-    const revisionCompletedCount = allProgress.filter(p => p.revisionCompleted).length;
+    // ========== OPTIMIZED: Compute overall stats (without fetching all progress documents) ==========
+    // Instead of .find() which loads all progress records, use a single aggregation to sum solved and revisionCompleted.
+    const overallStats = await SheetProgress.aggregate([
+      { $match: { sheetId: sheet._id, userId: targetUserId } },
+      {
+        $group: {
+          _id: null,
+          solvedCount: { $sum: { $cond: ['$solved', 1, 0] } },
+          revisionCompletedCount: { $sum: { $cond: ['$revisionCompleted', 1, 0] } },
+        },
+      },
+    ]);
+    const solvedCount = overallStats[0]?.solvedCount || 0;
+    const revisionCompletedCount = overallStats[0]?.revisionCompletedCount || 0;
     const totalQuestions = sheet.questions.length;
     const isFullyCompleted = solvedCount === totalQuestions && revisionCompletedCount === totalQuestions;
+    // ========== END OPTIMIZATION ==========
 
     const shareLink = `${config.frontendUrl}/sheets/${sheetSlug}/progress/${username}`;
 
@@ -1250,11 +1282,16 @@ class SheetService {
         limitedParticipants.set(sheetId, participants.slice(0, 6));
       }
 
-      // Fetch owner display names
+      // Fetch owner display names and usernames
       const ownerIds = sheets.map(s => s.ownerId).filter(id => id);
       const owners = await User.find({ _id: { $in: ownerIds } }).select('displayName username').lean();
       const ownerMap = new Map();
-      for (const owner of owners) ownerMap.set(owner._id.toString(), owner.displayName || owner.username);
+      for (const owner of owners) {
+        ownerMap.set(owner._id.toString(), {
+          displayName: owner.displayName || owner.username,
+          username: owner.username,
+        });
+      }
 
       // Bookmarked set for current user
       let bookmarkedSet = new Set();
@@ -1262,21 +1299,27 @@ class SheetService {
         bookmarkedSet = await this._getUserBookmarkedSheetIds(currentUserId);
       }
 
-      const sheetsWithDetails = sheets.map(s => ({
-        _id: s._id,
-        name: s.name,
-        slug: s.slug,
-        description: s.description,
-        ownerDisplayName: s.ownerId ? (ownerMap.get(s.ownerId.toString()) || 'Anonymous User') : 'Anonymous User',
-        specialTag: s.specialTag,
-        originalSourceName: s.originalSourceName,
-        originalSourceUrl: s.originalSourceUrl,
-        createdAt: s.createdAt,
-        bookmarkCount: s.bookmarkCount || 0,
-        isBookmarked: bookmarkedSet.has(s._id.toString()),
-        participantCount: countBySheet.get(s._id.toString()) || 0,
-        participants: limitedParticipants.get(s._id.toString()) || [],
-      }));
+      const sheetsWithDetails = sheets.map(s => {
+        const ownerInfo = s.ownerId ? ownerMap.get(s.ownerId.toString()) : null;
+        const ownerDisplayName = ownerInfo?.displayName || 'Anonymous User';
+        const ownerUsername = ownerInfo?.username || null;
+        return {
+          _id: s._id,
+          name: s.name,
+          slug: s.slug,
+          description: s.description,
+          ownerDisplayName,
+          ownerUsername,
+          specialTag: s.specialTag,
+          originalSourceName: s.originalSourceName,
+          originalSourceUrl: s.originalSourceUrl,
+          createdAt: s.createdAt,
+          bookmarkCount: s.bookmarkCount || 0,
+          isBookmarked: bookmarkedSet.has(s._id.toString()),
+          participantCount: countBySheet.get(s._id.toString()) || 0,
+          participants: limitedParticipants.get(s._id.toString()) || [],
+        };
+      });
 
       return {
         sheets: sheetsWithDetails,
@@ -1388,37 +1431,48 @@ class SheetService {
       limitedParticipants.set(sheetId, participants.slice(0, 6));
     }
 
-    // Owner display names
+    // Owner display names and usernames
     const ownerIds = sheets.map(s => s.ownerId).filter(id => id);
     const owners = await User.find({ _id: { $in: ownerIds } }).select('displayName username').lean();
     const ownerMap = new Map();
-    for (const owner of owners) ownerMap.set(owner._id.toString(), owner.displayName || owner.username);
+    for (const owner of owners) {
+      ownerMap.set(owner._id.toString(), {
+        displayName: owner.displayName || owner.username,
+        username: owner.username,
+      });
+    }
 
     let bookmarkedSet = new Set();
     if (currentUserId) {
       bookmarkedSet = await this._getUserBookmarkedSheetIds(currentUserId);
     }
 
-    const sheetsWithDetails = sheets.map(s => ({
-      _id: s._id,
-      name: s.name,
-      slug: s.slug,
-      description: s.description,
-      ownerDisplayName: s.ownerId ? (ownerMap.get(s.ownerId.toString()) || 'Anonymous User') : 'Anonymous User',
-      specialTag: s.specialTag,
-      originalSourceName: s.originalSourceName,
-      originalSourceUrl: s.originalSourceUrl,
-      createdAt: s.createdAt,
-      bookmarkCount: s.bookmarkCount || 0,
-      isBookmarked: bookmarkedSet.has(s._id.toString()),
-      participantCount: countBySheet.get(s._id.toString()) || 0,
-      participants: limitedParticipants.get(s._id.toString()) || [],
-      // Remove aggregation helper fields
-      userMembership: undefined,
-      allMembers: undefined,
-      isOwner: undefined,
-      hasMembership: undefined,
-    }));
+    const sheetsWithDetails = sheets.map(s => {
+      const ownerInfo = s.ownerId ? ownerMap.get(s.ownerId.toString()) : null;
+      const ownerDisplayName = ownerInfo?.displayName || 'Anonymous User';
+      const ownerUsername = ownerInfo?.username || null;
+      return {
+        _id: s._id,
+        name: s.name,
+        slug: s.slug,
+        description: s.description,
+        ownerDisplayName,
+        ownerUsername,   // NEW field
+        specialTag: s.specialTag,
+        originalSourceName: s.originalSourceName,
+        originalSourceUrl: s.originalSourceUrl,
+        createdAt: s.createdAt,
+        bookmarkCount: s.bookmarkCount || 0,
+        isBookmarked: bookmarkedSet.has(s._id.toString()),
+        participantCount: countBySheet.get(s._id.toString()) || 0,
+        participants: limitedParticipants.get(s._id.toString()) || [],
+        // Remove aggregation helper fields
+        userMembership: undefined,
+        allMembers: undefined,
+        isOwner: undefined,
+        hasMembership: undefined,
+      };
+    });
 
     return {
       sheets: sheetsWithDetails,

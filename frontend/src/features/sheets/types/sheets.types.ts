@@ -13,6 +13,7 @@ export interface Sheet {
   description: string;
   ownerId: ID;
   ownerDisplayName: string;
+  ownerUsername: string;
   questions: ID[];
   isActive: boolean;
   createdAt: ISODateString;

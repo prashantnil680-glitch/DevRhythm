@@ -28,7 +28,7 @@ export default function SheetsListingPage() {
 
   // Fetch total sheet count to determine if any sheets exist
   const { data: sheetsCountData, isLoading: countLoading } = useSheetsCount();
-  const hasSheets = (sheetsCountData?.count ?? 0) > 0;
+  const hasSheets = (sheetsCountData?.total ?? 0) > 0;
 
   // Filter state
   const [search, setSearch] = useState('');

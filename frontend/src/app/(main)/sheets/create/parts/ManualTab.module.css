@@ -45,6 +45,7 @@
 .detailsScroll {
   position: relative;
   padding-left: 2rem;
+  min-height: 20vh;
   max-height: 70vh;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -135,7 +136,7 @@
 
 .error {
   color: var(--error);
-  font-size: 0.7rem;
+  font-size: 1rem;
   margin-top: 0.25rem;
 }
 
@@ -288,6 +289,191 @@
   font-size: 0.7rem;
   color: var(--text-muted);
   margin-top: 0.25rem;
+}
+
+/* Loading Modal Styles (same as ImportTab) */
+.loadingModalContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+.loadingSpinner {
+  margin-bottom: 1.5rem;
+}
+
+.spinnerIcon {
+  font-size: 2.5rem;
+  color: var(--accent-moss);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.loadingMessage {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.loadingWarning {
+  font-size: 0.8rem;
+  color: #f97316;
+  background-color: rgba(249, 115, 22, 0.1);
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+.stageList {
+  width: 100%;
+  text-align: left;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  padding: 1rem;
+  border: 1px solid var(--border);
+}
+
+.stageItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px dashed var(--divider);
+}
+
+.stageItem:last-child {
+  border-bottom: none;
+}
+
+.stageIconCompleted {
+  color: #10b981;
+  font-size: 1rem;
+}
+
+.stageIconActive {
+  color: var(--accent-moss);
+  font-size: 1rem;
+  animation: spin 1s linear infinite;
+}
+
+.stageIconPending {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.stageLabel {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.progressStats {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-align: left;
+  background: var(--bg-surface);
+  padding: 0.75rem;
+  border-radius: 8px;
+}
+
+.progressStats p {
+  margin: 0.25rem 0;
+}
+
+.unresolvedWarning {
+  margin-top: 0.5rem;
+  color: #f97316;
+  font-size: 0.75rem;
+  word-break: break-word;
+}
+
+.errorContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.errorIcon {
+  font-size: 3rem;
+  color: #dc2626;
+  margin-bottom: 1rem;
+}
+
+.errorTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.errorMessage {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+  word-break: break-word;
+}
+
+.errorActions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.viewSheetLink {
+  text-decoration: none;
+}
+
+.loadingOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  z-index: 1000;
+  color: white;
+}
+
+.loadingSpinnerSmall {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 480px) {
+  .errorActions {
+    flex-direction: column;
+    width: 100%;
+  }
+  .errorActions button,
+  .viewSheetLink {
+    width: 100%;
+  }
 }
 
 @media (max-width: 768px) {

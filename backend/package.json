@@ -50,6 +50,7 @@
     "pdfkit": "^0.14.0",
     "rate-limit-redis": "^4.0.1",
     "redis": "^4.6.8",
+    "streamifier": "^0.1.1",
     "uuid": "^9.0.0",
     "winston": "^3.10.0",
     "xlsx": "^0.18.5"

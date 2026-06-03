@@ -21,6 +21,7 @@ export interface Sheet {
   originalSourceUrl?: string;
   bookmarkCount: number;      
   isBookmarked: boolean;      
+  totalQuestions: number;
 }
 
 export interface Participant {

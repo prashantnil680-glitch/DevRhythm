@@ -2,7 +2,7 @@
   transition: border-color 0.2s ease;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 12px;         /* slightly smaller radius */
+  border-radius: 12px;
   overflow: hidden;
 }
 
@@ -11,10 +11,10 @@
 }
 
 .cardContent {
-  padding: 0.75rem 1rem;       /* compact padding */
+  padding: 0.75rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;                 /* tight internal spacing */
+  gap: 0.5rem;
 }
 
 /* Top row: title + action button */
@@ -114,11 +114,30 @@
   color: var(--text-muted);
 }
 
-/* Participant avatars – circular, overlapping */
+/* Participant group – icon + text + avatars */
 .participantGroup {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.participantIcon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.participantText {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Avatar group with overlapping effect */
+.avatarGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
 }
 
 .avatarLink {
@@ -157,6 +176,7 @@
   color: var(--text-secondary);
   line-height: 1.8;
   white-space: nowrap;
+  margin-left: 0.25rem;
 }
 
 /* Tag & source chips */
@@ -197,12 +217,11 @@
   text-decoration: underline;
 }
 
-/* Make the action button (View/Join) more visible */
+/* Action buttons */
 .actionButton {
   transition: all 0.2s ease;
 }
 
-/* Specifically target the outline variant (View) */
 .actionButton:global(.btn-outline) {
   background-color: var(--bg-elevated);
   border: 1px solid var(--accent-moss);
@@ -218,7 +237,6 @@
   box-shadow: 0 2px 6px var(--shadow);
 }
 
-/* Ensure the primary variant (Join) already looks prominent – add a hover lift */
 .actionButton:global(.btn-primary):hover {
   transform: translateY(-1px);
   box-shadow: 0 2px 6px var(--shadow);
@@ -228,13 +246,6 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-.actionButtons {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
 }
 
 .bookmarkButton {
@@ -291,24 +302,56 @@
   transform: translateX(1px);
 }
 
-/* Responsive */
+/* Responsive adjustments */
 @media (max-width: 767px) {
   .cardContent {
     padding: 0.6rem 0.75rem;
   }
+
   .sheetTitle {
     font-size: 1.1rem;
   }
+
   .topRow {
     flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
   }
+
+  /* Do not force full width – keep buttons inline */
   .actionButton {
-    width: 100%;
-    justify-content: center;
+    width: auto;
   }
+
+  .actionGroup {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
   .metadataRow {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.4rem;
+  }
+
+  .participantGroup {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .participantText {
+    white-space: normal;
+  }
+
+  .avatarGroup {
+    flex-wrap: wrap;
+    gap: 0.2rem;
+    margin-top: 0.2rem;
+  }
+
+  .avatarLink {
+    margin-left: 0;
   }
 }

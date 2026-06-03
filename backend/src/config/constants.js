@@ -21,9 +21,11 @@ module.exports = {
     NEW_FOLLOWER: 'new_follower',
     WEEKLY_REPORT: 'weekly_report',
     POD_AVAILABLE: 'pod_available',
-    POD_SOLVED: 'pod_solved',      
-    SHEET_IMPORT_COMPLETED: 'sheet_import_completed', 
-    SHEET_IMPORT_FAILED: 'sheet_import_failed',      
+    POD_SOLVED: 'pod_solved',
+    SHEET_IMPORT_COMPLETED: 'sheet_import_completed',
+    SHEET_IMPORT_FAILED: 'sheet_import_failed',
+    SHEET_CREATED: 'sheet_created',
+    SHEET_CREATION_FAILED: 'sheet_creation_failed',
   },
   LEADERBOARD_TYPES: ['weekly', 'monthly'],
   SNAPSHOT_PERIODS: ['daily', 'weekly', 'monthly'],
@@ -32,7 +34,6 @@ module.exports = {
   MAX_DAILY_GOAL: 50,
   MAX_WEEKLY_GOAL: 100,
 
-  // Goal snapshot configuration
   GOAL_SNAPSHOT_PERIODS: ['monthly', 'yearly'],
   GOAL_SNAPSHOT_RETENTION_DAYS: 1095,
   GOAL_CHART_CACHE_TTL_SECONDS: 3600,

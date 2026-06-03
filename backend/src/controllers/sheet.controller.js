@@ -2,6 +2,63 @@ const SheetService = require('../services/sheet.service');
 const { formatResponse } = require('../utils/helpers/response');
 const AppError = require('../utils/errors/AppError');
 const Question = require('../models/Question');
+const { client: redisClient } = require('../config/redis');
+const { jobQueue } = require('../services/queue.service');
+const crypto = require('crypto');
+const cloudinaryDownload = require('../services/cloudinaryDownload.service');
+const UserFile = require('../models/UserFile');
+const cloudinary = require('../config/cloudinary');
+
+// ========== Helper: Get file buffer from either multer or Cloudinary ==========
+const getFileBuffer = async (file, fileId, userId) => {
+  if (file) {
+    return {
+      buffer: file.buffer,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+    };
+  }
+  if (fileId) {
+    // Try exact match in UserFile
+    let userFile = await UserFile.findOne({ publicId: fileId, userId });
+    let buffer, mimetype, size;
+    let originalname;
+
+    if (userFile) {
+      // Use stored metadata
+      const fetched = await cloudinaryDownload.fetchFile(fileId);
+      buffer = fetched.buffer;
+      mimetype = fetched.mimetype;
+      size = fetched.size;
+      originalname = userFile.fileName;
+    } else {
+      // Fallback: fetch directly from Cloudinary (trust folder contains userId)
+      const fetched = await cloudinaryDownload.fetchFile(fileId);
+      buffer = fetched.buffer;
+      mimetype = fetched.mimetype;
+      size = fetched.size;
+      // Derive original filename from publicId (last part after '/')
+      const parts = fileId.split('/');
+      let fileName = parts[parts.length - 1];
+      // Optionally, we could try to get the original name from the draft's fileName if available, but we'll use this.
+      originalname = fileName;
+      
+      // Optionally, create a missing UserFile record (async, don't await to avoid delay)
+      UserFile.create({
+        userId,
+        publicId: fileId,
+        fileName: originalname,
+        mimeType: mimetype,
+        size,
+        url: cloudinary.url(fileId, { resource_type: 'raw', secure: true }),
+      }).catch(err => console.warn('Failed to create missing UserFile record:', err.message));
+    }
+    
+    return { buffer, originalname, mimetype, size };
+  }
+  throw new AppError('No file or fileId provided', 400);
+};
 
 /**
  * Create a sheet manually (provide question titles/slugs/IDs and target date).
@@ -60,6 +117,19 @@ const getSheets = async (req, res, next) => {
       currentUserId
     );
     res.json(formatResponse('Sheets retrieved successfully', result.sheets, { pagination: result.pagination }));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get total count of sheets (public).
+ * GET /api/v1/sheets/count
+ */
+const getSheetsCount = async (req, res, next) => {
+  try {
+    const total = await SheetService.getSheetsCount();
+    res.json(formatResponse('Sheets count retrieved', { total }));
   } catch (error) {
     next(error);
   }
@@ -179,6 +249,20 @@ const getMyProgressChart = async (req, res, next) => {
 };
 
 /**
+ * Get aggregated progress chart for all participants.
+ * GET /api/v1/sheets/:slug/progress/chart
+ */
+const getSheetProgressChart = async (req, res, next) => {
+  try {
+    const { slug } = req.params;
+    const chartData = await SheetService.getSheetProgressChartData(slug);
+    res.json(formatResponse('Sheet progress chart data retrieved', chartData));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Get another user's progress in chart format.
  * GET /api/v1/sheets/:slug/progress/:username/chart
  */
@@ -225,7 +309,8 @@ const deleteSheet = async (req, res, next) => {
 };
 
 /**
- * Import Excel/JSON file to create a sheet.
+ * Import Excel/JSON file to create a sheet (synchronous, for small files).
+ * Supports either file upload or fileId (from Cloudinary).
  * POST /api/v1/sheets/import
  */
 const importSheet = async (req, res, next) => {
@@ -243,14 +328,11 @@ const importSheet = async (req, res, next) => {
   }, 30000);
 
   try {
-    if (!req.file) {
-      clearTimeout(timeout);
-      throw new AppError('No file uploaded', 400);
-    }
+    const { sheetName, description, targetDate, specialTag, originalSourceName, originalSourceUrl, fileId } = req.body;
+    const { buffer, originalname, mimetype, size } = await getFileBuffer(req.file, fileId);
 
-    const { sheetName, description, targetDate, specialTag, originalSourceName, originalSourceUrl } = req.body;
     const { parseExcelFile } = require('../services/excelParser.service');
-    const parsedRows = await parseExcelFile(req.file.buffer, req.file.originalname);
+    const parsedRows = await parseExcelFile(buffer, originalname);
     
     const identifiers = parsedRows.map(row => row.platformQuestionId || row.title).filter(Boolean);
     
@@ -266,7 +348,6 @@ const importSheet = async (req, res, next) => {
       throw new AppError('None of the questions could be matched. Please check the file content.', 400);
     }
     
-    // Convert resolved ObjectIds to strings before passing to createSheet
     const sheet = await SheetService.createSheet(
       req.user._id,
       sheetName,
@@ -326,15 +407,139 @@ const importSheet = async (req, res, next) => {
 };
 
 /**
- * Update current user's target date for a sheet.
- * PATCH /api/v1/sheets/:slug/target-date
+ * Import Excel/JSON file asynchronously (with progress tracking).
+ * Supports either file upload or fileId (from Cloudinary).
+ * POST /api/v1/sheets/import/async
  */
-const updateTargetDate = async (req, res, next) => {
+const importSheetAsync = async (req, res, next) => {
   try {
-    const { slug } = req.params;
-    const { targetDate } = req.body;
-    const updated = await SheetService.updateTargetDate(req.user._id, slug, targetDate);
-    res.json(formatResponse('Target date updated successfully', updated));
+    const { sheetName, description, targetDate, specialTag, originalSourceName, originalSourceUrl, fileId } = req.body;
+    const userId = req.user._id;
+    let fileInfo = null;
+
+    if (req.file) {
+      fileInfo = {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+      };
+    } else if (fileId) {
+      // Try to find existing UserFile record
+      let userFile = await UserFile.findOne({ publicId: fileId, userId });
+      if (userFile) {
+        const fetched = await cloudinaryDownload.fetchFile(fileId);
+        fileInfo = {
+          buffer: fetched.buffer,
+          originalname: userFile.fileName,
+          mimetype: fetched.mimetype,
+          size: fetched.size,
+        };
+      } else {
+        // No database record – fetch directly from Cloudinary
+        const fetched = await cloudinaryDownload.fetchFile(fileId);
+        const parts = fileId.split('/');
+        const derivedName = parts[parts.length - 1];
+        fileInfo = {
+          buffer: fetched.buffer,
+          originalname: derivedName,
+          mimetype: fetched.mimetype,
+          size: fetched.size,
+        };
+        // Create missing UserFile record asynchronously (only if userId exists)
+        if (userId) {
+          UserFile.create({
+            userId,
+            publicId: fileId,
+            fileName: derivedName,
+            mimeType: fetched.mimetype,
+            size: fetched.size,
+            url: cloudinary.url(fileId, { resource_type: 'raw', secure: true }),
+          }).catch(err => console.warn('[ImportSheetAsync] Failed to create missing UserFile record:', err.message));
+        }
+      }
+    } else {
+      throw new AppError('No file or fileId provided', 400);
+    }
+
+    const { parseExcelFile } = require('../services/excelParser.service');
+    const parsedRows = await parseExcelFile(fileInfo.buffer, fileInfo.originalname);
+    const identifiers = parsedRows.map(row => row.platformQuestionId || row.title).filter(Boolean);
+
+    if (identifiers.length === 0) {
+      throw new AppError('No valid question titles or slugs found in the file', 400);
+    }
+
+    // Generate unique job ID
+    const jobId = crypto.randomUUID();
+    const progressKey = `import:progress:${jobId}`;
+
+    // Store initial progress in Redis
+    const initialProgress = {
+      stage: 'queued',
+      totalQuestions: identifiers.length,
+      processed: 0,
+      matched: 0,
+      skipped: 0,
+      unresolved: [],
+      currentQuestion: null,
+      startedAt: new Date().toISOString(),
+    };
+    await redisClient.setEx(progressKey, 3600, JSON.stringify(initialProgress)); // 1 hour TTL
+
+    // Add job to Bull queue
+    await jobQueue.add('sheet.import', {
+      jobId,
+      userId,
+      sheetName,
+      description: description || '',
+      identifiers,
+      targetDate,
+      specialTag,
+      originalSourceName,
+      originalSourceUrl,
+    });
+
+    res.status(202).json({
+      success: true,
+      statusCode: 202,
+      message: 'Import started. Use GET /import/progress/{jobId} to track progress.',
+      data: { jobId },
+      meta: { timestamp: new Date().toISOString() },
+      error: null,
+    });
+  } catch (error) {
+    if (error.statusCode === 400 && error.data) {
+      return res.status(400).json({
+        success: false,
+        statusCode: 400,
+        message: error.message,
+        data: error.data,
+        meta: { timestamp: new Date().toISOString() },
+        error: null,
+      });
+    }
+    console.error('[ImportSheetAsync] Error:', error);
+    next(error);
+  }
+};
+
+/**
+ * Get import progress for a given jobId.
+ * GET /api/v1/sheets/import/progress/:jobId
+ */
+const getImportProgress = async (req, res, next) => {
+  try {
+    const { jobId } = req.params;
+    const progressKey = `import:progress:${jobId}`;
+    const progressData = await redisClient.get(progressKey);
+    
+    if (!progressData) {
+      throw new AppError('Import job not found or expired', 404);
+    }
+    
+    const progress = JSON.parse(progressData);
+    res.json(formatResponse('Import progress retrieved', progress));
   } catch (error) {
     next(error);
   }
@@ -369,39 +574,109 @@ const getBookmarkedSheets = async (req, res, next) => {
 };
 
 /**
- * Get total count of active sheets.
- * GET /api/v1/sheets/count
+ * Update current user's target date for a sheet.
+ * PATCH /api/v1/sheets/:slug/target-date
  */
-const getSheetsCount = async (req, res, next) => {
+const updateTargetDate = async (req, res, next) => {
   try {
-    const Sheet = require('../models/Sheet');
-    const count = await Sheet.countDocuments({ isActive: true });
-    res.json(formatResponse('Total sheets count retrieved', { count }));
+    const { slug } = req.params;
+    const { targetDate } = req.body;
+    const updated = await SheetService.updateTargetDate(req.user._id, slug, targetDate);
+    res.json(formatResponse('Target date updated successfully', updated));
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * Get aggregated progress chart data for all participants in a sheet.
- * GET /api/v1/sheets/:slug/progress/chart
+ * Get sheet rank (top 4 participants and current user's rank).
+ * GET /api/v1/sheets/:slug/rank
  */
-const getSheetProgressChart = async (req, res, next) => {
+const getSheetRank = async (req, res, next) => {
   try {
     const { slug } = req.params;
-    const chartData = await SheetService.getSheetProgressChartData(slug);
-    res.json(formatResponse('Sheet progress chart data retrieved', chartData));
+    const rankData = await SheetService.getSheetRank(slug, req.user._id);
+    res.json(formatResponse('Sheet rank retrieved', rankData));
   } catch (error) {
     next(error);
   }
 };
 
-const getSheetRank = async (req, res, next) => {
+/**
+ * Create a sheet asynchronously (with progress tracking).
+ * POST /api/v1/sheets/async
+ */
+const createSheetAsync = async (req, res, next) => {
   try {
-    const { slug } = req.params;
-    const currentUserId = req.user._id;
-    const rankData = await SheetService.getSheetRank(slug, currentUserId);
-    res.json(formatResponse('Sheet rank retrieved', rankData));
+    const { name, description, questions, targetDate, specialTag, originalSourceName, originalSourceUrl } = req.body;
+    const userId = req.user._id;
+
+    const jobId = crypto.randomUUID();
+    const progressKey = `sheet:create:progress:${jobId}`;
+
+    const initialProgress = {
+      stage: 'queued',
+      totalQuestions: questions.length,
+      processed: 0,
+      matched: 0,
+      skipped: 0,
+      unresolved: [],
+      currentQuestion: null,
+      startedAt: new Date().toISOString(),
+    };
+    await redisClient.setEx(progressKey, 3600, JSON.stringify(initialProgress));
+
+    await jobQueue.add('sheet.create', {
+      jobId,
+      userId,
+      name,
+      description,
+      questionIdentifiers: questions,
+      targetDate,
+      specialTag,
+      originalSourceName,
+      originalSourceUrl,
+    });
+
+    res.status(202).json({
+      success: true,
+      statusCode: 202,
+      message: 'Sheet creation started. Use GET /sheets/create/progress/{jobId} to track progress.',
+      data: { jobId },
+      meta: { timestamp: new Date().toISOString() },
+      error: null,
+    });
+  } catch (error) {
+    if (error.statusCode === 400 && error.data) {
+      return res.status(400).json({
+        success: false,
+        statusCode: 400,
+        message: error.message,
+        data: error.data,
+        meta: { timestamp: new Date().toISOString() },
+        error: null,
+      });
+    }
+    next(error);
+  }
+};
+
+/**
+ * Get progress of an async sheet creation job.
+ * GET /api/v1/sheets/create/progress/:jobId
+ */
+const getSheetCreateProgress = async (req, res, next) => {
+  try {
+    const { jobId } = req.params;
+    const progressKey = `sheet:create:progress:${jobId}`;
+    const progressData = await redisClient.get(progressKey);
+    
+    if (!progressData) {
+      throw new AppError('Sheet creation job not found or expired', 404);
+    }
+    
+    const progress = JSON.parse(progressData);
+    res.json(formatResponse('Sheet creation progress retrieved', progress));
   } catch (error) {
     next(error);
   }
@@ -410,20 +685,24 @@ const getSheetRank = async (req, res, next) => {
 module.exports = {
   createSheet,
   getSheets,
+  getSheetsCount,
   getSheetBySlug,
   joinSheet,
   leaveSheet,
   getMyProgress,
   getUserProgress,
   getMyProgressChart,
+  getSheetProgressChart,
   getUserProgressChart,
   updateSheet,
   deleteSheet,
   importSheet,
-  updateTargetDate,
+  importSheetAsync,
+  getImportProgress,
   toggleBookmark,
   getBookmarkedSheets,
-  getSheetsCount,
-  getSheetProgressChart,
+  updateTargetDate,
   getSheetRank,
+  createSheetAsync,
+  getSheetCreateProgress,
 };

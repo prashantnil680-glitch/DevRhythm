@@ -51,7 +51,6 @@ export default function SheetCard({
   } = sheet;
 
   const formattedDate = format(new Date(createdAt), 'MMM d, yyyy');
-
   const ownerParticipant = participants.find(p => p.userId === ownerId);
   const ownerName = ownerParticipant?.username || 'Anonymous User';
   const displayName = ownerParticipant?.displayName || ownerName;
@@ -79,10 +78,16 @@ export default function SheetCard({
   const hasSource = !!originalSourceName;
   const showMetadata = hasParticipants || hasTag || hasSource;
 
+  // Participant count text (for accessibility and clarity)
+  const participantText =
+    participantCount === 1
+      ? '1 participant joined this sheet'
+      : `${participantCount} participants joined this sheet`;
+
   return (
     <Card className={clsx(styles.card, className)} noHover>
       <div className={styles.cardContent}>
-        {/* Top row: title + action buttons (View/Join + Bookmark) */}
+        {/* Top row: title + action buttons */}
         <div className={styles.topRow}>
           <h3 className={styles.sheetTitle}>
             <Link href={ROUTES.SHEETS.DETAIL(slug)} className={styles.titleLink}>
@@ -117,11 +122,7 @@ export default function SheetCard({
         {/* Owner + date row */}
         <div className={styles.ownerRow}>
           {ownerName !== 'Anonymous User' ? (
-            <Link
-              href={ROUTES.SHEETS.PROGRESS(slug, ownerName)}
-              className={styles.ownerLink}
-              title={`View ${ownerName}'s progress`}
-            >
+            <Link href={ROUTES.SHEETS.PROGRESS(slug, ownerName)} className={styles.ownerLink} title={`View ${ownerName}'s progress`}>
               <Avatar src={ownerAvatar} name={ownerName} size="xs" className={styles.ownerAvatar} />
               <span className={styles.ownerName}>{displayName}</span>
             </Link>
@@ -144,21 +145,24 @@ export default function SheetCard({
         {/* Metadata row (participants, tag, source) */}
         {showMetadata && (
           <div className={styles.metadataRow}>
-            {/* Participant avatars */}
+            {/* Participant avatars + count text */}
             {hasParticipants && (
               <div className={styles.participantGroup}>
-                <FiUsers size={12} style={{ marginRight: '0.25rem' }} />
-                {displayParticipants.map((p, idx) => (
-                  <Link
-                    key={p.userId}
-                    href={ROUTES.SHEETS.PROGRESS(slug, p.username)}
-                    className={styles.avatarLink}
-                    title={`View ${p.username}'s progress`}
-                  >
-                    <Avatar src={p.avatarUrl} name={p.username} size="xs" />
-                  </Link>
-                ))}
-                {remainingCount > 0 && <span className={styles.extraCount}>+{remainingCount}</span>}
+                <FiUsers size={12} className={styles.participantIcon} />
+                <span className={styles.participantText}>{participantText}</span>
+                <div className={styles.avatarGroup}>
+                  {displayParticipants.map((p, idx) => (
+                    <Link
+                      key={p.userId}
+                      href={ROUTES.SHEETS.PROGRESS(slug, p.username)}
+                      className={styles.avatarLink}
+                      title={`View ${p.username}'s progress`}
+                    >
+                      <Avatar src={p.avatarUrl} name={p.username} size="xs" />
+                    </Link>
+                  ))}
+                  {remainingCount > 0 && <span className={styles.extraCount}>+{remainingCount}</span>}
+                </div>
               </div>
             )}
 

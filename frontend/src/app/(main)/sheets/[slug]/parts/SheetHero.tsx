@@ -3,7 +3,18 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { FiUsers, FiCalendar, FiEdit2, FiTrash2, FiLogOut, FiLogIn, FiClock, FiMoreVertical, FiBookmark } from 'react-icons/fi';
+import {
+  FiUsers,
+  FiCalendar,
+  FiEdit2,
+  FiTrash2,
+  FiLogOut,
+  FiLogIn,
+  FiClock,
+  FiMoreVertical,
+  FiBookmark,
+  FiBookOpen,
+} from 'react-icons/fi';
 import { FaBookmark } from 'react-icons/fa';
 import { Avatar } from '@/shared/components/Avatar';
 import Button from '@/shared/components/Button';
@@ -59,6 +70,7 @@ export default function SheetHero({
     slug,
     bookmarkCount,
     isBookmarked,
+    totalQuestions,
   } = sheet;
 
   const formattedCreatedAt = format(new Date(createdAt), 'MMM d, yyyy');
@@ -68,7 +80,6 @@ export default function SheetHero({
   const ownerAvatar = ownerParticipant?.avatarUrl;
   const ownerDisplayName = ownerParticipant?.displayName || ownerName;
 
-  // Participants excluding owner
   const otherParticipants = participants.filter(p => p.userId !== ownerId);
   const otherParticipantsCount = otherParticipants.length;
   const displayParticipants = otherParticipants.slice(0, 4);
@@ -100,7 +111,7 @@ export default function SheetHero({
                 onClick={onToggleBookmark}
                 disabled={isBookmarkPending}
                 className={`${styles.bookmarkButton} ${isBookmarked ? styles.bookmarked : ''}`}
-                aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+                aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark this sheet'}
               >
                 {isBookmarked ? <FaBookmark /> : <FiBookmark />}
                 {bookmarkCount > 0 && <span className={styles.bookmarkCount}>{bookmarkCount}</span>}
@@ -146,7 +157,7 @@ export default function SheetHero({
         </div>
       </div>
 
-      {/* Metadata row (owner, date, tags, source) */}
+      {/* Metadata row (owner, date, tags, source, total questions) */}
       <div className={styles.metadataRow}>
         <div className={styles.ownerInfo}>
           {ownerName !== 'Anonymous User' ? (
@@ -188,6 +199,11 @@ export default function SheetHero({
             </div>
           </>
         )}
+        <span className={styles.separator}>•</span>
+        <span className={styles.totalQuestionsMeta}>
+          <FiBookOpen size={14} className={styles.metaIcon} />
+          <strong>{totalQuestions}</strong> questions
+        </span>
       </div>
 
       {/* Description (optional) */}

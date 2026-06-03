@@ -200,7 +200,7 @@ export const sheetService = {
     );
     return response.data;
   },
-  async getSheetsCount(): Promise<{ count: number }> {
+  async getSheetsCount(): Promise<{ total: number }> {
     const response = await apiClient.get('/sheets/count');
     return response.data;
   },
@@ -213,5 +213,71 @@ export const sheetService = {
   async getSheetRank(slug: string): Promise<RankResponse> {
     const response = await apiClient.get<RankResponse>(`/sheets/${slug}/rank`);
     return response.data;
+  },
+
+  /**
+   * Create a sheet asynchronously (with progress tracking).
+   * POST /api/v1/sheets/async
+   */
+  async createSheetAsync(data: any): Promise<{ data: { jobId: string } }> {
+    const response = await apiClient.post<{ jobId: string }>('/sheets/async', data);
+    return response;
+  },
+
+  /**
+   * Get progress of an async sheet creation job.
+   * GET /api/v1/sheets/create/progress/:jobId
+   */
+  async getSheetCreateProgress(jobId: string): Promise<any> {
+    const response = await apiClient.get(`/sheets/create/progress/${jobId}`);
+    return response.data;
+  },
+
+  /**
+   * Get current user's draft for a given type.
+   * GET /api/v1/sheets/drafts?type=manual|import
+   */
+  async getDraft(type: 'manual' | 'import'): Promise<any> {
+    const response = await apiClient.get(`/sheets/drafts`, { params: { type } });
+    return response.data;
+  },
+
+  /**
+   * Save or update current user's draft.
+   * POST /api/v1/sheets/drafts
+   */
+  async saveDraft(type: 'manual' | 'import', data: any): Promise<{ draftId: string; updatedAt: string }> {
+    const response = await apiClient.post('/sheets/drafts', { type, data });
+    return response.data;
+  },
+
+  /**
+   * Delete current user's draft for a given type.
+   * DELETE /api/v1/sheets/drafts?type=manual|import
+   */
+  async deleteDraft(type: 'manual' | 'import'): Promise<{ deleted: boolean }> {
+    const response = await apiClient.delete('/sheets/drafts', { params: { type } });
+    return response.data;
+  },
+
+  /**
+   * Upload a file to Cloudinary and store metadata.
+   * POST /api/v1/sheets/upload-file
+   */
+  async uploadFile(file: File): Promise<{ publicId: string; fileName: string; url: string; size: number }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post('/sheets/upload-file', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  /**
+   * Delete an uploaded file from Cloudinary.
+   * DELETE /api/v1/sheets/uploaded-files/:publicId
+   */
+  async deleteUploadedFile(publicId: string): Promise<void> {
+    await apiClient.delete(`/sheets/uploaded-files/${publicId}`);
   },
 };

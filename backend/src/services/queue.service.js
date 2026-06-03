@@ -1,4 +1,3 @@
-// src/services/queue.service.js
 const Bull = require('bull');
 const config = require('../config');
 
@@ -111,6 +110,7 @@ const { handlePodAvailable } = require('./queueHandlers/podAvailable.handler');
 const { handleFetchLeetcodeDetails } = require('./queueHandlers/fetchLeetcodeDetails.handler');
 const { handleCodeExecution } = require('./queueHandlers/codeExecution.handler');
 const { handleSheetImport } = require('./queueHandlers/sheetImport.handler'); 
+const { handleSheetCreate } = require('./queueHandlers/sheetCreate.handler');
 
 // ========== REGISTER PROCESSORS ==========
 jobQueue.process('question.solved', handleQuestionSolved);
@@ -134,6 +134,7 @@ jobQueue.process('pod.available', handlePodAvailable);
 jobQueue.process('leetcode.fetch_details', handleFetchLeetcodeDetails);
 jobQueue.process('code.execution', handleCodeExecution);
 jobQueue.process('sheet.import', handleSheetImport); 
+jobQueue.process('sheet.create', handleSheetCreate);
 
 const startQueueWorkers = async () => {
   if (!jobQueue) {

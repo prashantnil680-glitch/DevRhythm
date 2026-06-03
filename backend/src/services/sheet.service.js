@@ -175,6 +175,64 @@ class SheetService {
     return Array.from(resolvedIds).map(id => new mongoose.Types.ObjectId(id));
   }
 
+
+    /**
+     * Create a sheet from already‑resolved question IDs (no identifier resolution).
+     * Used by async queue handler to separate resolution from creation.
+     * @param {string} ownerId
+     * @param {string} name
+     * @param {string} description
+     * @param {Array<string>} questionIds - array of valid ObjectId strings
+     * @param {Date|string} targetDate
+     * @param {string|null} specialTag
+     * @param {string|null} originalSourceName
+     * @param {string|null} originalSourceUrl
+     * @returns {Promise<Object>} Created sheet
+     * @throws {AppError} 409 if sheet with same name already exists for this owner
+     */
+    static async createSheetWithResolvedIds(ownerId, name, description, questionIds, targetDate, specialTag = null, originalSourceName = null, originalSourceUrl = null) {
+      // Check for existing sheet with same owner and name (case‑insensitive)
+      const existingSheet = await Sheet.findOne({
+        ownerId,
+        name: { $regex: new RegExp(`^${name}$`, 'i') },
+        isActive: true,
+      });
+      if (existingSheet) {
+        const error = new AppError('Sheet with this name already exists for you', 409);
+        error.data = { existingSheetSlug: existingSheet.slug };
+        throw error;
+      }
+  
+      // Generate unique slug
+      let baseSlug = slugify(name);
+      let slug = baseSlug;
+      let counter = 1;
+      while (await Sheet.findOne({ slug })) {
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+      }
+  
+      const sheet = await Sheet.create({
+        ownerId,
+        name,
+        slug,
+        description: description || '',
+        questions: questionIds,
+        isActive: true,
+        specialTag: specialTag || null,
+        originalSourceName: originalSourceName || null,
+        originalSourceUrl: originalSourceUrl || null,
+      });
+  
+      // Automatically create owner membership and progress
+      await this._initializeOwnerMembership(sheet._id, ownerId, questionIds, targetDate);
+  
+      // Invalidate caches
+      await this._invalidateSheetCaches(sheet._id, sheet.slug, ownerId);
+  
+      return sheet;
+    }
+
   /**
    * Create a sheet manually (owner provides question identifiers, target date, and optional metadata).
    * Automatically creates membership for the owner with the given target date.
@@ -606,91 +664,107 @@ class SheetService {
     }
     const skipNum = (pageNum - 1) * limitNum;
 
-    // Stage 1: Match bookmarks for the user
-    const matchStage = { $match: { userId } };
+    const pipeline = [
+      { $match: { userId } },
+      { $sort: { createdAt: -1 } },
+      { $skip: skipNum },
+      { $limit: limitNum },
+      {
+        $lookup: {
+          from: 'sheets',
+          localField: 'sheetId',
+          foreignField: '_id',
+          as: 'sheet',
+        },
+      },
+      { $unwind: '$sheet' },
+      { $match: { 'sheet.isActive': true } },
+      { $project: { sheet: 1 } }, // keep only sheet field
+    ];
 
-    // Stage 2: Lookup sheet details
-    const lookupStage = {
-      $lookup: {
-        from: 'sheets',
-        localField: 'sheetId',
-        foreignField: '_id',
-        as: 'sheet'
-      }
-    };
-
-    // Stage 3: Unwind the sheet array
-    const unwindStage = { $unwind: '$sheet' };
-
-    // Stage 4: Filter only active sheets
-    const activeMatch = { $match: { 'sheet.isActive': true } };
-
-    // Stage 5: Apply search if provided
-    let searchMatch = null;
     if (search && search.trim()) {
       const searchSlug = slugify(search);
-      searchMatch = {
+      pipeline.push({
         $match: {
           $or: [
             { 'sheet.slug': { $regex: searchSlug, $options: 'i' } },
             { 'sheet.name': { $regex: search, $options: 'i' } },
-            { 'sheet.description': { $regex: search, $options: 'i' } }
-          ]
-        }
-      };
+            { 'sheet.description': { $regex: search, $options: 'i' } },
+          ],
+        },
+      });
     }
 
-    // Stage 6: Sort by most recent bookmark first
-    const sortStage = { $sort: { createdAt: -1 } };
-
-    // Build the base pipeline for data (with pagination)
-    const dataPipeline = [matchStage, lookupStage, unwindStage, activeMatch];
-    if (searchMatch) dataPipeline.push(searchMatch);
-    dataPipeline.push(sortStage);
-    dataPipeline.push({ $skip: skipNum }, { $limit: limitNum });
-
-    // Count pipeline (same as data pipeline but without $skip/$limit and ending with $count)
-    const countPipeline = [matchStage, lookupStage, unwindStage, activeMatch];
-    if (searchMatch) countPipeline.push(searchMatch);
-    countPipeline.push({ $count: 'total' });
-
-    // Execute both pipelines in parallel
-    const [bookmarks, countResult] = await Promise.all([
-      SheetBookmark.aggregate(dataPipeline),
-      SheetBookmark.aggregate(countPipeline)
-    ]);
-
-    const total = countResult[0]?.total || 0;
+    const bookmarks = await SheetBookmark.aggregate(pipeline);
     const sheets = bookmarks.map(b => b.sheet);
 
-    // Fetch additional data for each sheet (participants, counts, etc.) – same as before
+    // Get total count for pagination
+    const countPipeline = pipeline.slice(0, -3); // remove $skip, $limit, and $project? Actually careful: we need a separate count pipeline.
+    // Simpler: we can count bookmarks separately
+    const countQuery = SheetBookmark.find({ userId });
+    if (search && search.trim()) {
+      const searchSlug = slugify(search);
+      const matchingSheetIds = await Sheet.find({
+        isActive: true,
+        $or: [
+          { slug: { $regex: searchSlug, $options: 'i' } },
+          { name: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } },
+        ],
+      }).distinct('_id');
+      countQuery.where('sheetId').in(matchingSheetIds);
+    }
+    const total = await countQuery.countDocuments();
+
+    // Remove questions from sheets
+    sheets.forEach(s => delete s.questions);
+
+    // Fetch participants limited to first 6 per sheet
     const sheetIds = sheets.map(s => s._id);
     const memberships = await SheetMembership.find({ sheetId: { $in: sheetIds } })
-      .populate('userId', 'username avatarUrl displayName')
+      .populate('userId', 'username displayName avatarUrl')
+      .sort({ joinedAt: 1 })
       .lean();
-    const membersBySheet = new Map();
+
+    const participantsBySheet = new Map();
+    const countBySheet = new Map();
     for (const m of memberships) {
       const sheetIdStr = m.sheetId.toString();
-      if (!membersBySheet.has(sheetIdStr)) membersBySheet.set(sheetIdStr, []);
-      membersBySheet.get(sheetIdStr).push({
+      if (!participantsBySheet.has(sheetIdStr)) participantsBySheet.set(sheetIdStr, []);
+      participantsBySheet.get(sheetIdStr).push({
         userId: m.userId._id,
         username: m.userId.username,
         displayName: m.userId.displayName,
         avatarUrl: m.userId.avatarUrl,
       });
+      countBySheet.set(sheetIdStr, (countBySheet.get(sheetIdStr) || 0) + 1);
     }
 
+    const limitedParticipants = new Map();
+    for (const [sheetId, participants] of participantsBySheet.entries()) {
+      limitedParticipants.set(sheetId, participants.slice(0, 6));
+    }
+
+    // Owner display names
     const ownerIds = sheets.map(s => s.ownerId).filter(id => id);
     const owners = await User.find({ _id: { $in: ownerIds } }).select('displayName username').lean();
     const ownerMap = new Map();
     for (const owner of owners) ownerMap.set(owner._id.toString(), owner.displayName || owner.username);
 
     const sheetsWithDetails = sheets.map(s => ({
-      ...s,
+      _id: s._id,
+      name: s.name,
+      slug: s.slug,
+      description: s.description,
       ownerDisplayName: s.ownerId ? (ownerMap.get(s.ownerId.toString()) || 'Anonymous User') : 'Anonymous User',
-      participantCount: membersBySheet.get(s._id.toString())?.length || 0,
-      participants: membersBySheet.get(s._id.toString()) || [],
+      specialTag: s.specialTag,
+      originalSourceName: s.originalSourceName,
+      originalSourceUrl: s.originalSourceUrl,
+      createdAt: s.createdAt,
+      bookmarkCount: s.bookmarkCount || 0,
       isBookmarked: true,
+      participantCount: countBySheet.get(s._id.toString()) || 0,
+      participants: limitedParticipants.get(s._id.toString()) || [],
     }));
 
     return {
@@ -862,6 +936,7 @@ class SheetService {
         originalSourceUrl: sheet.originalSourceUrl,
         bookmarkCount: sheet.bookmarkCount || 0,
         isBookmarked,
+        totalQuestions: sheet.questions.length,
         createdAt: sheet.createdAt,
         updatedAt: sheet.updatedAt,
       },
@@ -1014,7 +1089,7 @@ class SheetService {
         ];
       }
 
-      // Default sort: bookmarkCount desc, then createdAt desc
+      // Build sort object
       let sort = {};
       if (sortBy === 'bookmarkCount') {
         sort = { bookmarkCount: sortOrder === 'asc' ? 1 : -1 };
@@ -1028,27 +1103,41 @@ class SheetService {
         sort = { bookmarkCount: -1, createdAt: -1 };
       }
 
+      // Exclude the 'questions' field
       const [sheets, total] = await Promise.all([
-        Sheet.find(match).sort(sort).skip(skipNum).limit(limitNum).lean(),
+        Sheet.find(match).sort(sort).skip(skipNum).limit(limitNum).select('-questions').lean(),
         Sheet.countDocuments(match),
       ]);
 
       const sheetIds = sheets.map(s => s._id);
+
+      // Fetch memberships (sorted by join date to get the first participants)
       const memberships = await SheetMembership.find({ sheetId: { $in: sheetIds } })
         .populate('userId', 'username avatarUrl displayName')
+        .sort({ joinedAt: 1 }) // oldest first for consistency
         .lean();
-      const membersBySheet = new Map();
+
+      // Group participants by sheet and limit to first 6
+      const participantsBySheet = new Map();
+      const countBySheet = new Map();
       for (const m of memberships) {
         const sheetIdStr = m.sheetId.toString();
-        if (!membersBySheet.has(sheetIdStr)) membersBySheet.set(sheetIdStr, []);
-        membersBySheet.get(sheetIdStr).push({
+        if (!participantsBySheet.has(sheetIdStr)) participantsBySheet.set(sheetIdStr, []);
+        participantsBySheet.get(sheetIdStr).push({
           userId: m.userId._id,
           username: m.userId.username,
           displayName: m.userId.displayName,
           avatarUrl: m.userId.avatarUrl,
         });
+        countBySheet.set(sheetIdStr, (countBySheet.get(sheetIdStr) || 0) + 1);
       }
 
+      const limitedParticipants = new Map();
+      for (const [sheetId, participants] of participantsBySheet.entries()) {
+        limitedParticipants.set(sheetId, participants.slice(0, 6));
+      }
+
+      // Fetch owner display names
       const ownerIds = sheets.map(s => s.ownerId).filter(id => id);
       const owners = await User.find({ _id: { $in: ownerIds } }).select('displayName username').lean();
       const ownerMap = new Map();
@@ -1061,12 +1150,19 @@ class SheetService {
       }
 
       const sheetsWithDetails = sheets.map(s => ({
-        ...s,
+        _id: s._id,
+        name: s.name,
+        slug: s.slug,
+        description: s.description,
         ownerDisplayName: s.ownerId ? (ownerMap.get(s.ownerId.toString()) || 'Anonymous User') : 'Anonymous User',
-        participantCount: membersBySheet.get(s._id.toString())?.length || 0,
-        participants: membersBySheet.get(s._id.toString()) || [],
-        isBookmarked: bookmarkedSet.has(s._id.toString()),
+        specialTag: s.specialTag,
+        originalSourceName: s.originalSourceName,
+        originalSourceUrl: s.originalSourceUrl,
+        createdAt: s.createdAt,
         bookmarkCount: s.bookmarkCount || 0,
+        isBookmarked: bookmarkedSet.has(s._id.toString()),
+        participantCount: countBySheet.get(s._id.toString()) || 0,
+        participants: limitedParticipants.get(s._id.toString()) || [],
       }));
 
       return {
@@ -1113,6 +1209,7 @@ class SheetService {
           participantCount: { $size: '$allMembers' },
         },
       },
+      { $project: { questions: 0 } }, // exclude questions
     ];
 
     if (search) {
@@ -1128,7 +1225,7 @@ class SheetService {
       });
     }
 
-    // Default sort: bookmarkCount desc, then createdAt desc
+    // Sorting
     if (sortBy === 'bookmarkCount') {
       pipeline.push({ $sort: { bookmarkCount: sortOrder === 'asc' ? 1 : -1 } });
     } else if (sortBy === 'createdAt') {
@@ -1145,31 +1242,44 @@ class SheetService {
 
     const sheets = await Sheet.aggregate(pipeline);
 
+    // Count pipeline for pagination
     const countPipeline = pipeline.slice(0, -2);
     countPipeline.push({ $count: 'total' });
     const countResult = await Sheet.aggregate(countPipeline);
     const total = countResult[0]?.total || 0;
 
     const sheetIds = sheets.map(s => s._id);
-    const ownerIds = sheets.map(s => s.ownerId).filter(id => id);
-    const owners = await User.find({ _id: { $in: ownerIds } }).select('displayName username').lean();
-    const ownerMap = new Map();
-    for (const owner of owners) ownerMap.set(owner._id.toString(), owner.displayName || owner.username);
 
+    // Fetch participants (limit to first 6 per sheet)
     const memberships = await SheetMembership.find({ sheetId: { $in: sheetIds } })
       .populate('userId', 'username avatarUrl displayName')
+      .sort({ joinedAt: 1 })
       .lean();
-    const membersBySheet = new Map();
+
+    const participantsBySheet = new Map();
+    const countBySheet = new Map();
     for (const m of memberships) {
       const sheetIdStr = m.sheetId.toString();
-      if (!membersBySheet.has(sheetIdStr)) membersBySheet.set(sheetIdStr, []);
-      membersBySheet.get(sheetIdStr).push({
+      if (!participantsBySheet.has(sheetIdStr)) participantsBySheet.set(sheetIdStr, []);
+      participantsBySheet.get(sheetIdStr).push({
         userId: m.userId._id,
         username: m.userId.username,
         displayName: m.userId.displayName,
         avatarUrl: m.userId.avatarUrl,
       });
+      countBySheet.set(sheetIdStr, (countBySheet.get(sheetIdStr) || 0) + 1);
     }
+
+    const limitedParticipants = new Map();
+    for (const [sheetId, participants] of participantsBySheet.entries()) {
+      limitedParticipants.set(sheetId, participants.slice(0, 6));
+    }
+
+    // Owner display names
+    const ownerIds = sheets.map(s => s.ownerId).filter(id => id);
+    const owners = await User.find({ _id: { $in: ownerIds } }).select('displayName username').lean();
+    const ownerMap = new Map();
+    for (const owner of owners) ownerMap.set(owner._id.toString(), owner.displayName || owner.username);
 
     let bookmarkedSet = new Set();
     if (currentUserId) {
@@ -1177,12 +1287,20 @@ class SheetService {
     }
 
     const sheetsWithDetails = sheets.map(s => ({
-      ...s,
+      _id: s._id,
+      name: s.name,
+      slug: s.slug,
+      description: s.description,
       ownerDisplayName: s.ownerId ? (ownerMap.get(s.ownerId.toString()) || 'Anonymous User') : 'Anonymous User',
-      participantCount: membersBySheet.get(s._id.toString())?.length || 0,
-      participants: membersBySheet.get(s._id.toString()) || [],
-      isBookmarked: bookmarkedSet.has(s._id.toString()),
+      specialTag: s.specialTag,
+      originalSourceName: s.originalSourceName,
+      originalSourceUrl: s.originalSourceUrl,
+      createdAt: s.createdAt,
       bookmarkCount: s.bookmarkCount || 0,
+      isBookmarked: bookmarkedSet.has(s._id.toString()),
+      participantCount: countBySheet.get(s._id.toString()) || 0,
+      participants: limitedParticipants.get(s._id.toString()) || [],
+      // Remove aggregation helper fields
       userMembership: undefined,
       allMembers: undefined,
       isOwner: undefined,
@@ -1486,6 +1604,14 @@ class SheetService {
     }
 
     return { topRanks, currentUser: currentUserInfo };
+  }
+
+  /**
+   * Get total count of public sheets.
+   * @returns {Promise<number>}
+  */
+  static async getSheetsCount() {
+    return Sheet.countDocuments({ isActive: true });
   }
 }
 

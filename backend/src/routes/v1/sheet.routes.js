@@ -1,7 +1,10 @@
 const express = require('express');
 const multer = require('multer');
+const Joi = require('joi');
 const router = express.Router();
 const sheetController = require('../../controllers/sheet.controller');
+const draftController = require('../../controllers/draft.controller');
+const fileController = require('../../controllers/file.controller');
 const { auth, optionalAuth } = require('../../middleware/auth');
 const validate = require('../../middleware/validator');
 const { cache } = require('../../middleware/cache');
@@ -40,6 +43,57 @@ router.get(
   sheetController.getSheets
 );
 
+// ========== Draft routes ==========
+router.get(
+  '/drafts',
+  auth,
+  rateLimiters.userLimiter,
+  validate(Joi.object({ type: Joi.string().valid('manual', 'import').required() }), 'query'),
+  draftController.getDraft
+);
+
+router.post(
+  '/drafts',
+  auth,
+  rateLimiters.userLimiter,
+  validate(Joi.object({
+    type: Joi.string().valid('manual', 'import').required(),
+    data: Joi.object().required(),
+  }), 'body'),
+  draftController.saveDraft
+);
+
+router.delete(
+  '/drafts',
+  auth,
+  rateLimiters.userLimiter,
+  validate(Joi.object({ type: Joi.string().valid('manual', 'import').required() }), 'query'),
+  draftController.deleteDraft
+);
+
+// ========== File upload & management routes ==========
+router.post(
+  '/upload-file',
+  auth,
+  rateLimiters.userLimiter,
+  fileController.uploadFile
+);
+
+router.get(
+  '/uploaded-files',
+  auth,
+  rateLimiters.userLimiter,
+  fileController.listFiles
+);
+
+router.delete(
+  '/uploaded-files/:publicId',
+  auth,
+  rateLimiters.userLimiter,
+  validate(Joi.object({ publicId: Joi.string().required() }), 'params'),
+  fileController.deleteFile
+);
+
 // ========== Authenticated routes (specific paths) ==========
 router.get(
   '/bookmarks',
@@ -58,6 +112,24 @@ router.post(
   sheetController.createSheet
 );
 
+// Async manual sheet creation with progress tracking
+router.post(
+  '/async',
+  auth,
+  rateLimiters.groupCreateLimiter,
+  validate(sheetValidator.createSheetManual),
+  sheetController.createSheetAsync
+);
+
+// Get progress for async sheet creation
+router.get(
+  '/create/progress/:jobId',
+  auth,
+  rateLimiters.userLimiter,
+  validate(Joi.object({ jobId: Joi.string().uuid().required() }), 'params'),
+  sheetController.getSheetCreateProgress
+);
+
 router.post(
   '/import',
   auth,
@@ -67,36 +139,28 @@ router.post(
   sheetController.importSheet
 );
 
+// Async import with progress tracking
+router.post(
+  '/import/async',
+  auth,
+  rateLimiters.groupCreateLimiter,
+  upload.single('file'),
+  validate(sheetValidator.importExcelPreview, 'body'),
+  sheetController.importSheetAsync
+);
+
+// Get import progress
+router.get(
+  '/import/progress/:jobId',
+  auth,
+  rateLimiters.userLimiter,
+  validate(Joi.object({ jobId: Joi.string().uuid().required() }), 'params'),
+  sheetController.getImportProgress
+);
+
 router.get('/count', rateLimiters.publicLimiter, cache(300, 'sheets:count'), sheetController.getSheetsCount);
 
-// ========== Dynamic routes (with slug parameter) ==========
-router.get(
-  '/:slug',
-  optionalAuth,
-  rateLimiters.publicLimiter,
-  cache(60, 'sheet'),
-  validate(sheetValidator.sheetIdParam, 'params'),
-  sheetController.getSheetBySlug
-);
-
-router.post(
-  '/:slug/join',
-  auth,
-  rateLimiters.groupJoinLimiter,
-  validate(sheetValidator.sheetIdParam, 'params'),
-  validate(sheetValidator.joinSheet),
-  sheetController.joinSheet
-);
-
-router.delete(
-  '/:slug/leave',
-  auth,
-  rateLimiters.groupLeaveLimiter,
-  validate(sheetValidator.sheetIdParam, 'params'),
-  sheetController.leaveSheet
-);
-
-// Progress routes – order matters!
+// ========== Progress routes (order matters) ==========
 router.get(
   '/:slug/progress/me',
   auth,
@@ -113,7 +177,6 @@ router.get(
   sheetController.getMyProgressChart
 );
 
-// THIS MUST COME BEFORE /:slug/progress/:username
 router.get(
   '/:slug/progress/chart',
   auth,
@@ -140,12 +203,40 @@ router.get(
   sheetController.getUserProgressChart
 );
 
+// ========== Rank route (must be before /:slug) ==========
 router.get(
   '/:slug/rank',
   auth,
   rateLimiters.userLimiter,
   validate(sheetValidator.sheetIdParam, 'params'),
   sheetController.getSheetRank
+);
+
+// ========== Dynamic routes (with slug parameter) ==========
+router.get(
+  '/:slug',
+  optionalAuth,
+  rateLimiters.publicLimiter,
+  cache(60, 'sheet'),
+  validate(sheetValidator.sheetIdParam, 'params'),
+  sheetController.getSheetBySlug
+);
+
+router.post(
+  '/:slug/join',
+  auth,
+  rateLimiters.groupJoinLimiter,
+  validate(sheetValidator.sheetIdParam, 'params'),
+  validate(sheetValidator.joinSheet),
+  sheetController.joinSheet
+);
+
+router.delete(
+  '/:slug/leave',
+  auth,
+  rateLimiters.groupLeaveLimiter,
+  validate(sheetValidator.sheetIdParam, 'params'),
+  sheetController.leaveSheet
 );
 
 router.put(

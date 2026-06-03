@@ -56,6 +56,12 @@ SheetProgressSchema.index({ sheetId: 1, userId: 1 });
 // Index for quickly updating progress when a question is solved/revision completed
 SheetProgressSchema.index({ userId: 1, questionId: 1 });
 
+// Index for filtering by solved and revision status together (used in progress endpoint)
+SheetProgressSchema.index({ sheetId: 1, userId: 1, solved: 1, revisionCompleted: 1 });
+
+// Index for per‑question stats aggregation (used in sheet details)
+SheetProgressSchema.index({ sheetId: 1, questionId: 1 });
+
 // Pre‑save hook to update lastUpdated automatically
 SheetProgressSchema.pre('save', function (next) {
   this.lastUpdated = new Date();

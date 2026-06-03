@@ -108,13 +108,13 @@ const QuestionSchema = new mongoose.Schema(
       ),
       default: {},
     },
-    // =================================================================
   },
   {
     timestamps: true,
   }
 );
 
+// Existing indexes
 QuestionSchema.index({ platform: 1, platformQuestionId: 1 }, { unique: true });
 QuestionSchema.index({ difficulty: 1 });
 QuestionSchema.index({ pattern: 1 });
@@ -122,9 +122,17 @@ QuestionSchema.index({ tags: 1 });
 QuestionSchema.index({ title: "text", pattern: "text" });
 QuestionSchema.index({ platform: 1, difficulty: 1, pattern: 1 });
 QuestionSchema.index({ createdBy: 1 });
-
-// New index for efficient queries on execution metadata (if needed)
 QuestionSchema.index({ "executionMetadata.methodName": 1 });
+
+// ========== NEW INDEXES FOR PERFORMANCE ==========
+// Index for exact title matching (used in progress endpoint filtering and sorting)
+QuestionSchema.index({ title: 1 });
+
+// Index for exact platformQuestionId matching (used in search and sorting)
+QuestionSchema.index({ platformQuestionId: 1 });
+
+// Index for difficulty filtering (already exists, but we list for completeness – no change)
+// ================================================
 
 QuestionSchema.pre("save", function (next) {
   if (this.pattern && !Array.isArray(this.pattern)) {

@@ -1,41 +1,44 @@
 .header {
   border-bottom: 1px solid var(--divider);
-  padding: 0.5rem 0 0.75rem 0;
+  padding: 0.75rem 0 1rem 0;
   margin-bottom: 1.5rem;
 }
 
-/* Top row: sheet name + share button */
+/* Top row: sheet name + action buttons */
 .topRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 .sheetName {
   font-family: var(--font-heading);
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   margin: 0;
   color: var(--text-primary);
 }
 
-.shareButton {
-  flex-shrink: 0;
+.actionButtons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
-/* User row: avatar + username */
+/* User row: avatar + name */
 .userRow {
-  margin-bottom: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 .userLink {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
   text-decoration: none;
   color: inherit;
   transition: opacity 0.2s ease;
@@ -47,25 +50,35 @@
 
 .userAvatar {
   border-radius: 50% !important;
-  border: 1px solid var(--border);
+  border: 2px solid var(--accent-moss);
+  flex-shrink: 0;
+}
+
+.userText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.displayName {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .username {
+  font-size: 0.8rem;
   font-family: var(--font-code);
-  font-size: 0.9rem;
-  font-weight: 500;
   color: var(--text-secondary);
 }
 
-/* ===== Enlarged Metadata Row ===== */
+/* Metadata pills */
 .metadataRowLarge {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
   margin-top: 0.5rem;
-  font-size: 0.9rem;
-  font-weight: 500;
 }
 
 .metaItemLarge {
@@ -77,6 +90,8 @@
   border-radius: 40px;
   border: 1px solid var(--border);
   color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
 .metaIconLarge {
@@ -87,7 +102,7 @@
 .overdueBadgeLarge {
   background-color: #dc2626;
   color: white;
-  padding: 0.2rem 0.7rem;
+  padding: 0.2rem 0.6rem;
   border-radius: 30px;
   font-size: 0.7rem;
   font-weight: 600;
@@ -97,7 +112,7 @@
 .daysLeftBadge {
   display: inline-block;
   margin-left: 0.5rem;
-  padding: 0.2rem 0.7rem;
+  padding: 0.2rem 0.6rem;
   border-radius: 30px;
   font-size: 0.7rem;
   font-weight: 600;
@@ -115,14 +130,7 @@
   color: white;
 }
 
-/* Action buttons & bookmark styles (unchanged) */
-.actionButtons {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
+/* Bookmark button (consistent with sheet card) */
 .bookmarkButton {
   background: none;
   border: none;
@@ -180,10 +188,10 @@
 /* Responsive */
 @media (max-width: 767px) {
   .header {
-    padding: 0.4rem 0 0.6rem 0;
+    padding: 0.5rem 0 0.75rem 0;
   }
   .sheetName {
-    font-size: 1.2rem;
+    font-size: 1.3rem;
   }
   .metadataRowLarge {
     flex-direction: column;
@@ -192,8 +200,15 @@
   }
   .metaItemLarge {
     justify-content: center;
+    padding: 0.3rem 0.75rem;
+  }
+  .userText {
+    gap: 0;
+  }
+  .displayName {
+    font-size: 0.9rem;
   }
   .username {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
   }
 }

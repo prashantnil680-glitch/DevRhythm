@@ -215,6 +215,22 @@ export const sheetService = {
     return response.data;
   },
 
+  async getSheetParticipants(slug: string, params?: { page?: number; limit?: number }): Promise<{ participants: any[]; pagination: any }> {
+    const query = buildQueryString(params);
+    const res = await apiClient.get(`/sheets/${slug}/participants${query}`);
+    const data = (res as any).data;
+    const meta = (res as any).meta;
+    return {
+      participants: data,
+      pagination: meta?.pagination || {
+        page: params?.page || 1,
+        limit: params?.limit || 20,
+        total: data.length,
+        totalPages: 1,
+      },
+    };
+  },
+
   /**
    * Create a sheet asynchronously (with progress tracking).
    * POST /api/v1/sheets/async

@@ -30,7 +30,21 @@
   justify-content: space-between;
   align-items: baseline;
   margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--divider);
 }
+
+.viewAllLink {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.viewAllLink:hover {
+  color: var(--accent-moss);
+}
+
 .paginationWrapper {
   margin-top: 1.5rem;
   display: flex;

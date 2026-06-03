@@ -68,21 +68,13 @@ export default function UserProgressHeader({
     }
   };
 
-  const solvedPercentage = stats.totalQuestions
-    ? (stats.solvedCount / stats.totalQuestions) * 100
-    : 0;
-  const revisionPercentage = stats.totalQuestions
-    ? (stats.revisionCompletedCount / stats.totalQuestions) * 100
-    : 0;
-  const overallPercentage = (solvedPercentage + revisionPercentage) / 2;
-
   const profileUrl = isOwnProfile
     ? ROUTES.USER_PROFILE.OWN(username)
     : ROUTES.USER_PROFILE.PUBLIC(username);
 
   return (
     <div className={styles.header}>
-      {/* Top row: sheet name + share + bookmark + join */}
+      {/* Top row: sheet name + action buttons */}
       <div className={styles.topRow}>
         <h1 className={styles.sheetName}>{sheetName}</h1>
         <div className={styles.actionButtons}>
@@ -93,7 +85,7 @@ export default function UserProgressHeader({
             leftIcon={<FiShare2 />}
             className={styles.shareButton}
           >
-            Share Progress
+            Share
           </Button>
           {isAuthenticated && (
             <Tooltip content={isBookmarked ? 'Remove bookmark' : 'Bookmark this sheet'}>
@@ -116,7 +108,7 @@ export default function UserProgressHeader({
               isLoading={isJoining}
               leftIcon={<FiLogIn />}
             >
-              Join Sheet
+              Join
             </Button>
           )}
         </div>
@@ -125,25 +117,15 @@ export default function UserProgressHeader({
       {/* User row: avatar + name + profile link */}
       <div className={styles.userRow}>
         <Link href={profileUrl} className={styles.userLink}>
-          <Avatar name={username} size="sm" className={styles.userAvatar} />
-          <span className={styles.username}>@{username}</span>
+          <Avatar name={username} size="md" className={styles.userAvatar} />
+          <div className={styles.userText}>
+            <span className={styles.displayName}>{username}</span>
+            <span className={styles.username}>@{username}</span>
+          </div>
         </Link>
       </div>
 
-      {/* ===== Stats row – COMMENTED OUT (duplicated in chart below) ===== */}
-      {/* <div className={styles.statsRow}>
-        <span className={styles.stat}>
-          {stats.solvedCount}/{stats.totalQuestions} solved
-        </span>
-        <span className={styles.separator}>•</span>
-        <span className={styles.stat}>
-          {stats.revisionCompletedCount}/{stats.totalQuestions} revised
-        </span>
-        <span className={styles.separator}>•</span>
-        <span className={styles.stat}>{Math.round(overallPercentage)}% overall</span>
-      </div> */}
-
-      {/* Enlarged Metadata row */}
+      {/* Enlarged Metadata row (pills) */}
       <div className={styles.metadataRowLarge}>
         <div className={styles.metaItemLarge}>
           <FiCalendar className={styles.metaIconLarge} />

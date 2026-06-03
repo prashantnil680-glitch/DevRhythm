@@ -1613,6 +1613,92 @@ class SheetService {
   static async getSheetsCount() {
     return Sheet.countDocuments({ isActive: true });
   }
+  
+  /**
+   * Get paginated list of participants for a sheet, sorted by rank.
+   * @param {string} sheetSlug
+   * @param {number} page
+   * @param {number} limit
+   * @returns {Promise<{participants: Array, pagination: Object}>}
+   */
+  static async getSheetParticipants(sheetSlug, page = 1, limit = 20) {
+    const sheet = await Sheet.findOne({ slug: sheetSlug, isActive: true }).lean();
+    if (!sheet) {
+      throw new AppError('Sheet not found', 404);
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
+    const skip = (pageNum - 1) * limitNum;
+
+    // Aggregation pipeline to get participant stats (solvedCount, revisionCompletedCount, lastUpdated)
+    const pipeline = [
+      { $match: { sheetId: sheet._id } },
+      {
+        $group: {
+          _id: '$userId',
+          solvedCount: { $sum: { $cond: ['$solved', 1, 0] } },
+          revisionCompletedCount: { $sum: { $cond: ['$revisionCompleted', 1, 0] } },
+          lastUpdated: { $max: '$lastUpdated' },
+        },
+      },
+      {
+        $sort: {
+          solvedCount: -1,
+          revisionCompletedCount: -1,
+          lastUpdated: 1, // earlier completion first as tie-breaker
+        },
+      },
+      { $skip: skip },
+      { $limit: limitNum },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+      {
+        $project: {
+          userId: '$_id',
+          username: '$user.username',
+          displayName: '$user.displayName',
+          avatarUrl: '$user.avatarUrl',
+          solvedCount: 1,
+          revisionCompletedCount: 1,
+        },
+      },
+    ];
+
+    const participantsData = await SheetProgress.aggregate(pipeline);
+
+    // Get total number of participants for pagination
+    const totalParticipants = await SheetProgress.distinct('userId', { sheetId: sheet._id });
+    const total = totalParticipants.length;
+
+    // Assign rank numbers (based on the sorted order)
+    const participants = participantsData.map((p, index) => ({
+      rank: skip + index + 1,
+      userId: p.userId,
+      username: p.username,
+      displayName: p.displayName,
+      avatarUrl: p.avatarUrl,
+      totalQuestionsSolved: p.solvedCount,
+      // optionally include revisionCompletedCount if needed
+    }));
+
+    return {
+      participants,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    };
+  }
 }
 
 module.exports = SheetService;

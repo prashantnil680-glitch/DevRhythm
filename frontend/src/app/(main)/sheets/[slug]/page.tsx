@@ -1,9 +1,19 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useSheet, useJoinSheet, useLeaveSheet, useUpdateTargetDate, useDeleteSheet, useToggleBookmark, useAggregatedProgress, useSheetRank } from '@/features/sheets';
+import {
+  useSheet,
+  useJoinSheet,
+  useLeaveSheet,
+  useUpdateTargetDate,
+  useDeleteSheet,
+  useToggleBookmark,
+  useAggregatedProgress,
+  useSheetRank,
+  useSheetParticipants,
+} from '@/features/sheets';
 import { useUser } from '@/features/user';
 import { ROUTES } from '@/shared/config';
 import Breadcrumb from '@/shared/components/Breadcrumb';
@@ -28,7 +38,7 @@ export default function SheetDetailPage() {
   const { user } = useUser();
   const isAuthenticated = !!user;
 
-  // Filter states
+  // Filter states for questions
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [solveStatus, setSolveStatus] = useState('');
@@ -36,12 +46,15 @@ export default function SheetDetailPage() {
   const [difficulty, setDifficulty] = useState('');
   const limit = 20;
 
-  // Reset page to 1 when any filter changes (including search, but search is debounced inside SearchBar)
+  // Participants pagination state
+  const [participantsPage, setParticipantsPage] = useState(1);
+  const participantsLimit = 10;
+
+  // Reset page when filters change
   useEffect(() => {
     setPage(1);
   }, [search, solveStatus, revisionStatus, difficulty]);
 
-  // Build query params – use search directly (SearchBar debounces its onSearch callback)
   const queryParams = {
     page,
     limit,
@@ -51,9 +64,19 @@ export default function SheetDetailPage() {
     difficulty: difficulty || undefined,
   };
 
-  const { data: sheetData, isLoading, error, refetch } = useSheet(slug, queryParams);
+  const {
+    data: sheetData,
+    isLoading,
+    error,
+    refetch,
+  } = useSheet(slug, queryParams);
+
   const { data: aggregatedProgress, isLoading: aggLoading } = useAggregatedProgress(slug);
   const { data: rankData, isLoading: rankLoading } = useSheetRank(slug);
+  const {
+    data: participantsData,
+    isLoading: participantsLoading,
+  } = useSheetParticipants(slug, { page: participantsPage, limit: participantsLimit });
 
   const joinMutation = useJoinSheet();
   const leaveMutation = useLeaveSheet();
@@ -105,7 +128,7 @@ export default function SheetDetailPage() {
   const {
     sheet,
     questions,
-    participants,
+    participants: initialParticipants, // not used directly, kept for compatibility
     stats,
     hasJoined,
     currentUserProgress,
@@ -116,36 +139,48 @@ export default function SheetDetailPage() {
   const targetDate = currentUserProgress?.targetDate;
 
   const handleJoin = (targetDateStr: string) => {
-    joinMutation.mutate({ slug, targetDate: targetDateStr }, {
-      onSuccess: () => {
-        setJoinModalOpen(false);
-        refetch();
-      },
-    });
+    joinMutation.mutate(
+      { slug, targetDate: targetDateStr },
+      {
+        onSuccess: () => {
+          setJoinModalOpen(false);
+          refetch();
+        },
+      }
+    );
   };
 
   const handleLeave = () => {
-    leaveMutation.mutate({ slug }, {
-      onSuccess: () => {
-        setLeaveModalOpen(false);
-        refetch();
-        router.push(ROUTES.SHEETS.ROOT);
-      },
-      onError: () => setLeaveModalOpen(false),
-    });
+    leaveMutation.mutate(
+      { slug },
+      {
+        onSuccess: () => {
+          setLeaveModalOpen(false);
+          refetch();
+          router.push(ROUTES.SHEETS.ROOT);
+        },
+        onError: () => setLeaveModalOpen(false),
+      }
+    );
   };
 
   const handleUpdateTargetDate = (newTargetDate: string) => {
-    updateTargetDateMutation.mutate({ slug, targetDate: newTargetDate }, {
-      onSuccess: () => refetch(),
-    });
+    updateTargetDateMutation.mutate(
+      { slug, targetDate: newTargetDate },
+      {
+        onSuccess: () => refetch(),
+      }
+    );
     setTargetDateModalOpen(false);
   };
 
   const handleDelete = () => {
-    deleteMutation.mutate({ slug }, {
-      onSuccess: () => router.push(ROUTES.SHEETS.ROOT),
-    });
+    deleteMutation.mutate(
+      { slug },
+      {
+        onSuccess: () => router.push(ROUTES.SHEETS.ROOT),
+      }
+    );
     setDeleteModalOpen(false);
   };
 
@@ -166,7 +201,7 @@ export default function SheetDetailPage() {
 
       <SheetHero
         sheet={sheet}
-        participants={participants}
+        participants={initialParticipants}
         totalParticipants={stats.totalParticipants}
         hasJoined={hasJoined}
         isOwner={isOwner}
@@ -188,7 +223,9 @@ export default function SheetDetailPage() {
       <div ref={questionsSectionRef} className={styles.questionsSection}>
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Questions</h2>
-          <Link href="/questions" className={styles.viewAllLink}>View All →</Link>
+          <Link href="/questions" className={styles.viewAllLink}>
+            View All →
+          </Link>
         </div>
 
         <QuestionsFilterBar
@@ -231,11 +268,32 @@ export default function SheetDetailPage() {
       </div>
 
       <div className={styles.participantsSection}>
-        <h2 className={styles.sectionTitle}>Participants</h2>
-        <ParticipantList participants={participants} sheetSlug={slug} />
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>Participants</h2>
+          <Link href="/users" className={styles.viewAllLink}>
+            View All Participants →
+          </Link>
+        </div>
+        <ParticipantList
+          participants={participantsData?.participants || []}
+          sheetSlug={slug}
+          isLoading={participantsLoading}
+        />
+        {participantsData?.pagination && participantsData.pagination.totalPages > 1 && (
+          <div className={styles.paginationWrapper}>
+            <Pagination
+              currentPage={participantsPage}
+              totalPages={participantsData.pagination.totalPages}
+              onPageChange={setParticipantsPage}
+              showFirstLast
+              showPrevNext
+              size="md"
+            />
+          </div>
+        )}
       </div>
 
-      {/* Modals unchanged */}
+      {/* Modals */}
       <JoinSheetModal
         isOpen={joinModalOpen}
         onClose={() => setJoinModalOpen(false)}

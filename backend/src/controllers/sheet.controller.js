@@ -682,6 +682,21 @@ const getSheetCreateProgress = async (req, res, next) => {
   }
 };
 
+/**
+ * Get paginated list of participants for a sheet.
+ * GET /api/v1/sheets/:slug/participants
+ */
+const getSheetParticipants = async (req, res, next) => {
+  try {
+    const { slug } = req.params;
+    const { page = 1, limit = 20 } = req.query;
+    const result = await SheetService.getSheetParticipants(slug, page, limit);
+    res.json(formatResponse('Sheet participants retrieved', result.participants, { pagination: result.pagination }));
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createSheet,
   getSheets,
@@ -705,4 +720,5 @@ module.exports = {
   getSheetRank,
   createSheetAsync,
   getSheetCreateProgress,
+  getSheetParticipants,
 };

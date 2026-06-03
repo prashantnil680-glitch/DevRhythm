@@ -27,3 +27,4 @@ export { useSheetsCount } from './hooks/useSheetsCount';
 export { useSheetRank } from './hooks/useSheetRank';
 export { useAggregatedProgress } from './hooks/useAggregatedProgress';
 export { useSheetDraft } from './hooks/useSheetDraft';
+export { useSheetParticipants } from './hooks/useSheetParticipants';

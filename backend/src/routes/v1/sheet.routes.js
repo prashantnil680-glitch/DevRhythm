@@ -24,7 +24,6 @@ const upload = multer({
     ];
     const ext = file.originalname.split('.').pop().toLowerCase();
     const allowedExts = ['xlsx', 'xls', 'csv', 'json'];
-    
     if (allowedMimes.includes(file.mimetype) || allowedExts.includes(ext)) {
       cb(null, true);
     } else {
@@ -210,6 +209,19 @@ router.get(
   rateLimiters.userLimiter,
   validate(sheetValidator.sheetIdParam, 'params'),
   sheetController.getSheetRank
+);
+
+// ========== Participants list route (must be before /:slug) ==========
+router.get(
+  '/:slug/participants',
+  auth,
+  rateLimiters.userLimiter,
+  validate(sheetValidator.sheetIdParam, 'params'),
+  validate(Joi.object({
+    page: Joi.number().integer().min(1).default(1),
+    limit: Joi.number().integer().min(1).max(100).default(20)
+  }), 'query'),
+  sheetController.getSheetParticipants
 );
 
 // ========== Dynamic routes (with slug parameter) ==========

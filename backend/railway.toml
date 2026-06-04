@@ -1,17 +1,6 @@
-[build]
-builder = "nixpacks"
-nixPkgs = ["python3", "python311Packages.pip"]
-watch = ["package.json", "src/**"]
-
 [deploy]
 healthcheckPath = "/api/v1/health"
 healthcheckTimeout = 30
-
-[build.buildPhase]
-command = "npm install"
-
-[build.startPhase]
-command = "npm start"
 
 [environment]
 NODE_ENV = "production"

@@ -757,6 +757,14 @@ const getCurrentMonthHeatmap = async (userId, timeZone) => {
       intensityLevel: calculateIntensityLevel(activityCount)
     });
   }
+
+  const todayLocal = DateTime.now().setZone(timeZone).toFormat('yyyy-MM-dd');
+  for (const day of result) {
+    if (day.date > todayLocal) {
+      day.activityCount = 0;
+      day.intensityLevel = 0;
+    }
+  }
   return result;
 };
 

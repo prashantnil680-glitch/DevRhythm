@@ -27,10 +27,19 @@ const { incrementUserStats } = require('../user.service');
 const { incrementDailyActivityDirect } = require('../heatmap.service');
 const { updateUserActivity } = require('../user.service');
 const { atomicUpdateQuestionProgressOnSolve, atomicIncrementHeatmapDay, atomicIncrementUserStats } = require('../../utils/atomicUpdate');
-const { jobQueue } = require('../queue.service');
 const { validatePythonSyntax } = require('../../utils/pythonSyntaxValidator');
-const { validateCppSyntax } = require('../../utils/cppSyntaxValidator'); // optional
+const { validateCppSyntax } = require('../../utils/cppSyntaxValidator');
 const { getPythonImports, getCppIncludes } = require('../../utils/autoImports');
+
+// Lazy load jobQueue to avoid circular dependency
+let cachedJobQueue = null;
+function getJobQueue() {
+  if (!cachedJobQueue) {
+    const { jobQueue } = require('../queue.service');
+    cachedJobQueue = jobQueue;
+  }
+  return cachedJobQueue;
+}
 
 const SUPPORTED_LANGUAGES = ['cpp', 'python', 'java', 'javascript'];
 const GENERATORS = {
@@ -146,9 +155,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
 
   // ========== AUTO-INJECT IMPORTS FOR PYTHON ==========
   if (language === 'python') {
-    // Prepend standard imports to user code
     const autoImports = getPythonImports();
-    // Avoid double injection if code already contains the marker
     if (!code.includes('# === Auto-injected imports (LeetCode‑style) ===')) {
       code = autoImports + '\n\n' + code;
     }
@@ -157,9 +164,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
 
   // ========== AUTO-INJECT INCLUDES FOR C++ ==========
   if (language === 'cpp') {
-    // Prepend includes to user code
     const autoIncludes = getCppIncludes();
-    // Avoid double injection if code already contains the marker or any #include
     const hasIncludes = /^\s*#include\s*[<"]/m.test(code);
     if (!hasIncludes && !code.includes('// === Auto-injected includes (LeetCode‑style) ===')) {
       code = autoIncludes + '\n\n' + code;
@@ -236,6 +241,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
       };
     }
   }
+  // ========== END SYNTAX VALIDATION ==========
 
   const generator = GENERATORS[language];
   if (!generator) throw new AppError(`No wrapper generator for language: ${language}`, 500);
@@ -328,7 +334,8 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
   const totalCount = finalTestCases.length;
   const allPassed = passedCount === totalCount;
 
-  // Queue analytics job
+  // Queue analytics job (lazy-loaded jobQueue)
+  const jobQueue = getJobQueue();
   if (jobQueue) {
     try {
       await jobQueue.add('test_case.executed', {

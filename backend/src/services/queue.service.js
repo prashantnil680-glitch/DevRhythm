@@ -27,10 +27,16 @@ const redisOptions = (() => {
       port,
       password,
       db,
-      maxRetriesPerRequest: 100,
+      maxRetriesPerRequest: 20,
       enableOfflineQueue: true,
+      connectTimeout: 10000,
+      socket: {
+        keepAlive: true,
+        keepAliveInitialDelay: 5000,
+        timeout: 60000,
+      },
       retryStrategy: (times) => {
-        const delay = Math.min(times * 100, 30000);
+        const delay = Math.min(times * 1000, 30000);
         if (times === 1 || times % 50 === 0) {
           console.log(`Redis retry attempt ${times}, waiting ${delay}ms`);
         }
@@ -148,7 +154,7 @@ jobQueue.process('code.execution', CODE_EXECUTION_CONCURRENCY, handleCodeExecuti
 jobQueue.process('sheet.import', handleSheetImport);
 jobQueue.process('sheet.create', handleSheetCreate);
 
-// ========== QUEUE HELPERS FOR CODE EXECUTION (to avoid circular deps) ==========
+// ========== QUEUE HELPERS FOR CODE EXECUTION ==========
 
 /**
  * Enqueues a code execution job.
@@ -160,7 +166,6 @@ async function enqueueExecution({ userId, language, code, questionId, testCases,
 
   const jobId = crypto.randomUUID();
 
-  // Create job document in database
   await CodeExecutionJob.create({
     jobId,
     userId,
@@ -172,7 +177,6 @@ async function enqueueExecution({ userId, language, code, questionId, testCases,
     timezone,
   });
 
-  // Add to Bull queue
   await jobQueue.add(
     'code.execution',
     { jobId },
@@ -197,7 +201,6 @@ async function getExecutionStatus(jobId) {
   return CodeExecutionJob.findOne({ jobId });
 }
 
-// ========== WORKER CONTROL ==========
 const startQueueWorkers = async () => {
   if (!jobQueue) {
     console.error('Queue not available, workers not started');
@@ -216,6 +219,6 @@ module.exports = {
   jobQueue,
   startQueueWorkers,
   stopQueueWorkers,
-  enqueueExecution,    // NEW export
-  getExecutionStatus,  // NEW export
+  enqueueExecution,
+  getExecutionStatus,
 };

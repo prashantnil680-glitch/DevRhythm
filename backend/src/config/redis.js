@@ -20,8 +20,9 @@ const createRedisClient = () => {
           console.log(`Redis reconnect attempt ${retries}, waiting ${delay}ms`);
           return delay;
         },
-        keepAlive: 30000,
+        keepAlive: true,
         keepAliveInitialDelay: 5000,
+        connectTimeout: 10000,
       }
     });
 
@@ -35,19 +36,16 @@ const createRedisClient = () => {
     client.on('connect', () => console.log('Redis client connected'));
     client.on('ready', () => {
       console.log('Redis client ready');
-      // Start heartbeat if not already running
       if (heartbeatInterval) clearInterval(heartbeatInterval);
       heartbeatInterval = setInterval(async () => {
         try {
           if (client.isReady) {
             await client.ping();
-            // Optional: log once per hour to confirm heartbeat
-            // console.log('[Redis] Heartbeat PING');
           }
         } catch (err) {
           console.warn('[Redis] Heartbeat ping failed:', err.message);
         }
-      }, 30000); // every 30 seconds
+      }, 30000);
     });
     client.on('reconnecting', () => console.log('Redis client reconnecting'));
     client.on('end', () => {

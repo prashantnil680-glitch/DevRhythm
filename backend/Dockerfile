@@ -1,9 +1,15 @@
 FROM node:20-slim
 
-# Install Python 3 and pip, then symlink python3 to python
-RUN apt-get update && apt-get install -y python3 python3-pip && \
-    ln -s /usr/bin/python3 /usr/bin/python && \
-    rm -rf /var/lib/apt/lists/*
+# Install Python 3, pip, and C++ compiler (g++)
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    g++ \
+    && ln -s /usr/bin/python3 /usr/bin/python \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set environment variable for C++ compiler (used by cppSyntaxValidator)
+ENV CPP_COMPILER=g++
 
 # Set working directory
 WORKDIR /app
@@ -14,8 +20,8 @@ COPY package*.json ./
 # Install production dependencies only (use npm ci for faster, reproducible installs)
 RUN npm ci --only=production
 
-# Verify Python installation (optional, but good for debugging)
-RUN python3 --version && python --version
+# Verify Python and C++ installations (optional, for debugging)
+RUN python3 --version && python --version && g++ --version
 
 # Copy the rest of the application source code
 COPY . .

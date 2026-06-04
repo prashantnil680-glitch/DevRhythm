@@ -21,21 +21,13 @@ if (!redisUrl) {
 const parsedUrl = new URL(redisUrl);
 const isTLS = parsedUrl.protocol === 'rediss:';
 
+// Bull-compatible Redis options – no maxRetriesPerRequest, no enableReadyCheck, no retryStrategy
 const redisOptions = {
   host: parsedUrl.hostname,
   port: Number(parsedUrl.port) || 6379,
   password: parsedUrl.password ? decodeURIComponent(parsedUrl.password) : undefined,
   db: config.redis.db || 0,
-  maxRetriesPerRequest: 20,
-  enableOfflineQueue: true,
   connectTimeout: 10000,
-  retryStrategy: (times) => {
-    const delay = Math.min(times * 1000, 30000);
-    if (times === 1 || times % 20 === 0) {
-      console.log(`Redis retry attempt ${times}, waiting ${delay}ms`);
-    }
-    return delay;
-  },
 };
 
 if (isTLS) {
@@ -49,6 +41,8 @@ const jobQueue = new Bull('devrhythm-jobs', {
     retryProcessDelay: 5000,
     maxStalledCount: 3,
     guardInterval: 5000,
+    stalledInterval: 30000,      // Check for stalled jobs every 30 seconds
+    lockDuration: 60000,         // Lock a job for 60 seconds while processing
   },
   defaultJobOptions: {
     removeOnComplete: true,
@@ -89,6 +83,15 @@ jobQueue.on('ready', () => {
 
 jobQueue.on('error', (error) => {
   console.error('Queue error:', error);
+});
+
+// Suppress 'Missing key for job delayed' errors (log as warning)
+jobQueue.on('delayed', (job, err) => {
+  if (err && err.message && err.message.includes('Missing key for job')) {
+    console.warn(`Delayed job ${job.id} missing key (likely already completed):`, err.message);
+  } else if (err) {
+    console.error(`Delayed job ${job.id} error:`, err);
+  }
 });
 
 // Custom failed handler: treat 'Missing key' as warning (job already cleaned up)

@@ -10,26 +10,21 @@ const crypto = require('crypto');
 const config = require('../config');
 const CodeExecutionJob = require('../models/CodeExecutionJob');
 
-// Parse Redis URL
+// Redis connection options – using full URL to support TLS (rediss://)
 const redisOptions = (() => {
   if (!config.redis.url) {
     console.error('REDIS_URL not defined, queues will not work');
     return null;
   }
   try {
-    const url = new URL(config.redis.url);
-    const host = url.hostname;
-    const port = parseInt(url.port) || 6379;
-    const db = config.redis.db || 0;
-    const password = config.redis.password || (url.password ? decodeURIComponent(url.password) : undefined);
     return {
-      host,
-      port,
-      password,
-      db,
+      url: config.redis.url,
       maxRetriesPerRequest: 20,
       enableOfflineQueue: true,
       connectTimeout: 10000,
+      tls: {
+        rejectUnauthorized: false, // Required for Upstash Redis TLS
+      },
       socket: {
         keepAlive: true,
         keepAliveInitialDelay: 5000,
@@ -37,7 +32,7 @@ const redisOptions = (() => {
       },
       retryStrategy: (times) => {
         const delay = Math.min(times * 1000, 30000);
-        if (times === 1 || times % 50 === 0) {
+        if (times === 1 || times % 20 === 0) {
           console.log(`Redis retry attempt ${times}, waiting ${delay}ms`);
         }
         return delay;

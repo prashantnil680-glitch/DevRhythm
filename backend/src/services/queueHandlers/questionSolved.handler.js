@@ -19,7 +19,7 @@ const { updateUserActivity } = require("../user.service");
 const { client: redisClient } = require("../../config/redis");
 const constants = require("../../config/constants");
 const leetcodeService = require("../leetcode.service");
-const SheetService = require("../sheet.service"); // ADDED: Import SheetService
+const SheetService = require("../sheet.service");
 
 const getGoalDailySolveKey = (userId, dateStr) => `goal:solved:daily:${userId}:${dateStr}`;
 
@@ -69,7 +69,7 @@ const handleQuestionSolved = async (job) => {
     await updateUserActivity(userId, solvedDate, userTimeZone);
     await user.save();
 
-    // ========== Update sheet progress for this solve ==========
+    // Update sheet progress for this solve
     await SheetService.updateSheetProgressOnSolve(userId, questionId);
     await invalidateUserCache(userId);
 
@@ -96,58 +96,78 @@ const handleQuestionSolved = async (job) => {
       { upsert: true, new: true }
     );
 
-    // Pattern mastery update (unchanged)
+    // ========== PATTERN MASTERY UPDATE WITH VERSION ERROR RETRY ==========
     if (question.pattern && Array.isArray(question.pattern) && question.pattern.length > 0) {
       for (const patternName of question.pattern) {
-        let pattern = await PatternMastery.findOne({ userId, patternName });
-        if (!pattern) {
-          pattern = new PatternMastery({
-            userId,
-            patternName,
-            title: patternName,
-            description: `Problems using the ${patternName} pattern`,
-          });
-        } else {
-          if (!pattern.title) pattern.title = patternName;
-          if (!pattern.description) pattern.description = `Problems using the ${patternName} pattern`;
-        }
+        let retries = 3;
+        while (retries > 0) {
+          try {
+            let pattern = await PatternMastery.findOne({ userId, patternName });
+            if (!pattern) {
+              pattern = new PatternMastery({
+                userId,
+                patternName,
+                patternSlug: patternName.toLowerCase().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-'),
+                title: patternName,
+                description: `Problems using the ${patternName} pattern`,
+                solvedCount: 0,
+                masteredCount: 0,
+                totalAttempts: 0,
+                successfulAttempts: 0,
+                recentQuestions: [],
+              });
+            } else {
+              if (!pattern.title) pattern.title = patternName;
+              if (!pattern.description) pattern.description = `Problems using the ${patternName} pattern`;
+            }
 
-        if (isFirstSolve) {
-          pattern.solvedCount += 1;
-          pattern.totalAttempts += 1;
-          pattern.successfulAttempts += 1;
-        } else {
-          pattern.totalAttempts += 1;
-          pattern.successfulAttempts += 1;
-        }
+            if (isFirstSolve) pattern.solvedCount += 1;
+            pattern.totalAttempts += 1;
+            pattern.successfulAttempts += 1;
 
-        if (pattern.successfulAttempts > pattern.totalAttempts) {
-          pattern.successfulAttempts = pattern.totalAttempts;
-        }
+            if (pattern.successfulAttempts > pattern.totalAttempts) {
+              pattern.successfulAttempts = pattern.totalAttempts;
+            }
 
-        pattern.successRate = pattern.totalAttempts > 0 ? (pattern.successfulAttempts / pattern.totalAttempts) * 100 : 0;
-        const totalPatternQuestions = await Question.countDocuments({ pattern: patternName });
-        pattern.masteryRate = totalPatternQuestions > 0 ? (pattern.masteredCount / totalPatternQuestions) * 100 : 0;
-        pattern.confidenceLevel = pattern.masteryRate >= 80 ? 5 : pattern.masteryRate >= 60 ? 4 : pattern.masteryRate >= 40 ? 3 : pattern.masteryRate >= 20 ? 2 : 1;
-        pattern.lastPracticed = solvedDate;
-        pattern.lastUpdated = new Date();
-        pattern.recentQuestions.unshift({
-          questionProgressId: progressId,
-          questionId,
-          platformQuestionId: question.platformQuestionId,
-          title: question.title,
-          problemLink: question.problemLink,
-          platform: question.platform,
-          difficulty: question.difficulty,
-          solvedAt: solvedDate,
-          status: "Solved",
-          timeSpent,
-        });
-        if (pattern.recentQuestions.length > 10) pattern.recentQuestions.pop();
-        await pattern.save();
+            pattern.successRate = pattern.totalAttempts > 0 ? (pattern.successfulAttempts / pattern.totalAttempts) * 100 : 0;
+            const totalPatternQuestions = await Question.countDocuments({ pattern: patternName });
+            pattern.masteryRate = totalPatternQuestions > 0 ? (pattern.masteredCount / totalPatternQuestions) * 100 : 0;
+            pattern.confidenceLevel = pattern.masteryRate >= 80 ? 5 : pattern.masteryRate >= 60 ? 4 : pattern.masteryRate >= 40 ? 3 : pattern.masteryRate >= 20 ? 2 : 1;
+            pattern.lastPracticed = solvedDate;
+            pattern.lastUpdated = new Date();
+
+            // Add recent question (avoid duplicates)
+            const existingIdx = pattern.recentQuestions.findIndex(rq => rq.questionId?.toString() === questionId);
+            if (existingIdx !== -1) pattern.recentQuestions.splice(existingIdx, 1);
+            pattern.recentQuestions.unshift({
+              questionProgressId: progressId,
+              questionId,
+              platformQuestionId: question.platformQuestionId,
+              title: question.title,
+              problemLink: question.problemLink,
+              platform: question.platform,
+              difficulty: question.difficulty,
+              solvedAt: solvedDate,
+              status: "Solved",
+              timeSpent,
+            });
+            if (pattern.recentQuestions.length > 10) pattern.recentQuestions.pop();
+
+            await pattern.save();
+            break; // success
+          } catch (err) {
+            if (err.name === 'VersionError' && retries > 1) {
+              retries--;
+              await new Promise(resolve => setTimeout(resolve, 100));
+              continue;
+            }
+            throw err;
+          }
+        }
       }
       await invalidateCache(`pattern-mastery:*:user:${userId}:*`);
     }
+    // ========== END PATTERN MASTERY UPDATE ==========
 
     const solvedLocal = DateTime.fromJSDate(solvedDate, { zone: userTimeZone });
     const solvedLocalMidnight = solvedLocal.startOf('day');
@@ -259,7 +279,7 @@ const handleQuestionSolved = async (job) => {
       }
     }
 
-    // Daily/weekly goals update (unchanged)
+    // Daily/weekly goals update
     if (!wasSolvedToday) {
       let isGoalRelated = false;
 

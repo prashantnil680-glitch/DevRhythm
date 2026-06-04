@@ -11,6 +11,11 @@ const HeatmapData = require('../models/HeatmapData');
 
 /**
  * Increment user stats atomically and recalculate mastery rate.
+ * @param {string} userId
+ * @param {number} deltaSolved
+ * @param {number} deltaTimeSpent
+ * @param {number} totalActiveQuestions
+ * @returns {Promise<object|null>}
  */
 async function atomicIncrementUserStats(userId, deltaSolved, deltaTimeSpent, totalActiveQuestions) {
   if (!userId) throw new Error('userId is required');
@@ -20,13 +25,16 @@ async function atomicIncrementUserStats(userId, deltaSolved, deltaTimeSpent, tot
   if (!user) return null;
 
   const newTotalSolved = (user.stats.totalSolved || 0) + deltaSolved;
-  const newMasteryRate = totalActiveQuestions > 0 ? (newTotalSolved / totalActiveQuestions) * 100 : 0;
+  // Cap mastery rate at 100
+  const rawMastery = totalActiveQuestions > 0 ? (newTotalSolved / totalActiveQuestions) * 100 : 0;
+  const newMasteryRate = Math.min(100, rawMastery);
+  console.log(`[atomicIncrementUserStats] userId=${userId}, newTotalSolved=${newTotalSolved}, totalActiveQuestions=${totalActiveQuestions}, rawMastery=${rawMastery}, capped=${newMasteryRate}`);
 
   const updatedUser = await User.findOneAndUpdate(
     { _id: userId },
     {
       $inc: { 'stats.totalSolved': deltaSolved, 'stats.totalTimeSpent': deltaTimeSpent },
-      $set: { 'stats.masteryRate': Math.round(newMasteryRate * 100) / 100 },
+      $set: { 'stats.masteryRate': Math.min(100, Math.round(newMasteryRate * 100) / 100) },
     },
     { new: true, fields: { 'stats.totalSolved': 1, 'stats.totalTimeSpent': 1, 'stats.masteryRate': 1 } }
   );
@@ -41,8 +49,6 @@ async function atomicIncrementUserStats(userId, deltaSolved, deltaTimeSpent, tot
 async function atomicUpdateQuestionProgressOnSolve(userId, questionId, solvedAt, timeSpent) {
   if (!userId || !questionId) throw new Error('userId and questionId are required');
 
-  // Step 1: Always update attempts count, last attempt time, and total time.
-  // Use $setOnInsert only for fields that should never be overwritten after creation.
   await UserQuestionProgress.updateOne(
     { userId, questionId },
     {
@@ -65,7 +71,6 @@ async function atomicUpdateQuestionProgressOnSolve(userId, questionId, solvedAt,
     { upsert: true }
   );
 
-  // Step 2: Conditionally set status to 'Solved' only if not already Solved or Mastered.
   const statusUpdateResult = await UserQuestionProgress.updateOne(
     {
       userId,
@@ -83,9 +88,14 @@ async function atomicUpdateQuestionProgressOnSolve(userId, questionId, solvedAt,
 
   const isFirstSolve = statusUpdateResult.modifiedCount > 0;
 
-  // Step 3: Fetch the final document.
-  const progress = await UserQuestionProgress.findOne({ userId, questionId }).lean();
+  if (isFirstSolve) {
+    await UserQuestionProgress.updateOne(
+      { userId, questionId, 'attempts.firstAttemptAt': { $exists: false } },
+      { $set: { 'attempts.firstAttemptAt': solvedAt } }
+    );
+  }
 
+  const progress = await UserQuestionProgress.findOne({ userId, questionId }).lean();
   return { progress, isFirstSolve };
 }
 

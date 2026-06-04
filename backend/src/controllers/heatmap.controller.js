@@ -15,6 +15,26 @@ const config = require('../config');
 const { client: redisClient } = require('../config/redis');
 const { calculateIntensityLevel } = heatmapService;
 
+// ========== HELPER: Zero out future dates based on user timezone ==========
+function zeroFutureDates(dailyData, timeZone) {
+  const todayLocal = DateTime.now().setZone(timeZone).toFormat('yyyy-MM-dd');
+  return dailyData.map(day => {
+    let dateStr;
+    if (day.date && typeof day.date === 'object' && day.date.toISOString) {
+      dateStr = day.date.toISOString().split('T')[0];
+    } else if (typeof day.date === 'string') {
+      dateStr = day.date.split('T')[0];
+    } else {
+      dateStr = String(day.date);
+    }
+    if (dateStr > todayLocal) {
+      return { ...day, totalActivities: 0, intensityLevel: 0 };
+    }
+    return day;
+  });
+}
+// ========== END HELPER ==========
+
 /**
  * Convert a UTC date to user's local ISO string with offset.
  * Returns a string like "2026-05-30T00:00:00+05:30".
@@ -49,7 +69,6 @@ const convertDailyDataToLocal = (dailyData, timeZone) => {
  */
 const generateTooltipData = (dailyData) => {
   return dailyData.map(day => {
-    // Convert date to a string safely
     let dateStr;
     if (day.date && typeof day.date.toISOString === 'function') {
       dateStr = day.date.toISOString();
@@ -81,25 +100,25 @@ const getHeatmap = async (req, res, next) => {
     }
 
     // Convert dates to local strings
-    const localDailyData = convertDailyDataToLocal(heatmap.dailyData, timeZone);
-    heatmap.dailyData = localDailyData.map(day => ({
+    let localDailyData = convertDailyDataToLocal(heatmap.dailyData, timeZone);
+    localDailyData = zeroFutureDates(localDailyData, timeZone);
+
+    localDailyData = localDailyData.map(day => ({
       ...day,
       intensityLevel: calculateIntensityLevel(day.totalActivities || 0)
     }));
 
-    // Build response without calling any unsafe helper
     const response = {
       year: heatmap.year,
       weekCount: heatmap.weekCount,
       firstDate: heatmap.firstDate,
       lastDate: heatmap.lastDate,
-      dailyData: heatmap.dailyData,
+      dailyData: localDailyData,
       performance: heatmap.performance,
       consistency: heatmap.consistency,
       statsPanel: heatmap.statsPanel
     };
 
-    // Manual cached render data (no Date objects)
     const colorScale = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
     const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const weekLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -149,8 +168,10 @@ const getHeatmapByYear = async (req, res, next) => {
       throw new AppError('Heatmap data not found for year ' + year, 404);
     }
 
-    const localDailyData = convertDailyDataToLocal(heatmap.dailyData, timeZone);
-    heatmap.dailyData = localDailyData.map(day => ({
+    let localDailyData = convertDailyDataToLocal(heatmap.dailyData, timeZone);
+    localDailyData = zeroFutureDates(localDailyData, timeZone);
+
+    localDailyData = localDailyData.map(day => ({
       ...day,
       intensityLevel: calculateIntensityLevel(day.totalActivities || 0)
     }));
@@ -160,7 +181,7 @@ const getHeatmapByYear = async (req, res, next) => {
       weekCount: heatmap.weekCount,
       firstDate: heatmap.firstDate,
       lastDate: heatmap.lastDate,
-      dailyData: heatmap.dailyData,
+      dailyData: localDailyData,
       performance: heatmap.performance,
       consistency: heatmap.consistency,
       statsPanel: heatmap.statsPanel
@@ -280,7 +301,7 @@ const getFilteredHeatmap = async (req, res, next) => {
       throw new AppError('Invalid view type', 400);
     }
 
-    const heatmap = await HeatmapData.findOne({
+    let heatmap = await HeatmapData.findOne({
       userId: req.user._id,
       year
     }).lean();
@@ -305,17 +326,25 @@ const getFilteredHeatmap = async (req, res, next) => {
       filteredData = await heatmapService.calculateFilteredData(req.user._id, year, viewType, timeZone);
     }
 
-    filteredData.forEach(day => {
+    // Convert to local timezone and zero out future dates
+    let localFilteredData = convertDailyDataToLocal(filteredData, timeZone);
+    localFilteredData = zeroFutureDates(localFilteredData, timeZone);
+    localFilteredData = localFilteredData.map(day => ({
+      ...day,
+      intensityLevel: calculateIntensityLevel(day.totalActivities || 0)
+    }));
+
+    localFilteredData.forEach(day => {
       totalActivities += day.totalActivities;
       if (day.totalActivities > maxInDay) maxInDay = day.totalActivities;
     });
 
     const consistencyScore = heatmap.consistency?.consistencyScore || 0;
-    const averagePerDay = filteredData.length > 0 ? totalActivities / filteredData.length : 0;
+    const averagePerDay = localFilteredData.length > 0 ? totalActivities / localFilteredData.length : 0;
 
     res.json(formatResponse('Filtered heatmap data retrieved', {
       viewType,
-      dailyData: filteredData,
+      dailyData: localFilteredData,
       summary: {
         totalActivities,
         averagePerDay: parseFloat(averagePerDay.toFixed(1)),
@@ -451,12 +480,14 @@ const getPublicUserHeatmap = async (req, res, next) => {
 
     const userTimeZone = user.preferences?.timezone || 'UTC';
 
-    const heatmap = await heatmapService.getOrCreateHeatmap(userId, parsedYear, userTimeZone);
+    let heatmap = await heatmapService.getOrCreateHeatmap(userId, parsedYear, userTimeZone);
     if (!heatmap) throw new AppError('Heatmap data not found', 404);
 
-    // Recalculate intensity levels
+    // Convert to local timezone and zero out future dates
     if (heatmap.dailyData) {
-      heatmap.dailyData = heatmap.dailyData.map(day => ({
+      let localDailyData = convertDailyDataToLocal(heatmap.dailyData, userTimeZone);
+      localDailyData = zeroFutureDates(localDailyData, userTimeZone);
+      heatmap.dailyData = localDailyData.map(day => ({
         ...day,
         intensityLevel: calculateIntensityLevel(day.totalActivities || 0)
       }));
@@ -476,7 +507,6 @@ const getPublicUserHeatmap = async (req, res, next) => {
         consistency: heatmap.consistency,
         statsPanel: heatmap.statsPanel,
       };
-      // Use the safe generateTooltipData function
       const freshTooltipData = generateTooltipData(heatmap.dailyData);
       if (includeCache && heatmap.cachedRenderData) {
         response.cachedRenderData = {

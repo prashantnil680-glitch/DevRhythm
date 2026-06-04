@@ -23,7 +23,6 @@ const updateUserActivity = async (userId, activityDate = new Date(), timeZone = 
   const todayLocal = getLocalDateStr(new Date(), timeZone);
   const activityLocal = getLocalDateStr(activityDate, timeZone);
 
-  // Only update if activity is on or before today (ignore future)
   if (activityLocal > todayLocal) return user;
 
   const lastActiveLocal = user.streak.lastActiveDate
@@ -31,12 +30,10 @@ const updateUserActivity = async (userId, activityDate = new Date(), timeZone = 
     : null;
 
   if (!lastActiveLocal) {
-    // First activity ever
     user.streak.current = 1;
     user.streak.longest = 1;
     user.stats.activeDays = 1;
   } else if (lastActiveLocal !== activityLocal) {
-    // Check if last active was yesterday (in user's local timezone)
     const activityDateObj = new Date(activityDate);
     const yesterdayLocal = getLocalDateStr(
       new Date(activityDateObj.setDate(activityDateObj.getDate() - 1)),
@@ -52,9 +49,7 @@ const updateUserActivity = async (userId, activityDate = new Date(), timeZone = 
     }
     user.stats.activeDays += 1;
   }
-  // else same day → do nothing
 
-  // Store last active date as the start of the local day in UTC (for consistency)
   const localStartUTC = getStartOfDay(activityDate, timeZone);
   user.streak.lastActiveDate = localStartUTC;
 
@@ -77,11 +72,9 @@ const incrementUserStats = async (userId, deltaSolved = 1, deltaTimeSpent = 0) =
   const user = await User.findById(userId);
   if (!user) throw new Error('User not found');
 
-  // Increment stats
   user.stats.totalSolved = (user.stats.totalSolved || 0) + deltaSolved;
   user.stats.totalTimeSpent = (user.stats.totalTimeSpent || 0) + deltaTimeSpent;
 
-  // Recalculate mastery rate: solved / total active questions * 100
   const totalQuestions = await Question.countDocuments({ isActive: true });
   let masteryRate = 0;
   if (totalQuestions > 0) {
@@ -92,7 +85,6 @@ const incrementUserStats = async (userId, deltaSolved = 1, deltaTimeSpent = 0) =
 
   await user.save();
   
-  // Invalidate user cache so dashboard reflects new stats
   await invalidateCache(`user:${userId}:profile`);
   await invalidateCache(`dashboard:user:${userId}`);
   

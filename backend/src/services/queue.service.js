@@ -7,45 +7,39 @@
 
 const Bull = require('bull');
 const crypto = require('crypto');
+const { URL } = require('url');
 const config = require('../config');
 const CodeExecutionJob = require('../models/CodeExecutionJob');
 
-// Redis connection options – using full URL to support TLS (rediss://)
-const redisOptions = (() => {
-  if (!config.redis.url) {
-    console.error('REDIS_URL not defined, queues will not work');
-    return null;
-  }
-  try {
-    return {
-      url: config.redis.url,
-      maxRetriesPerRequest: 20,
-      enableOfflineQueue: true,
-      connectTimeout: 10000,
-      tls: {
-        rejectUnauthorized: false, // Required for Upstash Redis TLS
-      },
-      socket: {
-        keepAlive: true,
-        keepAliveInitialDelay: 5000,
-        timeout: 60000,
-      },
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 1000, 30000);
-        if (times === 1 || times % 20 === 0) {
-          console.log(`Redis retry attempt ${times}, waiting ${delay}ms`);
-        }
-        return delay;
-      },
-    };
-  } catch (err) {
-    console.error('Invalid Redis URL:', err);
-    return null;
-  }
-})();
+// Parse REDIS_URL manually to ensure TLS works correctly with Upstash
+const redisUrl = config.redis.url;
+if (!redisUrl) {
+  console.error('REDIS_URL not defined, queues will not work');
+  process.exit(1);
+}
 
-if (!redisOptions) {
-  console.error('Redis configuration missing, queues will not work');
+const parsedUrl = new URL(redisUrl);
+const isTLS = parsedUrl.protocol === 'rediss:';
+
+const redisOptions = {
+  host: parsedUrl.hostname,
+  port: Number(parsedUrl.port) || 6379,
+  password: parsedUrl.password ? decodeURIComponent(parsedUrl.password) : undefined,
+  db: config.redis.db || 0,
+  maxRetriesPerRequest: 20,
+  enableOfflineQueue: true,
+  connectTimeout: 10000,
+  retryStrategy: (times) => {
+    const delay = Math.min(times * 1000, 30000);
+    if (times === 1 || times % 20 === 0) {
+      console.log(`Redis retry attempt ${times}, waiting ${delay}ms`);
+    }
+    return delay;
+  },
+};
+
+if (isTLS) {
+  redisOptions.tls = { rejectUnauthorized: false };
 }
 
 // Create a single queue for all job types with global removeOnComplete

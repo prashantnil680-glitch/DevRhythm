@@ -569,7 +569,7 @@
 
 .mobileNavItem.active {
   color: var(--accent-moss);
-  background-color: var(--hover-surface);
+  /* background-color: var(--hover-surface); */
   font-weight: 600;
 }
 

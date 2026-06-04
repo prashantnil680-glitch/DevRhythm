@@ -463,6 +463,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       <nav className={clsx(styles.mobileNavbar, className)}>
         <div className={styles.mobileNavLinks}>
+          {/* Home */}
           <Link
             href={ROUTES.DASHBOARD}
             className={clsx(styles.mobileNavItem, isActive(ROUTES.DASHBOARD) && styles.active)}
@@ -472,6 +473,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className={styles.mobileLabel}>Home</span>
           </Link>
 
+          {/* Revisions */}
           <Link
             href={ROUTES.REVISIONS.ROOT}
             className={clsx(styles.mobileNavItem, isActive(ROUTES.REVISIONS.ROOT) && styles.active)}
@@ -484,7 +486,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </Link>
 
-          {/* Notifications (mobile) */}
+          {/* Notifications (only for logged in users) */}
           {user && (
             <Link
               href={ROUTES.NOTIFICATIONS.ROOT}
@@ -501,6 +503,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </Link>
           )}
 
+          {/* Quick add (plus) – unchanged */}
           <Link
             href={ROUTES.QUESTIONS.CREATE}
             className={styles.quickAddButton}
@@ -509,15 +512,27 @@ export const Navbar: React.FC<NavbarProps> = ({
             <FiPlus />
           </Link>
 
+          {/* All Sheets – replaces "Groups" */}
           <Link
-            href={ROUTES.GROUPS.ROOT}
-            className={clsx(styles.mobileNavItem, isActive(ROUTES.GROUPS.ROOT) && styles.active)}
-            aria-label="Groups"
+            href={ROUTES.SHEETS.ROOT}
+            className={clsx(styles.mobileNavItem, isActive(ROUTES.SHEETS.ROOT) && styles.active)}
+            aria-label="All Sheets"
           >
-            <FiUsers className={styles.mobileIcon} />
-            <span className={styles.mobileLabel}>Groups</span>
+            <FiGrid className={styles.mobileIcon} />
+            <span className={styles.mobileLabel}>Sheets</span>
           </Link>
 
+          {/* All Questions – new button */}
+          <Link
+            href={ROUTES.QUESTIONS.ROOT}
+            className={clsx(styles.mobileNavItem, isActive(ROUTES.QUESTIONS.ROOT) && styles.active)}
+            aria-label="All Questions"
+          >
+            <FiBookOpen className={styles.mobileIcon} />
+            <span className={styles.mobileLabel}>Questions</span>
+          </Link>
+
+          {/* Profile / Login */}
           <Link
             href={user ? ROUTES.USER_PROFILE.OWN(user.username) : loginHref}
             className={clsx(

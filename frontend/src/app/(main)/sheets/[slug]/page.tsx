@@ -318,6 +318,7 @@ export default function SheetDetailPage() {
               currentPage={participantsPage}
               totalPages={participantsData.pagination.totalPages}
               onPageChange={setParticipantsPage}
+              siblingCount={0}
               showFirstLast
               showPrevNext
               size="md"

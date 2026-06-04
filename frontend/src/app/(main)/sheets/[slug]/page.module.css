@@ -45,10 +45,25 @@
   color: var(--accent-moss);
 }
 
+
 .paginationWrapper {
   margin-top: 1.5rem;
   display: flex;
   justify-content: center;
+  overflow-x: auto;
+  width: 100%;
+  padding-bottom: 0.5rem;
+}
+
+/* Allow pagination list to wrap and be centered */
+.paginationWrapper :global(.pagination) {
+  max-width: 100%;
+}
+
+.paginationWrapper :global(.list) {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem;
 }
 
 .progressSection {

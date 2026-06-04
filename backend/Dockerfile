@@ -14,6 +14,7 @@ COPY package*.json ./
 # Install production dependencies only (use npm ci for faster, reproducible installs)
 RUN npm ci --only=production
 
+# Verify Python installation (optional, but good for debugging)
 RUN python3 --version && python --version
 
 # Copy the rest of the application source code

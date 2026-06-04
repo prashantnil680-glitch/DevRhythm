@@ -1,3 +1,10 @@
+/**
+ * src/middleware/rateLimiter.js
+ *
+ * Rate limiters for various endpoints.
+ * Added limiters for async code execution and result polling.
+ */
+
 const rateLimit = require('express-rate-limit');
 const { client: redisClient } = require('../config/redis');
 const config = require('../config');
@@ -29,7 +36,6 @@ try {
 
 // Create a Redis limiter if possible, otherwise fallback to memory
 const createRedisLimiter = (windowMs, max, keyPrefix) => {
-  // Use Redis store if available and ready
   if (redisStoreAvailable && redisClient && redisClient.isReady) {
     try {
       return rateLimit({
@@ -39,7 +45,6 @@ const createRedisLimiter = (windowMs, max, keyPrefix) => {
         }),
         windowMs,
         max,
-        // Explicitly enable the Retry-After header (default is false, but we want it)
         skipHeaders: false,
         message: {
           success: false,
@@ -49,9 +54,7 @@ const createRedisLimiter = (windowMs, max, keyPrefix) => {
           meta: {},
           error: { code: 'RATE_LIMIT_EXCEEDED' }
         },
-        // Optional: ensure Retry-After is set even if the store doesn't
         onLimitReached: (req, res, options) => {
-          // Set Retry-After header to the number of seconds remaining in the window
           res.setHeader('Retry-After', Math.ceil(options.windowMs / 1000));
         }
       });
@@ -59,7 +62,6 @@ const createRedisLimiter = (windowMs, max, keyPrefix) => {
       console.warn(`Redis limiter failed for ${keyPrefix}, using memory:`, error.message);
     }
   }
-  // Fallback to memory store
   return createMemoryLimiter(windowMs, max);
 };
 
@@ -119,6 +121,13 @@ const heatmapFilterLimiter = createRedisLimiter(60 * 60 * 1000, 500, 'heatmap:fi
 const progressLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'progress');
 const rankParticipantsLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'rank-participants');
 
+// ===== NEW: Code execution async limiters =====
+// Submitting code execution jobs (stricter limit: 10 per minute per user)
+const codeExecuteAsyncLimiter = createRedisLimiter(60 * 1000, 10, 'code:execute-async');
+
+// Polling for results (higher limit: 30 per minute per user)
+const codeResultPollLimiter = createRedisLimiter(60 * 1000, 30, 'code:result-poll');
+
 module.exports = {
   oauthLimiter,
   tokenLimiter,
@@ -164,9 +173,14 @@ module.exports = {
   heatmapStatsLimiter,
   heatmapFilterLimiter,
 
+  progressLimiter,
+  rankParticipantsLimiter,
+
+  // NEW exports
+  codeExecuteAsyncLimiter,
+  codeResultPollLimiter,
+
   // Keep helpers for any custom use
   createMemoryLimiter,
   createRedisLimiter,
-  progressLimiter,  
-  rankParticipantsLimiter,
 };

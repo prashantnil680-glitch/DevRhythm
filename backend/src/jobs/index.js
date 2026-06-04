@@ -1,3 +1,10 @@
+/**
+ * src/jobs/index.js
+ *
+ * Central job orchestration.
+ * Added temporary file cleanup job.
+ */
+
 const leaderboardJobs = require('./leaderboard.job');
 const notificationJobs = require('./notification.job');
 const progressSnapshotJobs = require('./progressSnapshot.job');
@@ -7,7 +14,8 @@ const expiredGoalsJob = require('./expiredGoals.job');
 const heatmapFlushJob = require('./heatmapFlush.job');
 const goalSnapshotJob = require('./goalSnapshot.job');
 const dailyQuestionJob = require('./dailyQuestion.job');
-const overdueRevisionsJob = require('./updateOverdueRevisions.job'); 
+const overdueRevisionsJob = require('./updateOverdueRevisions.job');
+const tempFileCleanupJob = require('./tempFileCleanup.job'); // NEW
 
 const startAllJobs = () => {
   if (process.env.NODE_ENV === 'production') {
@@ -20,7 +28,8 @@ const startAllJobs = () => {
     heatmapFlushJob.startHeatmapFlushJob();
     goalSnapshotJob.startGoalSnapshotJob();
     dailyQuestionJob.startDailyQuestionJob();
-    overdueRevisionsJob.startOverdueRevisionsJob(); 
+    overdueRevisionsJob.startOverdueRevisionsJob();
+    tempFileCleanupJob.startTempCleanupJob(); // NEW
   }
 };
 
@@ -34,7 +43,8 @@ const stopAllJobs = () => {
   heatmapFlushJob.stopHeatmapFlushJob();
   goalSnapshotJob.stopGoalSnapshotJob();
   dailyQuestionJob.stopDailyQuestionJob();
-  overdueRevisionsJob.stopOverdueRevisionsJob(); 
+  overdueRevisionsJob.stopOverdueRevisionsJob();
+  tempFileCleanupJob.stopTempCleanupJob(); // NEW
 };
 
 module.exports = {
@@ -49,5 +59,6 @@ module.exports = {
   heatmapFlushJob,
   goalSnapshotJob,
   dailyQuestionJob,
-  overdueRevisionsJob, 
+  overdueRevisionsJob,
+  tempFileCleanupJob, // NEW export
 };

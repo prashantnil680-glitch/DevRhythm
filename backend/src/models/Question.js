@@ -1,3 +1,10 @@
+/**
+ * src/models/Question.js
+ *
+ * Question schema.
+ * Added interactive flag inside executionMetadata.
+ */
+
 const mongoose = require("mongoose");
 
 const QuestionSchema = new mongoose.Schema(
@@ -93,13 +100,13 @@ const QuestionSchema = new mongoose.Schema(
               type: { type: String, required: true },
             },
           ],
-          dataStructures: [{ type: String }], 
-          interactive: { type: Boolean, default: false },
+          dataStructures: [{ type: String }],
+          interactive: { type: Boolean, default: false },   // NEW: true for multi-method problems
           methods: [
             {
               name: { type: String, required: true },
               returnType: { type: String, required: true },
-              parameters: [{ type: String }], 
+              parameters: [{ type: String }],
             },
           ],
           constructorParams: [{ type: String }],
@@ -123,16 +130,8 @@ QuestionSchema.index({ title: "text", pattern: "text" });
 QuestionSchema.index({ platform: 1, difficulty: 1, pattern: 1 });
 QuestionSchema.index({ createdBy: 1 });
 QuestionSchema.index({ "executionMetadata.methodName": 1 });
-
-// ========== NEW INDEXES FOR PERFORMANCE ==========
-// Index for exact title matching (used in progress endpoint filtering and sorting)
 QuestionSchema.index({ title: 1 });
-
-// Index for exact platformQuestionId matching (used in search and sorting)
 QuestionSchema.index({ platformQuestionId: 1 });
-
-// Index for difficulty filtering (already exists, but we list for completeness – no change)
-// ================================================
 
 QuestionSchema.pre("save", function (next) {
   if (this.pattern && !Array.isArray(this.pattern)) {

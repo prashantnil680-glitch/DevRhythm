@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { useMarkRevision } from '@/features/revision/hooks/useMarkRevision';
 import { useSaveNotes } from '@/features/progress/hooks/useSaveNotes';
-import { useRunCode } from '@/features/codeExecution/hooks/useRunCode';
+import { useRunCodeWithPolling } from '@/features/codeExecution/hooks/useRunCodeWithPolling';
 import { useDeleteQuestion } from '@/features/question/hooks/useDeleteQuestion';
 import { useQuestionDetails } from '@/features/question/hooks/useQuestionDetails';
 import { useUpdateStatus } from '@/features/progress/hooks/useUpdateStatus';
@@ -141,7 +141,6 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
       setSimilarQuestions(clientSimilarQuestions);
       setShouldFetchSimilar(false);
     } else if (clientSimilarError && !clientSimilarLoading) {
-      // If fetch fails, keep empty and stop retrying
       setShouldFetchSimilar(false);
     }
   }, [clientSimilarQuestions, clientSimilarLoading, clientSimilarError]);
@@ -182,7 +181,8 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
 
   const markRevisionMutation = useMarkRevision(initialQuestion._id);
   const saveNotesMutation = useSaveNotes(initialQuestion._id);
-  const runCodeMutation = useRunCode();
+  const runCodeMutation = useRunCodeWithPolling();
+  const { status: executionStatus, resetStatus } = runCodeMutation; // NEW: destructure status
   const deleteQuestionMutation = useDeleteQuestion();
 
   useEffect(() => {
@@ -225,19 +225,42 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
     setPersistedResults(undefined);
     const sanitizedTestCases = testCases.map(({ stdin, expected }) => ({ stdin, expected }));
     try {
-      await runCodeMutation.mutateAsync({
+      const result = await runCodeMutation.mutateAsync({
         questionId: initialQuestion._id,
         code,
         language,
         testCases: sanitizedTestCases,
       });
       setExecutionError(null);
+      // Invalidate and refetch question details
       await queryClient.invalidateQueries({ queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'] });
       await queryClient.refetchQueries({ queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'] });
+
+      // If tests failed, extract the first meaningful error message from the results
+      if (!result.allPassed && result.results && result.results.length > 0) {
+        const failedResult = result.results.find(r => !r.passed);
+        if (failedResult?.error) {
+          setExecutionError(failedResult.error);
+        } else if (result.results.some(r => !r.passed && r.error)) {
+          // fallback
+          const firstError = result.results.find(r => r.error)?.error;
+          if (firstError) setExecutionError(firstError);
+        } else {
+          setExecutionError('Some test cases failed. Check the results tab for details.');
+        }
+      }
     } catch (error: any) {
       console.error('Run code error:', error);
-      const message = error.response?.data?.message || error.message || 'Code execution failed';
-      setExecutionError(message);
+      // The mutation may throw a network error or a job failure.
+      // Extract the error message from the API response if available.
+      const apiMessage = error.response?.data?.message;
+      if (apiMessage && typeof apiMessage === 'string') {
+        setExecutionError(apiMessage);
+      } else if (error.message) {
+        setExecutionError(error.message);
+      } else {
+        setExecutionError('Code execution failed. Please try again.');
+      }
     }
   }, [initialQuestion._id, runCodeMutation, queryClient]);
 
@@ -312,7 +335,6 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
 
   useTimeTracker(initialQuestion._id, isAuthenticated && mounted);
 
-  // Build URL for "View all questions" with current question's tags
   const viewAllQuestionsUrl = useMemo(() => {
     if (!initialQuestion.tags || initialQuestion.tags.length === 0) {
       return '/questions?page=1';
@@ -384,19 +406,6 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
         <a href={initialQuestion.problemLink} target="_blank" rel="noopener noreferrer" className={styles.metadataChip}>
           Solve on {initialQuestion.platform} <FiExternalLink size={10} />
         </a>
-        {/* {initialQuestion.solutionLinks && initialQuestion.solutionLinks.length > 0 && (
-          <div className={styles.solutionDropdown}>
-            <span className={styles.metadataChip}>
-              🔗 Solutions
-              <select className={styles.solutionSelect} onChange={(e) => window.open(e.target.value, '_blank')} value="">
-                <option value="" disabled>Select solution</option>
-                {initialQuestion.solutionLinks.map((link, idx) => (
-                  <option key={idx} value={link}>Solution {idx + 1}</option>
-                ))}
-              </select>
-            </span>
-          </div>
-        )} */}
       </div>
 
       {/* Warning Banner */}
@@ -476,11 +485,12 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
             initialHistory={codeHistory}
             activeTab={rightActiveTab}
             onTabChange={setRightActiveTab}
+            executionStatus={executionStatus}   // NEW: pass execution status
           />
         </div>
       </div>
 
-      {/* Similar Questions - with client-side fallback */}
+      {/* Similar Questions */}
       <div className={styles.similarSection}>
         {similarQuestions.length > 0 ? (
           <SimilarQuestionsGrid

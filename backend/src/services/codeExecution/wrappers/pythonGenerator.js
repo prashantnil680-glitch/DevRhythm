@@ -376,6 +376,7 @@ def solve(input_str):
   }
 
   _buildNonInteractiveMain(deserCode, callCode, returnType, methodName, className) {
+    // Special case for Codec (serialization/deserialization) – keep original
     if (className === 'Codec') {
       return `
 def solve(input_str):
@@ -406,6 +407,8 @@ if __name__ == "__main__":
     sys.stdout.write(output)
 `;
     }
+
+    // Modified main block with proper void handling
     return `
 def solve(input_str):
     import json
@@ -420,13 +423,15 @@ ${callCode}
         # serialise that argument (TreeNode, ListNode, Node) as the result.
         if result is None:
             first_arg = arg_0 if 'arg_0' in locals() else None
-            if first_arg is not None:
-                if isinstance(first_arg, TreeNode):
-                    return json.dumps(serialize_tree(first_arg))
-                elif isinstance(first_arg, ListNode):
-                    return json.dumps(serialize_linked_list(first_arg))
-                elif isinstance(first_arg, Node):
-                    return json.dumps(serialize_node(first_arg))
+            if first_arg is not None and hasattr(first_arg, '__class__'):
+                class_name = first_arg.__class__.__name__
+                if class_name in ('ListNode', 'TreeNode', 'Node'):
+                    if class_name == 'ListNode':
+                        return json.dumps(serialize_linked_list(first_arg))
+                    elif class_name == 'TreeNode':
+                        return json.dumps(serialize_tree(first_arg))
+                    elif class_name == 'Node':
+                        return json.dumps(serialize_node(first_arg))
             # Fallback: if raw input was an empty list, output empty list
             if len(raw_args) > 0 and isinstance(raw_args[0], list) and len(raw_args[0]) == 0:
                 return "[]"

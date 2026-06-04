@@ -4,6 +4,7 @@ import React, { Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useInView } from 'react-intersection-observer';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
+import type { ExecutionStatus } from '@/features/codeExecution/components/ExecutionStatusIndicator';
 
 // Dynamically import the heavy CodeExecutionArea with SSR disabled
 const CodeExecutionArea = dynamic(
@@ -25,6 +26,7 @@ interface LazyRightColumnProps {
   initialHistory: any[];
   activeTab: string;
   onTabChange: (tabId: string) => void;
+  executionStatus?: ExecutionStatus;  // NEW: status for the indicator
 }
 
 export const LazyRightColumn: React.FC<LazyRightColumnProps> = (props) => {

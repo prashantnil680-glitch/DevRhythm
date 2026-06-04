@@ -1,3 +1,10 @@
+/**
+ * src/services/codeExecution/metadata.service.js
+ *
+ * Metadata extraction and caching service.
+ * Modified to store the interactive flag in the database.
+ */
+
 const Question = require('../../models/Question');
 const PythonExtractor = require('./metadataExtractor/pythonExtractor');
 const JavaExtractor = require('./metadataExtractor/javaExtractor');
@@ -63,6 +70,10 @@ class MetadataService {
 
     try {
       metadata = extractors[language].extract(starterCode);
+      // Ensure interactive flag is explicitly set (extractors may already set it, but we guarantee it)
+      if (metadata.interactive === undefined) {
+        metadata.interactive = false;
+      }
     } catch (extractError) {
       throw new Error(`Failed to extract metadata for ${language}: ${extractError.message}`);
     }
@@ -75,7 +86,7 @@ class MetadataService {
    * Store extracted metadata in the database.
    * @param {string} questionId – MongoDB ObjectId.
    * @param {string} language – Language key.
-   * @param {Object} metadata – Extracted metadata.
+   * @param {Object} metadata – Extracted metadata (includes interactive flag).
    * @returns {Promise<void>}
    */
   async _storeMetadata(questionId, language, metadata) {
@@ -109,6 +120,9 @@ class MetadataService {
       if (starterCode && typeof starterCode === 'string' && starterCode.trim() !== '') {
         try {
           const metadata = extractor.extract(starterCode);
+          if (metadata.interactive === undefined) {
+            metadata.interactive = false;
+          }
           results[lang] = metadata;
           await this._storeMetadata(questionId, lang, metadata);
         } catch (err) {

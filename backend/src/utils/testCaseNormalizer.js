@@ -1,4 +1,6 @@
 /**
+ * src/utils/testCaseNormalizer.js
+ *
  * Normalize a test case input string into a JSON object with an "args" array,
  * or preserve an interactive JSON object (with "constructor" and "methods").
  *
@@ -24,15 +26,8 @@ function normalizeTestCaseInput(stdin) {
   }
 
   // 1. Already valid interactive JSON (contains "constructor" and "methods")
-  if (trimmed.startsWith('{') && trimmed.includes('"constructor"') && trimmed.includes('"methods"')) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (parsed.constructor !== undefined && parsed.methods !== undefined) {
-        return trimmed;
-      }
-    } catch (e) {
-      // Not valid JSON, continue
-    }
+  if (isInteractiveFormat(trimmed)) {
+    return trimmed;
   }
 
   // 2. Already valid simple JSON object with "args"
@@ -93,6 +88,22 @@ function normalizeTestCaseInput(stdin) {
   }
 
   return JSON.stringify({ args });
+}
+
+/**
+ * Detects if a string is a valid interactive JSON structure.
+ * Interactive format must be an object with both "constructor" and "methods" keys.
+ * @param {string} str
+ * @returns {boolean}
+ */
+function isInteractiveFormat(str) {
+  if (!str.startsWith('{') || !str.endsWith('}')) return false;
+  try {
+    const parsed = JSON.parse(str);
+    return parsed && typeof parsed === 'object' && 'constructor' in parsed && 'methods' in parsed;
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
@@ -162,4 +173,4 @@ function parseValue(valueStr) {
   return valueStr;
 }
 
-module.exports = { normalizeTestCaseInput };
+module.exports = { normalizeTestCaseInput, isInteractiveFormat };

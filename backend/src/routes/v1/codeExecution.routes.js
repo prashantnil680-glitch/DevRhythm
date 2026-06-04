@@ -1,3 +1,10 @@
+/**
+ * src/routes/v1/codeExecution.routes.js
+ *
+ * Code execution routes.
+ * Modified to use the new rate limiters from middleware/rateLimiter.js.
+ */
+
 const express = require('express');
 const router = express.Router();
 const codeExecutionController = require('../../controllers/codeExecution.controller');
@@ -25,26 +32,26 @@ const executeSchema = Joi.object({
 .with('expected', 'stdin');
 
 // Async execution schema (same validation)
-const executeAsyncSchema = executeSchema; // reuse
+const executeAsyncSchema = executeSchema;
 
 // ==============================
-// SYNC ENDPOINT (original)
+// SYNC ENDPOINT (now async via queue)
 // ==============================
 router.post('/execute',
   auth,
-  rateLimiters.createRedisLimiter(60 * 1000, 10, 'code:execute'), // stricter rate limit
+  rateLimiters.codeExecuteAsyncLimiter,  
   validate(executeSchema),
   codeExecutionController.runCode
 );
 
 // ==============================
-// ASYNC ENDPOINTS (new)
+// ASYNC ENDPOINTS
 // ==============================
 
 // Submit code for async execution
 router.post('/execute-async',
   auth,
-  rateLimiters.createRedisLimiter(60 * 1000, 10, 'code:execute-async'),
+  rateLimiters.codeExecuteAsyncLimiter,  
   validate(executeAsyncSchema),
   codeExecutionController.executeCodeAsync
 );
@@ -52,7 +59,7 @@ router.post('/execute-async',
 // Poll for result
 router.get('/result/:jobId',
   auth,
-  rateLimiters.createRedisLimiter(60 * 1000, 30, 'code:result'),
+  rateLimiters.codeResultPollLimiter,    
   validate(Joi.object({ jobId: Joi.string().required() }), 'params'),
   codeExecutionController.getCodeResult
 );

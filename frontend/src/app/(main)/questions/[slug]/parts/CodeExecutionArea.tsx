@@ -34,6 +34,7 @@ import { SiCplusplus } from 'react-icons/si';
 import { FaPython } from 'react-icons/fa';
 import { PartyPopper, PartyPopperRef } from '@/shared/components/PartyPopper';
 import { parseErrorLineNumber, getErrorType } from './errorParser';
+import { ExecutionStatusIndicator, ExecutionStatus } from '@/features/codeExecution/components/ExecutionStatusIndicator';
 
 interface TestCase {
   stdin: string;
@@ -62,6 +63,7 @@ interface CodeExecutionAreaProps {
   initialHistory: any[];
   activeTab: string;
   onTabChange: (tabId: string) => void;
+  executionStatus?: ExecutionStatus;  // NEW: status for indicator
 }
 
 const languageOptions = [
@@ -310,6 +312,7 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
   initialHistory,
   activeTab,
   onTabChange,
+  executionStatus = 'idle',  // NEW: default to idle
 }) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isDark = useTheme();
@@ -381,7 +384,6 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
     setCode(val);
     onCodeChange?.(val);
     checkIfModified(val);
-    // Clear error highlight when code changes
     if (errorLine !== null) {
       setErrorLine(null);
       if (editorViewRef.current) {
@@ -478,12 +480,10 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
     }
   }, [results, executionError, onTabChange]);
 
-  // ========== Party Popper – FIXED with transition detection ==========
+  // Party popper
   useEffect(() => {
-    // Detect transition: we were running (prevIsRunningRef.current === true) and now finished (isRunning === false)
     const wasRunning = prevIsRunningRef.current;
     const justFinished = wasRunning && !isRunning;
-
     if (justFinished && !executionError && results && results.length > 0 && results.every(r => r.passed)) {
       const key = `${results.length}-${results.filter(r => r.passed).length}`;
       if (lastPartyTrigger.current !== key) {
@@ -491,19 +491,15 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
         partyPopperRef.current?.fire();
       }
     }
-    // Update ref after the check
     prevIsRunningRef.current = isRunning;
   }, [isRunning, results, executionError]);
 
   // Parse errors from test case results and highlight line
   useEffect(() => {
     if (!results || results.length === 0) {
-      // Clear error line if no results, but executionError may set it later
-      // Do not clear here unconditionally; let executionError effect handle it.
       if (!executionError) setErrorLine(null);
       return;
     }
-    // Find first failed test case with an error message
     const failedWithError = results.find(r => !r.passed && r.error);
     if (failedWithError && failedWithError.error) {
       const line = parseErrorLineNumber(failedWithError.error, language);
@@ -517,9 +513,7 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
               view.dispatch({
                 effects: EditorView.scrollIntoView(lineInfo.from, { y: 'center' }),
               });
-            } catch (e) {
-              // Line number out of range – ignore
-            }
+            } catch (e) {}
           }
         }, 100);
       }
@@ -528,12 +522,9 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
     }
   }, [results, language, executionError]);
 
-  // Parse error line from executionError (global compilation/runtime error)
   useEffect(() => {
     if (executionError) {
-      console.log('[Highlight] executionError:', executionError);
       const line = parseErrorLineNumber(executionError, language);
-      console.log('[Highlight] Parsed line number:', line);
       if (line !== null) {
         setErrorLine(line);
         if (editorViewRef.current) {
@@ -542,13 +533,10 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
             if (view) {
               try {
                 const lineInfo = view.state.doc.lineAt(line);
-                console.log('[Highlight] Scrolling to line:', line, 'from:', lineInfo.from);
                 view.dispatch({
                   effects: EditorView.scrollIntoView(lineInfo.from, { y: 'center' }),
                 });
-              } catch (e) {
-                console.warn('[Highlight] Invalid line number:', line, e);
-              }
+              } catch (e) {}
             }
           }, 200);
         }
@@ -562,26 +550,22 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
     }
   }, [executionError, language, results]);
 
-  // Apply error line decoration
   useEffect(() => {
     if (!editorViewRef.current) return;
     const view = editorViewRef.current;
     if (errorLine !== null) {
       try {
         const line = view.state.doc.lineAt(errorLine);
-        console.log('[Highlight] Applying decoration to line:', errorLine);
         view.dispatch({
           effects: errorLineEffect.of({ from: line.from, to: line.to }),
         });
-      } catch (e) {
-        console.warn('Invalid line number for error highlight:', errorLine);
-      }
+      } catch (e) {}
     } else {
       view.dispatch({ effects: errorLineEffect.of(null) });
     }
   }, [errorLine]);
 
-  // ========== Custom Find/Replace Handlers ==========
+  // Custom Find/Replace Handlers
   const handleFindNext = useCallback(() => {
     if (!editorViewRef.current || !findText) return;
     goToMatch(editorViewRef.current, 'next');
@@ -602,7 +586,6 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
     replaceAll(editorViewRef.current, findText, replaceText);
   }, [findText, replaceText]);
 
-  // Update search matches whenever findText changes
   useEffect(() => {
     if (!editorViewRef.current) return;
     const view = editorViewRef.current;
@@ -610,7 +593,6 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
     (window as any).__searchText = findText;
   }, [findText]);
 
-  // Keyboard shortcuts for find panel
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
@@ -669,7 +651,6 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
     }
   };
 
-  // Custom extensions for 4‑space indentation and Tab key behavior
   const indentExtensions = useMemo(() => {
     return [
       indentUnit.of('    '),
@@ -726,6 +707,13 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
     ]),
   ], [language, customTheme, indentExtensions]);
 
+  const handleStatusHide = useCallback(() => {
+    // Optionally notify parent or just let the indicator hide itself.
+    // The parent already passes executionStatus, and it will become 'idle' 
+    // only when a new run starts. We don't need to force reset here.
+    // But we can call resetStatus if needed.
+  }, []);
+
   return (
     <div className={styles.container}>
       <PartyPopper ref={partyPopperRef} />
@@ -734,6 +722,8 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
         <div className={styles.languageRow}>
           <Select options={languageOptions} value={language} onChange={setLanguage} className={styles.select} />
         </div>
+        {/* NEW: Execution status indicator */}
+        <ExecutionStatusIndicator status={executionStatus} onHide={handleStatusHide} />
         <div className={styles.tabsSwitch}>
           {tabs.map((tab) => (
             <button
@@ -761,7 +751,7 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
             variant="primary"
             size="sm"
             onClick={() => onRun(code, language, [...defaultTestCases, ...customTestCases])}
-            isLoading={isRunning}
+            disabled={isRunning}
             leftIcon={<FiPlay />}
             className={styles.runButton}
           >

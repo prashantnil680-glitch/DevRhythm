@@ -1,3 +1,10 @@
+/**
+ * src/config/index.js
+ *
+ * Central configuration loader.
+ * Added codeExecution concurrency and timeout settings.
+ */
+
 const dotenv = require('dotenv');
 dotenv.config();
 
@@ -71,7 +78,13 @@ module.exports = {
 
   codeExecution: {
     provider: process.env.CODE_EXECUTION_PROVIDER || 'judge0',
-    normalizationEnabled: process.env.CODE_NORMALIZATION_ENABLED !== 'false', 
+    normalizationEnabled: process.env.CODE_NORMALIZATION_ENABLED !== 'false',
+    // NEW: Maximum concurrent code execution workers (Bull queue concurrency)
+    maxConcurrentJobs: parseInt(process.env.CODE_EXECUTION_CONCURRENCY) || 5,
+    // NEW: Timeout for interactive problem execution (milliseconds)
+    interactiveTimeout: parseInt(process.env.CODE_EXECUTION_INTERACTIVE_TIMEOUT) || 30000,
+    // NEW: Base directory for temporary files (defaults to OS temp + 'devrhythm-code')
+    tempDir: process.env.CODE_EXECUTION_TEMP_DIR || null,
     judge0: {
       apiUrl: process.env.JUDGE0_API_URL || 'http://localhost:2358',
       cpuTimeLimit: parseFloat(process.env.JUDGE0_CPU_TIME_LIMIT) || 2,
@@ -89,7 +102,7 @@ module.exports = {
     maxPage: parseInt(process.env.USER_LIST_MAX_PAGE) || 100,
     maxLimit: parseInt(process.env.USER_LIST_MAX_LIMIT) || 100,
     defaultLimit: 20,
-    cacheTtlPublic: parseInt(process.env.USER_LIST_CACHE_TTL_PUBLIC) || 60,   // seconds
-    cacheTtlAuth: parseInt(process.env.USER_LIST_CACHE_TTL_AUTH) || 30,       // seconds
+    cacheTtlPublic: parseInt(process.env.USER_LIST_CACHE_TTL_PUBLIC) || 60,
+    cacheTtlAuth: parseInt(process.env.USER_LIST_CACHE_TTL_AUTH) || 30,
   },
 };

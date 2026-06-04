@@ -1,5 +1,14 @@
+/**
+ * src/services/queue.service.js
+ *
+ * Bull queue setup and processor registration.
+ * Also exports enqueueExecution and getExecutionStatus for code execution.
+ */
+
 const Bull = require('bull');
+const crypto = require('crypto');
 const config = require('../config');
+const CodeExecutionJob = require('../models/CodeExecutionJob');
 
 // Parse Redis URL
 const redisOptions = (() => {
@@ -18,12 +27,10 @@ const redisOptions = (() => {
       port,
       password,
       db,
-      maxRetriesPerRequest: 100,        // Increased to handle intermittent ECONNRESET
-      enableOfflineQueue: true,         // Queue commands when Redis is down
+      maxRetriesPerRequest: 100,
+      enableOfflineQueue: true,
       retryStrategy: (times) => {
-        // Exponential backoff with max 30 seconds
         const delay = Math.min(times * 100, 30000);
-        // Log only first attempt and every 50th attempt to avoid spam
         if (times === 1 || times % 50 === 0) {
           console.log(`Redis retry attempt ${times}, waiting ${delay}ms`);
         }
@@ -40,14 +47,18 @@ if (!redisOptions) {
   console.error('Redis configuration missing, queues will not work');
 }
 
-// Create a single queue for all job types
+// Create a single queue for all job types with global removeOnComplete
 const jobQueue = new Bull('devrhythm-jobs', {
   redis: redisOptions,
   settings: {
-    retryProcessDelay: 5000,   // Wait 5 seconds between retries
-    maxStalledCount: 3,        // Max stalled jobs before failing
-    guardInterval: 5000,       // Check stalled jobs every 5 seconds
-  }
+    retryProcessDelay: 5000,
+    maxStalledCount: 3,
+    guardInterval: 5000,
+  },
+  defaultJobOptions: {
+    removeOnComplete: true,
+    removeOnFail: true,
+  },
 });
 
 // ========== HEARTBEAT: keep Redis connection alive ==========
@@ -59,13 +70,11 @@ const startHeartbeat = () => {
       const client = await jobQueue.client;
       if (client && client.status === 'ready') {
         await client.ping();
-        // Optional: log once per hour to confirm heartbeat
-        // console.log('[Redis] Heartbeat PING sent');
       }
     } catch (err) {
       // Silently fail – the queue will handle reconnection
     }
-  }, 60000); // every 60 seconds
+  }, 60000);
 };
 
 const stopHeartbeat = () => {
@@ -85,7 +94,7 @@ jobQueue.on('error', (error) => {
 });
 
 jobQueue.on('failed', (job, err) => {
-  console.error(`Job ${job.id} (${job.data.type}) failed:`, err);
+  console.error(`Job ${job.id} (${job.name}) failed:`, err);
 });
 
 // ========== IMPORT HANDLERS ==========
@@ -109,7 +118,7 @@ const { handleConfidenceIncrement } = require('./queueHandlers/confidenceIncreme
 const { handlePodAvailable } = require('./queueHandlers/podAvailable.handler');
 const { handleFetchLeetcodeDetails } = require('./queueHandlers/fetchLeetcodeDetails.handler');
 const { handleCodeExecution } = require('./queueHandlers/codeExecution.handler');
-const { handleSheetImport } = require('./queueHandlers/sheetImport.handler'); 
+const { handleSheetImport } = require('./queueHandlers/sheetImport.handler');
 const { handleSheetCreate } = require('./queueHandlers/sheetCreate.handler');
 
 // ========== REGISTER PROCESSORS ==========
@@ -132,16 +141,69 @@ jobQueue.process('time.threshold_reached', handleTimeThresholdReached);
 jobQueue.process('confidence.increment', handleConfidenceIncrement);
 jobQueue.process('pod.available', handlePodAvailable);
 jobQueue.process('leetcode.fetch_details', handleFetchLeetcodeDetails);
-jobQueue.process('code.execution', handleCodeExecution);
-jobQueue.process('sheet.import', handleSheetImport); 
+
+const CODE_EXECUTION_CONCURRENCY = config.codeExecution?.maxConcurrentJobs || 5;
+jobQueue.process('code.execution', CODE_EXECUTION_CONCURRENCY, handleCodeExecution);
+
+jobQueue.process('sheet.import', handleSheetImport);
 jobQueue.process('sheet.create', handleSheetCreate);
 
+// ========== QUEUE HELPERS FOR CODE EXECUTION (to avoid circular deps) ==========
+
+/**
+ * Enqueues a code execution job.
+ * @param {object} params - { userId, language, code, questionId, testCases, timezone }
+ * @returns {Promise<string>} jobId
+ */
+async function enqueueExecution({ userId, language, code, questionId, testCases, timezone = 'UTC' }) {
+  if (!jobQueue) throw new Error('Job queue not available');
+
+  const jobId = crypto.randomUUID();
+
+  // Create job document in database
+  await CodeExecutionJob.create({
+    jobId,
+    userId,
+    questionId,
+    language,
+    code,
+    testCases: testCases || [],
+    status: 'pending',
+    timezone,
+  });
+
+  // Add to Bull queue
+  await jobQueue.add(
+    'code.execution',
+    { jobId },
+    {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 2000 },
+      timeout: config.codeExecution?.interactiveTimeout || 30000,
+      removeOnComplete: true,
+      removeOnFail: true,
+    }
+  );
+
+  return jobId;
+}
+
+/**
+ * Retrieves execution status and result.
+ * @param {string} jobId
+ * @returns {Promise<object|null>} Job document or null if not found.
+ */
+async function getExecutionStatus(jobId) {
+  return CodeExecutionJob.findOne({ jobId });
+}
+
+// ========== WORKER CONTROL ==========
 const startQueueWorkers = async () => {
   if (!jobQueue) {
     console.error('Queue not available, workers not started');
     return;
   }
-  console.log('Queue workers started');
+  console.log(`Queue workers started (code.execution concurrency: ${CODE_EXECUTION_CONCURRENCY})`);
 };
 
 const stopQueueWorkers = async () => {
@@ -154,4 +216,6 @@ module.exports = {
   jobQueue,
   startQueueWorkers,
   stopQueueWorkers,
+  enqueueExecution,    // NEW export
+  getExecutionStatus,  // NEW export
 };

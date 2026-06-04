@@ -29,21 +29,19 @@ class OnlineCompilerProvider extends BaseCodeExecutionProvider {
       throw new Error('OnlineCompiler API URL or API key not configured');
     }
 
-    const finalCode = code;
+    if (this.isFirstLog) {
+      this.isFirstLog = false;
+      console.log('[OnlineCompilerProvider] First execution, language:', language);
+    }
+
     const compiler = this.mapLanguage(language);
     const payload = {
       compiler: compiler,
-      code: finalCode,
+      code: code,
       input: stdin || '',
     };
 
     const url = `${this.apiUrl}/api/run-code-sync/`;
-    
-    if (this.isFirstLog) {
-      this.isFirstLog = false;
-      // Optional debug log – can be removed in production
-      // console.log('[OnlineCompilerProvider] First execution, language:', language);
-    }
 
     try {
       const response = await axios.post(url, payload, {
@@ -55,53 +53,73 @@ class OnlineCompilerProvider extends BaseCodeExecutionProvider {
       });
 
       const data = response.data;
-      return {
-        stdout: data.output || '',
-        stderr: data.error || '',
-        exitCode: data.exit_code !== undefined ? data.exit_code : (data.error ? 1 : 0),
-      };
-    } catch (error) {
-      // Log full error details for debugging
-      console.error('[OnlineCompilerProvider] Execution error:', {
-        language,
-        url,
-        message: error.message,
-        responseStatus: error.response?.status,
-        responseData: error.response?.data,
-        requestError: error.request ? 'Request made but no response received' : undefined,
-      });
+      // console.log('[OnlineCompilerProvider] API response:', JSON.stringify(data, null, 2));
 
+      let stdout = '';
+      let stderr = '';
+      let exitCode = 0;
+
+      // 1. Extract stdout
+      if (data.output !== undefined) stdout = String(data.output);
+      else if (data.stdout !== undefined) stdout = String(data.stdout);
+
+      // 2. Extract stderr from various possible fields (nested)
+      const errorSources = [
+        data.stderr,
+        data.error,
+        data.message,
+        data.err,
+        data.exception,
+        data.compilationError,
+        data.runtimeError,
+        data.result?.stderr,
+        data.result?.error,
+        data.result?.message,
+        data.result?.output, // sometimes errors go to output
+      ];
+
+      for (const src of errorSources) {
+        if (src && typeof src === 'string' && src.trim()) {
+          stderr = src.trim();
+          break;
+        }
+      }
+
+      // 3. Fallback: if output contains typical error patterns
+      if (!stderr && stdout && (stdout.includes('Traceback') || stdout.includes('Error') || stdout.includes('SyntaxError'))) {
+        stderr = stdout;
+        stdout = '';
+      }
+
+      // 4. Extract exit code
+      if (typeof data.exit_code === 'number') exitCode = data.exit_code;
+      else if (typeof data.exitCode === 'number') exitCode = data.exitCode;
+      else if (stderr) exitCode = 1;
+      else if (data.status === 'error') exitCode = 1;
+
+      // 5. If still no error but exitCode != 0, create generic
+      if (exitCode !== 0 && !stderr) {
+        stderr = `Execution failed with exit code ${exitCode}`;
+      }
+
+      return { stdout, stderr, exitCode };
+    } catch (error) {
+      console.error('[OnlineCompilerProvider] Request error:', error.message);
       let stderr = '';
       let exitCode = 1;
 
-      // Try to extract meaningful error from API response
       if (error.response && error.response.data) {
         const apiData = error.response.data;
-        if (typeof apiData === 'object') {
-          stderr = apiData.message || apiData.error || apiData.stderr || apiData.output;
-          if (apiData.details) stderr += `\nDetails: ${apiData.details}`;
-        } else if (typeof apiData === 'string') {
-          stderr = apiData;
-        }
-        if (!stderr) {
-          stderr = `API error (${error.response.status}): ${error.response.statusText}`;
-        }
+        stderr = apiData.message || apiData.error || apiData.stderr || apiData.output;
+        if (!stderr) stderr = `API error (${error.response.status}): ${error.response.statusText}`;
       } else if (error.request) {
         stderr = `Network error: ${error.message}`;
       } else {
         stderr = `Unexpected error: ${error.message}`;
       }
 
-      // Clean up stderr to avoid extremely long strings
-      if (stderr.length > 2000) {
-        stderr = stderr.substring(0, 2000) + '... (truncated)';
-      }
-
-      return {
-        stdout: '',
-        stderr: stderr || 'Execution service error',
-        exitCode,
-      };
+      if (stderr.length > 2000) stderr = stderr.substring(0, 2000) + '... (truncated)';
+      return { stdout: '', stderr, exitCode };
     }
   }
 

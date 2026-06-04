@@ -1,16 +1,14 @@
-const CodeExecutionJob = require('../../models/CodeExecutionJob');
-const codeExecutionController = require('../../controllers/codeExecution.controller');
-
 /**
+ * src/services/queueHandlers/codeExecution.handler.js
+ *
  * Bull queue processor for asynchronous code execution.
- * Expected job.data: { jobId }
- * 
- * This handler:
- * 1. Fetches the job document from DB
- * 2. Marks status as 'processing'
- * 3. Executes the code (reuses existing runCode logic)
- * 4. Updates job with result or error
+ * Now uses executeCodeCore from coreExecutor (no circular dependency).
  */
+
+const CodeExecutionJob = require('../../models/CodeExecutionJob');
+const { executeCodeCore } = require('../codeExecution/coreExecutor');
+const { createTempDir, cleanup } = require('../codeExecution/tempFileManager');
+
 const handleCodeExecution = async (job) => {
   const { jobId } = job.data;
 
@@ -18,63 +16,38 @@ const handleCodeExecution = async (job) => {
     throw new Error('Missing jobId in code execution job');
   }
 
-  console.log(`[CodeExecutionWorker] Processing job ${jobId}`);
+  console.log(`[CodeExecutionWorker] Processing job ${jobId} (attempt ${job.attemptsMade + 1})`);
 
-  // Fetch the job document
   const jobDoc = await CodeExecutionJob.findOne({ jobId });
   if (!jobDoc) {
     throw new Error(`Job ${jobId} not found in database`);
   }
 
-  // Update status to processing
   jobDoc.status = 'processing';
   jobDoc.startedAt = new Date();
   jobDoc.bullJobId = job.id;
   await jobDoc.save();
 
-  // Prepare a mock request object that contains all needed data
-  const mockReq = {
-    user: { _id: jobDoc.userId },
-    body: {
+  let tempDir = null;
+  try {
+    tempDir = await createTempDir();
+
+    const executionBody = {
       language: jobDoc.language,
       code: jobDoc.code,
       questionId: jobDoc.questionId,
       testCases: jobDoc.testCases,
-    },
-    userTimeZone: jobDoc.timezone,
-  };
+      timeSpent: 0,
+    };
 
-  // Mock response object to capture output
-  let responseData = null;
-  let errorOccurred = null;
+    const result = await executeCodeCore(
+      jobDoc.userId,
+      executionBody,
+      jobDoc.timezone || 'UTC'
+    );
 
-  const mockRes = {
-    status: (code) => ({
-      json: (data) => {
-        responseData = data;
-      },
-    }),
-    json: (data) => {
-      responseData = data;
-    },
-  };
-
-  // Next function to catch errors
-  const mockNext = (err) => {
-    errorOccurred = err;
-  };
-
-  try {
-    // Call the existing controller function
-    await codeExecutionController.runCode(mockReq, mockRes, mockNext);
-
-    if (errorOccurred) {
-      throw errorOccurred;
-    }
-
-    // Store result
     jobDoc.status = 'completed';
-    jobDoc.result = responseData?.data || responseData;
+    jobDoc.result = result;
     jobDoc.completedAt = new Date();
     jobDoc.progress = 100;
     await jobDoc.save();
@@ -86,8 +59,11 @@ const handleCodeExecution = async (job) => {
     jobDoc.errorMessage = err.message;
     jobDoc.completedAt = new Date();
     await jobDoc.save();
-    // Re-throw to let Bull retry if needed (up to 3 times)
     throw err;
+  } finally {
+    if (tempDir) {
+      await cleanup(tempDir).catch(e => console.warn(`Failed to cleanup temp dir ${tempDir}:`, e.message));
+    }
   }
 };
 

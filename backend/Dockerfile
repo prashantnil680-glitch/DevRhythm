@@ -1,4 +1,4 @@
-FROM node:18-slim
+FROM node:20-slim
 
 # Install Python 3 and pip, then symlink python3 to python
 RUN apt-get update && apt-get install -y python3 python3-pip && \

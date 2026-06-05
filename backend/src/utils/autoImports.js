@@ -13,7 +13,6 @@
  */
 function getPythonImports() {
   return `
-# === Auto‑injected imports (LeetCode‑style) ===
 from typing import List, Optional, Dict, Set, Tuple, Union, Callable, Any
 from collections import defaultdict, deque, Counter, OrderedDict
 from itertools import accumulate, product, combinations, permutations, chain
@@ -30,12 +29,10 @@ import sys
 import os
 import json
 
-# === Auto‑injected helper aliases (optional, matches LeetCode behaviour) ===
 def sorted_list(iterable=None):
     """Return a sorted list (helper for sorted sets via bisect)."""
     return sorted(iterable) if iterable else []
 
-# === End auto‑injected code ===
 `.trim();
 }
 
@@ -46,7 +43,6 @@ def sorted_list(iterable=None):
  */
 function getCppIncludes() {
   return `
-// === Auto‑injected includes (LeetCode‑style) ===
 #include <iostream>
 #include <vector>
 #include <string>
@@ -71,7 +67,6 @@ function getCppIncludes() {
 #include <ctime>
 #include <cassert>
 using namespace std;
-// === End auto‑injected code ===
 `.trim();
 }
 

@@ -26,7 +26,7 @@ const constants = require('../../config/constants');
 const { incrementUserStats } = require('../user.service');
 const { incrementDailyActivityDirect } = require('../heatmap.service');
 const { updateUserActivity } = require('../user.service');
-const { atomicUpdateQuestionProgressOnSolve, atomicIncrementHeatmapDay, atomicIncrementUserStats } = require('../../utils/atomicUpdate');
+const { atomicUpdateQuestionProgressOnSolve, atomicIncrementUserStats } = require('../../utils/atomicUpdate');
 const { validatePythonSyntax } = require('../../utils/pythonSyntaxValidator');
 const { validateCppSyntax } = require('../../utils/cppSyntaxValidator');
 const { getPythonImports, getCppIncludes } = require('../../utils/autoImports');
@@ -334,7 +334,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
   const totalCount = finalTestCases.length;
   const allPassed = passedCount === totalCount;
 
-  // Queue analytics job (lazy-loaded jobQueue)
+  // Queue analytics job
   const jobQueue = getJobQueue();
   if (jobQueue) {
     try {
@@ -430,10 +430,8 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
 
     await updateUserActivity(userId, now, timeZone);
 
-    const year = now.getUTCFullYear();
-    const { getStartOfDay } = require('../../utils/helpers/date');
-    const dayStart = getStartOfDay(now, timeZone);
-    const heatmapIncrements = {
+    // ========== HEATMAP UPDATE – use incrementDailyActivityDirect ==========
+    const increments = {
       totalActivities: 1,
       totalSubmissions: 1,
       totalTimeSpentMinutes: body.timeSpent || 0,
@@ -442,7 +440,8 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
       passedCount: passedCount,
       failedCount: totalCount - passedCount,
     };
-    await atomicIncrementHeatmapDay(userId, year, dayStart, heatmapIncrements);
+    await incrementDailyActivityDirect(userId, now, timeZone, increments, isFirstSolve, question.difficulty, question.platform);
+    // ========== END HEATMAP UPDATE ==========
 
     // Increment confidence
     const progressDoc = await UserQuestionProgress.findOne({ userId, questionId });

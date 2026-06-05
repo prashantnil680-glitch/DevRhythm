@@ -7,7 +7,6 @@
 
 const User = require('../models/User');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
-const HeatmapData = require('../models/HeatmapData');
 
 /**
  * Increment user stats atomically and recalculate mastery rate.
@@ -28,7 +27,6 @@ async function atomicIncrementUserStats(userId, deltaSolved, deltaTimeSpent, tot
   // Cap mastery rate at 100
   const rawMastery = totalActiveQuestions > 0 ? (newTotalSolved / totalActiveQuestions) * 100 : 0;
   const newMasteryRate = Math.min(100, rawMastery);
-  console.log(`[atomicIncrementUserStats] userId=${userId}, newTotalSolved=${newTotalSolved}, totalActiveQuestions=${totalActiveQuestions}, rawMastery=${rawMastery}, capped=${newMasteryRate}`);
 
   const updatedUser = await User.findOneAndUpdate(
     { _id: userId },
@@ -100,51 +98,12 @@ async function atomicUpdateQuestionProgressOnSolve(userId, questionId, solvedAt,
 }
 
 /**
- * Atomically increment a day's activity in HeatmapData.
- */
-async function atomicIncrementHeatmapDay(userId, year, dayStart, increments, setOnInsert = {}) {
-  if (!userId || !year || !dayStart) throw new Error('userId, year, dayStart are required');
-
-  const defaultDay = {
-    date: dayStart,
-    dayOfWeek: dayStart.getUTCDay(),
-    totalActivities: 0,
-    newProblemsSolved: 0,
-    revisionProblems: 0,
-    totalSubmissions: 0,
-    totalTimeSpent: 0,
-    difficultyBreakdown: { easy: 0, medium: 0, hard: 0 },
-    platformBreakdown: { leetcode: 0, hackerrank: 0, codeforces: 0, other: 0 },
-    studyGroupActivity: 0,
-    dailyGoalAchieved: false,
-    goalTarget: 0,
-    goalCompletion: 0,
-    intensityLevel: 0,
-    streakCount: 0,
-    testCaseExecutions: 0,
-    passedCount: 0,
-    failedCount: 0,
-    timeSpentEvents: 0,
-    ...setOnInsert,
-  };
-
-  const update = {
-    $inc: increments,
-    $setOnInsert: defaultDay,
-    $set: { lastUpdated: new Date() },
-  };
-
-  const result = await HeatmapData.findOneAndUpdate(
-    { userId, year, 'dailyData.date': dayStart },
-    update,
-    { new: true, upsert: true }
-  );
-
-  return result;
-}
-
-/**
  * Generic atomic increment with retry for high‑contention scenarios.
+ * @param {Function} model - Mongoose model
+ * @param {object} filter - Query filter
+ * @param {object} update - Update operators
+ * @param {number} maxRetries - Default 3
+ * @returns {Promise<object>} Updated document
  */
 async function atomicIncrementWithRetry(model, filter, update, maxRetries = 3) {
   let lastError;
@@ -174,6 +133,5 @@ async function atomicIncrementWithRetry(model, filter, update, maxRetries = 3) {
 module.exports = {
   atomicIncrementUserStats,
   atomicUpdateQuestionProgressOnSolve,
-  atomicIncrementHeatmapDay,
   atomicIncrementWithRetry,
 };

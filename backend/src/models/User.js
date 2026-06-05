@@ -98,31 +98,38 @@ const UserSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// ========== PRE‑VALIDATE HOOK: Cap masteryRate before validation ==========
+UserSchema.pre('validate', function(next) {
+  if (this.stats && typeof this.stats.masteryRate === 'number') {
+    if (this.stats.masteryRate > 100) this.stats.masteryRate = 100;
+    if (this.stats.masteryRate < 0) this.stats.masteryRate = 0;
+  }
+  next();
+});
+
+// ========== PRE‑SAVE HOOK: Cap masteryRate as safety net ==========
+UserSchema.pre('save', function(next) {
+  if (this.stats && typeof this.stats.masteryRate === 'number') {
+    if (this.stats.masteryRate > 100) this.stats.masteryRate = 100;
+    if (this.stats.masteryRate < 0) this.stats.masteryRate = 0;
+  }
+  next();
+});
+
 // ========== PERFORMANCE INDEXES ==========
-// Basic unique indexes
 UserSchema.index({ email: 1 }, { unique: true });
 UserSchema.index({ username: 1 }, { unique: true });
 UserSchema.index({ providerId: 1 }, { unique: true });
-
-// Visibility + active + exclude self – used by /users endpoint
 UserSchema.index({ privacy: 1, isActive: 1, _id: 1 });
-
-// Sorting indexes (descending order for most common sorts)
 UserSchema.index({ 'stats.totalSolved': -1 });
 UserSchema.index({ 'stats.masteryRate': -1 });
 UserSchema.index({ 'stats.totalTimeSpent': -1 });
 UserSchema.index({ createdAt: -1 });
-
-// Search indexes (prefix search)
 UserSchema.index({ username: 1 });
 UserSchema.index({ displayName: 1 });
-
-// Compound indexes for multi‑field static sorts
 UserSchema.index({ 'stats.masteryRate': -1, 'stats.totalSolved': -1 });
 UserSchema.index({ 'stats.totalSolved': -1, 'stats.masteryRate': -1 });
 UserSchema.index({ 'stats.totalTimeSpent': -1, 'stats.totalSolved': -1 });
-
-// Other existing indexes (preserved)
 UserSchema.index({ 'streak.current': -1 });
 UserSchema.index({ lastOnline: -1 });
 UserSchema.index({ 'preferences.timezone': 1 });

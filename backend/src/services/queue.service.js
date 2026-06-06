@@ -82,6 +82,9 @@ jobQueue.on('ready', () => {
 });
 
 jobQueue.on('error', (error) => {
+  if (error && error.message && error.message.includes('Missing key for job')) {
+    return;
+  }
   console.error('Queue error:', error);
 });
 

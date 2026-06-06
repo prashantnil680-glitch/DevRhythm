@@ -53,6 +53,19 @@ const jobQueue = new Bull('devrhythm-jobs', {
 // Increase max listeners to avoid MaxListenersExceededWarning
 jobQueue.setMaxListeners(50);
 
+// Increase max listeners on the underlying Redis clients as soon as they become available
+Promise.all([jobQueue.client, jobQueue.subscriber, jobQueue.bclient])
+  .then(([client, subscriber, bclient]) => {
+    [client, subscriber, bclient].forEach((clientInstance) => {
+      if (clientInstance && typeof clientInstance.setMaxListeners === 'function') {
+        clientInstance.setMaxListeners(50);
+      }
+    });
+  })
+  .catch((err) => {
+    console.warn('[Queue] Failed to increase max listeners on Redis clients:', err.message);
+  });
+
 // ========== HEARTBEAT: keep Redis connection alive ==========
 let heartbeatInterval = null;
 const startHeartbeat = () => {

@@ -1,3 +1,6 @@
+const events = require('events');
+events.EventEmitter.defaultMaxListeners = 50;
+
 const app = require('./app');
 const config = require('./config');
 const mongoose = require('./config/database');
@@ -10,7 +13,6 @@ const startServer = async () => {
   try {
     // Wait for database and Redis
     await mongoose.connect(config.database.uri, config.database.connectionOptions);
-    // console.log('MongoDB connected');
     await waitForRedis();
 
     // Start queue workers

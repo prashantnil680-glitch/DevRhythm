@@ -6,6 +6,7 @@
  * No circular dependencies – imports only services and models.
  */
 
+const crypto = require('crypto');
 const { DateTime } = require('luxon');
 const metadataService = require('./metadata.service');
 const PythonGenerator = require('./wrappers/pythonGenerator');
@@ -30,6 +31,7 @@ const { atomicUpdateQuestionProgressOnSolve, atomicIncrementUserStats } = requir
 const { validatePythonSyntax } = require('../../utils/pythonSyntaxValidator');
 const { validateCppSyntax } = require('../../utils/cppSyntaxValidator');
 const { getPythonImports, getCppIncludes } = require('../../utils/autoImports');
+const { client: redisClient } = require('../../config/redis');
 
 // Lazy load jobQueue to avoid circular dependency
 let cachedJobQueue = null;
@@ -48,6 +50,46 @@ const GENERATORS = {
   cpp: new CppGenerator(),
   javascript: new JsGenerator(),
 };
+
+/**
+ * Compute SHA256 hash of code for caching.
+ */
+function getCodeHash(code) {
+  return crypto.createHash('sha256').update(code).digest('hex');
+}
+
+/**
+ * Get cached syntax validation result.
+ * @returns {Promise<{error: string|null, cached: boolean}>}
+ */
+async function getCachedSyntaxValidation(language, codeHash) {
+  if (!redisClient) return { error: null, cached: false };
+  try {
+    const cacheKey = `syntax:valid:${language}:${codeHash}`;
+    const cached = await redisClient.get(cacheKey);
+    if (cached !== null) {
+      const parsed = JSON.parse(cached);
+      return { error: parsed.error, cached: true };
+    }
+  } catch (err) {
+    console.warn('[SyntaxCache] Redis get error:', err.message);
+  }
+  return { error: null, cached: false };
+}
+
+/**
+ * Store syntax validation result in cache.
+ */
+async function setCachedSyntaxValidation(language, codeHash, error) {
+  if (!redisClient) return;
+  try {
+    const cacheKey = `syntax:valid:${language}:${codeHash}`;
+    const value = JSON.stringify({ error: error || null });
+    await redisClient.setEx(cacheKey, 300, value); // TTL 5 minutes
+  } catch (err) {
+    console.warn('[SyntaxCache] Redis set error:', err.message);
+  }
+}
 
 const normalizeLanguage = (lang) => {
   const lower = lang.toLowerCase();
@@ -141,8 +183,17 @@ const cleanupExecutionHistory = async (userId, questionId, language) => {
  * Core execution logic – atomic and race‑free.
  * @returns {Promise<object>} Result object.
  */
-async function executeCodeCore(userId, body, timeZone = 'UTC') {
+async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
+  if (!timing) {
+    timing = { start: () => {}, end: () => {}, record: () => {} };
+  }
+
   let { language, code, stdin, expected, testCases, questionId } = body;
+  
+  // ========== STORE ORIGINAL USER CODE FOR HISTORY ==========
+  const originalUserCode = code;
+  // =========================================================
+
   language = normalizeLanguage(language);
 
   if (!SUPPORTED_LANGUAGES.includes(language)) {
@@ -160,7 +211,6 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
       code = autoImports + '\n\n' + code;
     }
   }
-  // ========== END AUTO-INJECT ==========
 
   // ========== AUTO-INJECT INCLUDES FOR C++ ==========
   if (language === 'cpp') {
@@ -170,7 +220,6 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
       code = autoIncludes + '\n\n' + code;
     }
   }
-  // ========== END AUTO-INJECT ==========
 
   const [question, userProgress] = await Promise.all([
     Question.findById(questionId).lean(),
@@ -179,23 +228,41 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
   if (!question) throw new AppError('Question not found', 404);
 
   let metadata;
+  timing.start('validation.metadata_extraction');
   try {
     metadata = await metadataService.getExecutionMetadata(questionId, language);
+    timing.end('validation.metadata_extraction');
   } catch (err) {
+    timing.end('validation.metadata_extraction');
     console.error(`[CodeExecution] Metadata extraction failed for question ${questionId}, language ${language}:`, err);
     throw new AppError(`Failed to extract problem metadata: ${err.message}. Please ensure the starter code is valid.`, 400);
   }
+  timing.end('validation.ast_parsing');
 
   const defaultTestCases = (question.testCases || []).map(tc => ({
     stdin: tc.stdin || '',
     expected: tc.expected,
   }));
+  timing.start('test_cases.preparation');
   const finalTestCases = buildTestCases(question, userProgress, testCases, stdin, expected);
   if (finalTestCases.length === 0) throw new AppError('No test cases available for this question', 400);
+  timing.end('test_cases.preparation');
+  timing.record('test_cases.count', finalTestCases.length, { count: finalTestCases.length });
 
-  // ========== SYNTAX VALIDATION (Python & C++) ==========
+  const codeHash = getCodeHash(code);
+  let syntaxError = null;
+
+  // ========== SYNTAX VALIDATION WITH CACHING (Python & C++) ==========
   if (language === 'python') {
-    const syntaxError = validatePythonSyntax(code);
+    timing.start('validation.syntax_validation');
+    const { error: cachedError, cached } = await getCachedSyntaxValidation('python', codeHash);
+    if (cached) {
+      syntaxError = cachedError;
+    } else {
+      syntaxError = validatePythonSyntax(code);
+      await setCachedSyntaxValidation('python', codeHash, syntaxError);
+    }
+    timing.end('validation.syntax_validation');
     if (syntaxError) {
       const failedResults = finalTestCases.map(tc => ({
         input: tc.stdin,
@@ -219,7 +286,15 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
   }
 
   if (language === 'cpp') {
-    const syntaxError = validateCppSyntax(code);
+    timing.start('validation.syntax_validation');
+    const { error: cachedError, cached } = await getCachedSyntaxValidation('cpp', codeHash);
+    if (cached) {
+      syntaxError = cachedError;
+    } else {
+      syntaxError = validateCppSyntax(code);
+      await setCachedSyntaxValidation('cpp', codeHash, syntaxError);
+    }
+    timing.end('validation.syntax_validation');
     if (syntaxError) {
       const failedResults = finalTestCases.map(tc => ({
         input: tc.stdin,
@@ -241,7 +316,10 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
       };
     }
   }
-  // ========== END SYNTAX VALIDATION ==========
+
+  timing.start('validation.normalization');
+  // Normalization is a no‑op in current implementation; just mark as 0ms
+  timing.end('validation.normalization');
 
   const generator = GENERATORS[language];
   if (!generator) throw new AppError(`No wrapper generator for language: ${language}`, 500);
@@ -258,6 +336,8 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
   }
 
   let batchResults;
+  timing.start('compiler.provider_request');
+  const compilerStart = Date.now();
   try {
     const { executeBatch } = require('../codeExecution.service');
     batchResults = await executeBatch({
@@ -265,7 +345,11 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
       code: fullCode,
       testCases: finalTestCases,
     });
+    const compilerDuration = Date.now() - compilerStart;
+    timing.end('compiler.provider_request');
+    timing.record('compiler.external_api_duration', compilerDuration);
   } catch (execError) {
+    timing.end('compiler.provider_request');
     console.error('Execution provider error:', execError);
     const failedResults = finalTestCases.map(tc => ({
       input: tc.stdin,
@@ -288,6 +372,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
   }
 
   const isOrderIrrelevant = question.contentRef ? /any order/i.test(question.contentRef) : false;
+  timing.start('processing.result_parsing');
   const results = batchResults.map((res, idx) => {
     const testCase = finalTestCases[idx];
     const actualOutput = res.stdout || '';
@@ -329,10 +414,13 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
       passed,
     };
   });
+  timing.end('processing.result_parsing');
 
+  timing.start('processing.pass_fail_calculation');
   const passedCount = results.filter(r => r.passed).length;
   const totalCount = finalTestCases.length;
   const allPassed = passedCount === totalCount;
+  timing.end('processing.pass_fail_calculation');
 
   // Queue analytics job
   const jobQueue = getJobQueue();
@@ -358,11 +446,12 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
   else if (stdin !== undefined) customToSave = [{ stdin: stdin || '', expected: expected || '' }];
   await saveCustomTestCases(userId, questionId, customToSave, defaultTestCases);
 
+  timing.start('persistence.result_storage');
   await CodeExecutionHistory.create({
     userId,
     questionId,
     language,
-    code,
+    code: originalUserCode,
     testCases: results.map(r => ({
       stdin: r.input,
       expected: r.expected,
@@ -380,9 +469,11 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
       customTestCasesCount: customToSave.length,
     },
   });
+  timing.end('persistence.result_storage');
 
   await cleanupExecutionHistory(userId, questionId, language);
 
+  timing.start('processing.revision_update');
   const existingRevision = await RevisionSchedule.findOne({ userId, questionId });
   if (!existingRevision && allPassed) {
     const solvedLocal = DateTime.fromJSDate(new Date(), { zone: timeZone });
@@ -400,6 +491,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
     await invalidateCache(`revisions:*:user:${userId}:*`);
     await invalidateCache(`question-details:*:${questionId}:*`);
   }
+  timing.end('processing.revision_update');
 
   const responseData = {
     questionId,
@@ -417,6 +509,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
     const now = new Date();
     const totalActiveQuestions = await Question.countDocuments({ isActive: true });
 
+    timing.start('processing.question_solved_update');
     const { progress: updatedProgress, isFirstSolve } = await atomicUpdateQuestionProgressOnSolve(
       userId,
       questionId,
@@ -427,11 +520,11 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
     if (isFirstSolve) {
       await atomicIncrementUserStats(userId, 1, body.timeSpent || 0, totalActiveQuestions);
     }
+    timing.end('processing.question_solved_update');
 
     await updateUserActivity(userId, now, timeZone);
 
-    // REMOVED: heatmap increment block – no longer called here
-
+    timing.start('processing.activity_creation');
     await ActivityLog.create({
       userId,
       action: 'question_solved',
@@ -448,6 +541,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
       },
       timestamp: now,
     });
+    timing.end('processing.activity_creation');
 
     await invalidateProgressCache(userId);
 
@@ -462,6 +556,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
       });
     }
 
+    timing.start('processing.confidence_update');
     await revisionActivityService.recordCodeSubmission(userId, questionId, now);
     const revisionResult = await revisionActivityService.checkAndCompleteRevision(
       userId,
@@ -476,6 +571,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
       responseData.revisionOutOfOrder = revisionResult.outOfOrder || false;
       responseData.revisionOverdueCompleted = revisionResult.overdueCompleted || false;
     }
+    timing.end('processing.confidence_update');
   }
 
   return responseData;

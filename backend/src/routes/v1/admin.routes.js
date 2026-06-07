@@ -2,6 +2,13 @@ const express = require('express');
 const router = express.Router();
 const { refreshNewLeetCodeProblems, repairIncompleteQuestions } = require('../../services/leetcodeSync.service');
 const config = require('../../config');
+const {
+  getMainQueueMetrics,
+  getMainQueueHealth,
+  getCodeExecutionQueueMetrics,
+  getCodeExecutionQueueHealth,
+} = require('../../services/queueMonitor.service');
+const { clearStaleCodeExecutionLocks } = require('../../services/queue.service');
 
 // Simple API key middleware
 const requireApiKey = (req, res, next) => {
@@ -12,6 +19,7 @@ const requireApiKey = (req, res, next) => {
   next();
 };
 
+// ========== LeetCode endpoints ==========
 router.post('/leetcode/refresh', requireApiKey, async (req, res, next) => {
   try {
     const refreshResult = await refreshNewLeetCodeProblems();
@@ -66,7 +74,77 @@ router.post('/leetcode/repair-missing', requireApiKey, async (req, res, next) =>
   }
 });
 
-// ========== NEW: Heatmap rebuild endpoint ==========
+// ========== Queue monitoring endpoints ==========
+
+// Main queue (non‑code jobs)
+router.get('/queue/main-metrics', requireApiKey, async (req, res, next) => {
+  try {
+    const metrics = await getMainQueueMetrics();
+    res.json({
+      success: true,
+      message: 'Main queue metrics retrieved successfully',
+      data: metrics,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/queue/main-health', requireApiKey, async (req, res, next) => {
+  try {
+    const health = await getMainQueueHealth();
+    res.json({
+      success: true,
+      message: 'Main queue health retrieved successfully',
+      data: health,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Dedicated code execution queue
+router.get('/queue/code-metrics', requireApiKey, async (req, res, next) => {
+  try {
+    const metrics = await getCodeExecutionQueueMetrics();
+    res.json({
+      success: true,
+      message: 'Code execution queue metrics retrieved successfully',
+      data: metrics,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/queue/code-health', requireApiKey, async (req, res, next) => {
+  try {
+    const health = await getCodeExecutionQueueHealth();
+    res.json({
+      success: true,
+      message: 'Code execution queue health retrieved successfully',
+      data: health,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Manual lock cleanup (affects code execution queue locks)
+router.post('/queue/clear-locks', requireApiKey, async (req, res, next) => {
+  try {
+    const deletedCount = await clearStaleCodeExecutionLocks();
+    res.json({
+      success: true,
+      message: `Cleared ${deletedCount} stale code execution locks`,
+      data: { deletedCount },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ========== Heatmap rebuild endpoint ==========
 router.post('/heatmap/rebuild', requireApiKey, async (req, res, next) => {
   try {
     const { dryRun = false, userId = null } = req.body;
@@ -81,6 +159,12 @@ router.post('/heatmap/rebuild', requireApiKey, async (req, res, next) => {
     console.error('[Admin] Heatmap rebuild error:', error);
     next(error);
   }
+});
+
+router.post('/queue/fast/clear', requireApiKey, async (req, res) => {
+  const cleaned = await fastCodeExecutionQueue.clean(0, 'wait');
+  const active = await fastCodeExecutionQueue.clean(0, 'active');
+  res.json({ cleaned: cleaned.length, active: active.length });
 });
 
 module.exports = router;

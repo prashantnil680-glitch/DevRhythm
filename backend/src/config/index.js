@@ -2,7 +2,6 @@
  * src/config/index.js
  *
  * Central configuration loader.
- * Added codeExecution concurrency and timeout settings.
  */
 
 const dotenv = require('dotenv');
@@ -39,12 +38,12 @@ module.exports = {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackUrl: process.env.GOOGLE_CALLBACK_URL || `${config.backendUrl}/api/v1/auth/google/callback`,
+      callbackUrl: process.env.GOOGLE_CALLBACK_URL || `${process.env.BACKEND_URL}/api/v1/auth/google/callback`,
     },
     github: {
       clientId: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      callbackUrl: process.env.GITHUB_CALLBACK_URL || `${config.backendUrl}/api/v1/auth/github/callback`,
+      callbackUrl: process.env.GITHUB_CALLBACK_URL || `${process.env.BACKEND_URL}/api/v1/auth/github/callback`,
     }
   },
   
@@ -79,11 +78,9 @@ module.exports = {
   codeExecution: {
     provider: process.env.CODE_EXECUTION_PROVIDER || 'judge0',
     normalizationEnabled: process.env.CODE_NORMALIZATION_ENABLED !== 'false',
-    // NEW: Maximum concurrent code execution workers (Bull queue concurrency)
-    maxConcurrentJobs: parseInt(process.env.CODE_EXECUTION_CONCURRENCY) || 5,
-    // NEW: Timeout for interactive problem execution (milliseconds)
+    maxConcurrentJobs: Math.min(20, Math.max(1, parseInt(process.env.CODE_EXECUTION_CONCURRENCY) || 10)),
+    lockTtlSeconds: Math.min(120, Math.max(5, parseInt(process.env.CODE_EXECUTION_LOCK_TTL) || 30)),
     interactiveTimeout: parseInt(process.env.CODE_EXECUTION_INTERACTIVE_TIMEOUT) || 30000,
-    // NEW: Base directory for temporary files (defaults to OS temp + 'devrhythm-code')
     tempDir: process.env.CODE_EXECUTION_TEMP_DIR || null,
     judge0: {
       apiUrl: process.env.JUDGE0_API_URL || 'http://localhost:2358',
@@ -95,6 +92,30 @@ module.exports = {
       apiKey: process.env.ONLINECOMPILER_API_KEY,
       timeout: parseInt(process.env.ONLINECOMPILER_TIMEOUT) || 30000,
     },
+  },
+
+  // ========== DEDICATED FAST CODE EXECUTION QUEUE (Python, JavaScript) ==========
+  fastCodeExecutionQueue: {
+    // Number of parallel workers (default: 15, min: 1, max: 20)
+    concurrency: Math.min(20, Math.max(1, parseInt(process.env.FAST_CODE_EXECUTION_QUEUE_CONCURRENCY) || 15)),
+    // Job lock duration in milliseconds
+    lockDuration: Math.min(120000, Math.max(10000, parseInt(process.env.FAST_CODE_EXECUTION_LOCK_DURATION) || 60000)),
+    // How often to check for stalled jobs (milliseconds)
+    stalledInterval: Math.min(120000, Math.max(5000, parseInt(process.env.FAST_CODE_EXECUTION_STALLED_INTERVAL) || 30000)),
+    // Maximum number of times a stalled job can be retried
+    maxStalledCount: Math.min(10, Math.max(1, parseInt(process.env.FAST_CODE_EXECUTION_MAX_STALLED_COUNT) || 3)),
+  },
+
+  // ========== DEDICATED SLOW CODE EXECUTION QUEUE (C++, Java) ==========
+  slowCodeExecutionQueue: {
+    // Number of parallel workers (default: 5, min: 1, max: 20)
+    concurrency: Math.min(20, Math.max(1, parseInt(process.env.SLOW_CODE_EXECUTION_QUEUE_CONCURRENCY) || 5)),
+    // Job lock duration in milliseconds
+    lockDuration: Math.min(120000, Math.max(10000, parseInt(process.env.SLOW_CODE_EXECUTION_LOCK_DURATION) || 60000)),
+    // How often to check for stalled jobs (milliseconds)
+    stalledInterval: Math.min(120000, Math.max(5000, parseInt(process.env.SLOW_CODE_EXECUTION_STALLED_INTERVAL) || 30000)),
+    // Maximum number of times a stalled job can be retried
+    maxStalledCount: Math.min(10, Math.max(1, parseInt(process.env.SLOW_CODE_EXECUTION_MAX_STALLED_COUNT) || 3)),
   },
 
   // ========== USER LIST OPTIMIZATION CONSTANTS ==========

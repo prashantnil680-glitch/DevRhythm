@@ -2,7 +2,6 @@
  * src/jobs/index.js
  *
  * Central job orchestration.
- * Added temporary file cleanup job.
  */
 
 const leaderboardJobs = require('./leaderboard.job');
@@ -15,7 +14,9 @@ const heatmapFlushJob = require('./heatmapFlush.job');
 const goalSnapshotJob = require('./goalSnapshot.job');
 const dailyQuestionJob = require('./dailyQuestion.job');
 const overdueRevisionsJob = require('./updateOverdueRevisions.job');
-const tempFileCleanupJob = require('./tempFileCleanup.job'); // NEW
+const tempFileCleanupJob = require('./tempFileCleanup.job');
+// const codeExecutionCleanupJob = require('./codeExecutionQueueCleanup.job'); // OLD – replaced
+const dualQueueCleanupJob = require('./dualQueueCleanup.job'); // NEW
 
 const startAllJobs = () => {
   if (process.env.NODE_ENV === 'production') {
@@ -29,7 +30,9 @@ const startAllJobs = () => {
     goalSnapshotJob.startGoalSnapshotJob();
     dailyQuestionJob.startDailyQuestionJob();
     overdueRevisionsJob.startOverdueRevisionsJob();
-    tempFileCleanupJob.startTempCleanupJob(); // NEW
+    tempFileCleanupJob.startTempCleanupJob();
+    // codeExecutionCleanupJob.startCodeExecutionCleanupJob(); // DISABLED – replaced by dual queue cleanup
+    dualQueueCleanupJob.startDualQueueCleanupJob(); // NEW
   }
 };
 
@@ -44,7 +47,9 @@ const stopAllJobs = () => {
   goalSnapshotJob.stopGoalSnapshotJob();
   dailyQuestionJob.stopDailyQuestionJob();
   overdueRevisionsJob.stopOverdueRevisionsJob();
-  tempFileCleanupJob.stopTempCleanupJob(); // NEW
+  tempFileCleanupJob.stopTempCleanupJob();
+  // codeExecutionCleanupJob.stopCodeExecutionCleanupJob(); // DISABLED
+  dualQueueCleanupJob.stopDualQueueCleanupJob(); // NEW
 };
 
 module.exports = {
@@ -60,5 +65,7 @@ module.exports = {
   goalSnapshotJob,
   dailyQuestionJob,
   overdueRevisionsJob,
-  tempFileCleanupJob, // NEW export
+  tempFileCleanupJob,
+  // codeExecutionCleanupJob, // OLD – removed
+  dualQueueCleanupJob, // NEW
 };

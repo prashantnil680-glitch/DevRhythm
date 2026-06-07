@@ -43,6 +43,10 @@ class OnlineCompilerProvider extends BaseCodeExecutionProvider {
 
     const url = `${this.apiUrl}/api/run-code-sync/`;
 
+    // + Log request start
+    const start = Date.now();
+    console.log(`[OnlineCompiler] Request to ${url} with language ${compiler}`);
+
     try {
       const response = await axios.post(url, payload, {
         headers: {
@@ -51,6 +55,9 @@ class OnlineCompilerProvider extends BaseCodeExecutionProvider {
         },
         timeout: this.timeout,
       });
+
+      const duration = Date.now() - start;
+      console.log(`[OnlineCompiler] Response received in ${duration}ms, status ${response.status}`);
 
       const data = response.data;
       // console.log('[OnlineCompilerProvider] API response:', JSON.stringify(data, null, 2));
@@ -104,7 +111,9 @@ class OnlineCompilerProvider extends BaseCodeExecutionProvider {
 
       return { stdout, stderr, exitCode };
     } catch (error) {
-      console.error('[OnlineCompilerProvider] Request error:', error.message);
+      const duration = Date.now() - start;
+      console.error(`[OnlineCompiler] Request failed after ${duration}ms:`, error.message);
+      
       let stderr = '';
       let exitCode = 1;
 

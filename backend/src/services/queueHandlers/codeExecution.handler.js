@@ -9,20 +9,21 @@ const CodeExecutionJob = require('../../models/CodeExecutionJob');
 const { executeCodeCore } = require('../codeExecution/coreExecutor');
 const { createTempDir, cleanup } = require('../codeExecution/tempFileManager');
 const { client: redisClient } = require('../../config/redis');
-
-const LOCK_TTL_SECONDS = 60; // 60 seconds lock TTL
+const { invalidateCache } = require('../../middleware/cache');
+const TimingLogger = require('../../utils/timingLogger');
+const config = require('../../config');
 
 /**
  * Acquire a distributed lock for a given jobId.
  * @param {string} jobId
+ * @param {number} ttlSeconds
  * @returns {Promise<boolean>} True if lock acquired, false otherwise.
  */
-async function acquireLock(jobId) {
+async function acquireLock(jobId, ttlSeconds) {
   if (!redisClient) return false;
   const lockKey = `lock:code-execution:${jobId}`;
   try {
-    // Use SET NX EX to atomically set the lock if it doesn't exist
-    const result = await redisClient.set(lockKey, '1', { NX: true, EX: LOCK_TTL_SECONDS });
+    const result = await redisClient.set(lockKey, '1', { NX: true, EX: ttlSeconds });
     return result === 'OK';
   } catch (err) {
     console.error(`[CodeExecutionWorker] Failed to acquire lock for job ${jobId}:`, err.message);
@@ -51,12 +52,18 @@ const handleCodeExecution = async (job) => {
     throw new Error('Missing jobId in code execution job');
   }
 
-  // Try to acquire distributed lock
-  const lockAcquired = await acquireLock(jobId);
+  const lockTtl = config.codeExecution?.lockTtlSeconds || 30;
+  const lockAcquired = await acquireLock(jobId, lockTtl);
+
   if (!lockAcquired) {
     console.warn(`[CodeExecutionWorker] Lock not acquired for job ${jobId} (already being processed). Skipping.`);
     return;
   }
+
+  console.log(`[CodeExecutionWorker] Lock acquired for job ${jobId} (TTL: ${lockTtl}s)`);
+
+  const timing = new TimingLogger(jobId);
+  const now = Date.now();
 
   console.log(`[CodeExecutionWorker] Processing job ${jobId} (attempt ${job.attemptsMade + 1})`);
 
@@ -67,12 +74,19 @@ const handleCodeExecution = async (job) => {
     throw new Error(`Job ${jobId} not found in database`);
   }
 
+  const createdAt = new Date(jobDoc.createdAt).getTime();
+  const waitTime = now - createdAt;
+  timing.record('queue.wait_time', waitTime);
+  console.log(`[Timing] ${jobId} | worker picked up | time since creation: ${waitTime}ms`);
+
   jobDoc.status = 'processing';
   jobDoc.startedAt = new Date();
   jobDoc.bullJobId = job.id;
   await jobDoc.save();
 
   let tempDir = null;
+  let result = null;
+
   try {
     tempDir = await createTempDir();
 
@@ -84,10 +98,11 @@ const handleCodeExecution = async (job) => {
       timeSpent: 0,
     };
 
-    const result = await executeCodeCore(
+    result = await executeCodeCore(
       jobDoc.userId,
       executionBody,
-      jobDoc.timezone || 'UTC'
+      jobDoc.timezone || 'UTC',
+      timing
     );
 
     jobDoc.status = 'completed';
@@ -103,13 +118,27 @@ const handleCodeExecution = async (job) => {
     jobDoc.errorMessage = err.message;
     jobDoc.completedAt = new Date();
     await jobDoc.save();
-    throw err; // Re-throw to let Bull handle retries
+    throw err;
   } finally {
     if (tempDir) {
       await cleanup(tempDir).catch(e => console.warn(`Failed to cleanup temp dir ${tempDir}:`, e.message));
     }
     await releaseLock(jobId);
   }
+
+  // Non‑blocking cache invalidation (fire and forget)
+  setImmediate(async () => {
+    try {
+      timing.start('persistence.cache_invalidation');
+      await invalidateCache(`code-execution:${jobId}`);
+      await invalidateCache(`question-details:*:${jobDoc.questionId}*`);
+      timing.end('persistence.cache_invalidation');
+    } catch (cacheErr) {
+      console.error(`[CodeExecutionWorker] Cache invalidation failed for job ${jobId}:`, cacheErr.message);
+    } finally {
+      timing.summary();
+    }
+  });
 };
 
 module.exports = { handleCodeExecution };

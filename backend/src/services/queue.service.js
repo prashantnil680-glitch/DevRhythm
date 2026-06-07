@@ -1,8 +1,8 @@
 /**
  * src/services/queue.service.js
  *
- * Bull queue setup and processor registration.
- * Also exports enqueueExecution and getExecutionStatus for code execution.
+ * Bull queue setup and processor registration for all job types except code.execution.
+ * Code execution jobs are handled by a dedicated queue (codeExecutionQueue.service.js).
  */
 
 const Bull = require('bull');
@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const { URL } = require('url');
 const config = require('../config');
 const CodeExecutionJob = require('../models/CodeExecutionJob');
+const { client: redisClient } = require('../config/redis');
 
 // Parse REDIS_URL manually to ensure TLS works correctly with Upstash
 const redisUrl = config.redis.url;
@@ -21,7 +22,7 @@ if (!redisUrl) {
 const parsedUrl = new URL(redisUrl);
 const isTLS = parsedUrl.protocol === 'rediss:';
 
-// Bull-compatible Redis options – no maxRetriesPerRequest, no enableReadyCheck, no retryStrategy
+// Bull-compatible Redis options
 const redisOptions = {
   host: parsedUrl.hostname,
   port: Number(parsedUrl.port) || 6379,
@@ -34,15 +35,15 @@ if (isTLS) {
   redisOptions.tls = { rejectUnauthorized: false };
 }
 
-// Create a single queue for all job types with global removeOnComplete
+// Create a single queue for all job types
 const jobQueue = new Bull('devrhythm-jobs', {
   redis: redisOptions,
   settings: {
     retryProcessDelay: 5000,
     maxStalledCount: 3,
     guardInterval: 5000,
-    stalledInterval: 30000,      // Check for stalled jobs every 30 seconds
-    lockDuration: 60000,         // Lock a job for 60 seconds while processing
+    stalledInterval: 30000,
+    lockDuration: 60000,
   },
   defaultJobOptions: {
     removeOnComplete: true,
@@ -53,7 +54,7 @@ const jobQueue = new Bull('devrhythm-jobs', {
 // Increase max listeners to avoid MaxListenersExceededWarning
 jobQueue.setMaxListeners(50);
 
-// Increase max listeners on the underlying Redis clients as soon as they become available
+// Increase max listeners on the underlying Redis clients
 Promise.all([jobQueue.client, jobQueue.subscriber, jobQueue.bclient])
   .then(([client, subscriber, bclient]) => {
     [client, subscriber, bclient].forEach((clientInstance) => {
@@ -101,7 +102,6 @@ jobQueue.on('error', (error) => {
   console.error('Queue error:', error);
 });
 
-// Suppress 'Missing key for job delayed' errors (log as warning)
 jobQueue.on('delayed', (job, err) => {
   if (err && err.message && err.message.includes('Missing key for job')) {
     console.warn(`Delayed job ${job.id} missing key (likely already completed):`, err.message);
@@ -110,7 +110,6 @@ jobQueue.on('delayed', (job, err) => {
   }
 });
 
-// Custom failed handler: treat 'Missing key' as warning (job already cleaned up)
 jobQueue.on('failed', (job, err) => {
   if (err && err.message && err.message.includes('Missing key for job')) {
     console.warn(`Job ${job.id} (${job.name}) failed (likely already removed):`, err.message);
@@ -139,11 +138,10 @@ const { handleTimeThresholdReached } = require('./queueHandlers/timeThresholdRea
 const { handleConfidenceIncrement } = require('./queueHandlers/confidenceIncrement.handler');
 const { handlePodAvailable } = require('./queueHandlers/podAvailable.handler');
 const { handleFetchLeetcodeDetails } = require('./queueHandlers/fetchLeetcodeDetails.handler');
-const { handleCodeExecution } = require('./queueHandlers/codeExecution.handler');
 const { handleSheetImport } = require('./queueHandlers/sheetImport.handler');
 const { handleSheetCreate } = require('./queueHandlers/sheetCreate.handler');
 
-// ========== REGISTER PROCESSORS ==========
+// ========== REGISTER PROCESSORS (all except code.execution) ==========
 jobQueue.process('question.solved', handleQuestionSolved);
 jobQueue.process('question.mastered', handleQuestionMastered);
 jobQueue.process('question.attempted', handleQuestionAttempted);
@@ -163,20 +161,15 @@ jobQueue.process('time.threshold_reached', handleTimeThresholdReached);
 jobQueue.process('confidence.increment', handleConfidenceIncrement);
 jobQueue.process('pod.available', handlePodAvailable);
 jobQueue.process('leetcode.fetch_details', handleFetchLeetcodeDetails);
-
-const CODE_EXECUTION_CONCURRENCY = config.codeExecution?.maxConcurrentJobs || 5;
-jobQueue.process('code.execution', CODE_EXECUTION_CONCURRENCY, handleCodeExecution);
-
 jobQueue.process('sheet.import', handleSheetImport);
 jobQueue.process('sheet.create', handleSheetCreate);
 
 // ========== QUEUE HELPERS FOR CODE EXECUTION ==========
+// Note: enqueueExecution still exists but will be modified in File 5 to use the dedicated queue.
+// For now, keep the function as is but it will be replaced later.
+// This function is called by the controller; it currently adds to the main queue.
+// We will update the controller later to use the dedicated queue.
 
-/**
- * Enqueues a code execution job.
- * @param {object} params - { userId, language, code, questionId, testCases, timezone }
- * @returns {Promise<string>} jobId
- */
 async function enqueueExecution({ userId, language, code, questionId, testCases, timezone = 'UTC' }) {
   if (!jobQueue) throw new Error('Job queue not available');
 
@@ -208,11 +201,6 @@ async function enqueueExecution({ userId, language, code, questionId, testCases,
   return jobId;
 }
 
-/**
- * Retrieves execution status and result.
- * @param {string} jobId
- * @returns {Promise<object|null>} Job document or null if not found.
- */
 async function getExecutionStatus(jobId) {
   return CodeExecutionJob.findOne({ jobId });
 }
@@ -222,13 +210,13 @@ const startQueueWorkers = async () => {
     console.error('Queue not available, workers not started');
     return;
   }
-  console.log(`Queue workers started (code.execution concurrency: ${CODE_EXECUTION_CONCURRENCY})`);
+  console.log('Main queue workers started (all job types except code.execution)');
 };
 
 const stopQueueWorkers = async () => {
   stopHeartbeat();
   if (jobQueue) await jobQueue.close();
-  console.log('Queue workers stopped');
+  console.log('Main queue workers stopped');
 };
 
 module.exports = {

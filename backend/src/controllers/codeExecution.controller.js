@@ -2,20 +2,45 @@
  * src/controllers/codeExecution.controller.js
  *
  * Handles code execution requests.
- * All submissions are processed asynchronously via Bull queue.
+ * All submissions are processed asynchronously via dedicated Bull queues.
+ * Fast languages (Python, JavaScript) go to fast queue.
+ * Slow languages (C++, Java) go to slow queue.
+ * Syntax validation is performed synchronously to avoid queuing invalid code.
  */
 
 const crypto = require('crypto');
-const { enqueueExecution, getExecutionStatus } = require('../services/queue.service');
+const { fastCodeExecutionQueue } = require('../services/fastCodeExecutionQueue.service');
+const { slowCodeExecutionQueue } = require('../services/slowCodeExecutionQueue.service');
 const { executeCodeCore, SUPPORTED_LANGUAGES, normalizeLanguage } = require('../services/codeExecution/coreExecutor');
 const { formatResponse } = require('../utils/helpers/response');
 const AppError = require('../utils/errors/AppError');
 const Question = require('../models/Question');
 const CodeExecutionJob = require('../models/CodeExecutionJob');
-const { jobQueue } = require('../services/queue.service');
+const { validatePythonSyntax } = require('../utils/pythonSyntaxValidator');
+const { validateCppSyntax } = require('../utils/cppSyntaxValidator');
+
+// Language classification
+const FAST_LANGUAGES = ['python', 'javascript'];
+const SLOW_LANGUAGES = ['cpp', 'java'];
 
 /**
- * SYNC ENDPOINT (now returns job ID immediately).
+ * Determine which queue to use based on language.
+ * @param {string} language - Normalized language (python, javascript, cpp, java)
+ * @returns {Bull.Queue} The appropriate Bull queue
+ */
+function getQueueForLanguage(language) {
+  if (FAST_LANGUAGES.includes(language)) {
+    return fastCodeExecutionQueue;
+  }
+  if (SLOW_LANGUAGES.includes(language)) {
+    return slowCodeExecutionQueue;
+  }
+  // Fallback to fast queue (should never happen due to SUPPORTED_LANGUAGES check)
+  return fastCodeExecutionQueue;
+}
+
+/**
+ * SYNC ENDPOINT (returns job ID immediately).
  * POST /api/v1/code/execute
  */
 const runCode = async (req, res, next) => {
@@ -33,19 +58,56 @@ const runCode = async (req, res, next) => {
     const question = await Question.findById(questionId).select('_id');
     if (!question) throw new AppError('Question not found', 404);
 
+    // ========== SYNCHRONOUS SYNTAX VALIDATION ==========
+    let syntaxError = null;
+    if (normalizedLang === 'python') {
+      syntaxError = validatePythonSyntax(code);
+    } else if (normalizedLang === 'cpp') {
+      syntaxError = validateCppSyntax(code);
+    }
+
+    if (syntaxError) {
+      return res.status(400).json(formatResponse('Syntax error in code', null, null, {
+        code: 'SYNTAX_ERROR',
+        message: syntaxError,
+        language: normalizedLang,
+      }));
+    }
+    // ========== END SYNCHRONOUS VALIDATION ==========
+
     let finalTestCases = testCases;
     if (stdin !== undefined && !testCases) {
       finalTestCases = [{ stdin: stdin || '', expected: expected || '' }];
     }
 
-    const jobId = await enqueueExecution({
+    const jobId = crypto.randomUUID();
+
+    // Create job document in database
+    await CodeExecutionJob.create({
+      jobId,
       userId: req.user._id,
+      questionId,
       language: normalizedLang,
       code,
-      questionId,
       testCases: finalTestCases || [],
+      status: 'pending',
       timezone: req.userTimeZone || 'UTC',
     });
+
+    // Select appropriate queue based on language
+    const targetQueue = getQueueForLanguage(normalizedLang);
+    const queueName = targetQueue === fastCodeExecutionQueue ? 'fast' : 'slow';
+
+    // Add job to the selected queue
+    await targetQueue.add('code.execution', { jobId }, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 2000 },
+      timeout: 30000,
+      removeOnComplete: true,
+      removeOnFail: true,
+    });
+
+    console.log(`[CodeExecution] Job ${jobId} enqueued to ${queueName} queue (language: ${normalizedLang})`);
 
     res.status(202).json(formatResponse('Code execution queued', { jobId, status: 'pending' }));
   } catch (error) {
@@ -72,6 +134,23 @@ const executeCodeAsync = async (req, res, next) => {
     const question = await Question.findById(questionId).select('_id');
     if (!question) throw new AppError('Question not found', 404);
 
+    // ========== SYNCHRONOUS SYNTAX VALIDATION ==========
+    let syntaxError = null;
+    if (normalizedLang === 'python') {
+      syntaxError = validatePythonSyntax(code);
+    } else if (normalizedLang === 'cpp') {
+      syntaxError = validateCppSyntax(code);
+    }
+
+    if (syntaxError) {
+      return res.status(400).json(formatResponse('Syntax error in code', null, null, {
+        code: 'SYNTAX_ERROR',
+        message: syntaxError,
+        language: normalizedLang,
+      }));
+    }
+    // ========== END SYNCHRONOUS VALIDATION ==========
+
     const jobId = crypto.randomUUID();
     const finalTestCases = testCases || (stdin !== undefined ? [{ stdin: stdin || '', expected: expected || '' }] : []);
 
@@ -87,15 +166,18 @@ const executeCodeAsync = async (req, res, next) => {
     });
     await jobDoc.save();
 
-    if (!jobQueue) {
-      throw new AppError('Job queue not available', 500);
-    }
-    await jobQueue.add('code.execution', { jobId }, {
+    const targetQueue = getQueueForLanguage(normalizedLang);
+    const queueName = targetQueue === fastCodeExecutionQueue ? 'fast' : 'slow';
+
+    await targetQueue.add('code.execution', { jobId }, {
       attempts: 3,
       backoff: { type: 'exponential', delay: 2000 },
+      timeout: 30000,
+      removeOnComplete: true,
+      removeOnFail: true,
     });
-    jobDoc.bullJobId = jobDoc.id; // Bull job id not needed, but store something
-    await jobDoc.save();
+
+    console.log(`[CodeExecution] Job ${jobId} enqueued to ${queueName} queue (language: ${normalizedLang})`);
 
     res.status(202).json(formatResponse('Code execution queued', { jobId, status: 'pending' }));
   } catch (error) {
@@ -109,7 +191,6 @@ const executeCodeAsync = async (req, res, next) => {
 const getCodeResult = async (req, res, next) => {
   try {
     const { jobId } = req.params;
-    // Use lean() and bypass any Mongoose caching
     const jobDoc = await CodeExecutionJob.findOne({ jobId }).lean();
     if (!jobDoc) {
       console.warn(`[Poll] Job ${jobId} not found in DB`);

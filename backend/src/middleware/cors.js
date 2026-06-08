@@ -7,7 +7,7 @@ const corsOptions = {
       config.frontendUrl,
       'http://localhost:4000',
       'http://localhost:5000',
-      'https://devrhythm.vercel.app'
+      'https://www.devrhythm.space'
     ];
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);

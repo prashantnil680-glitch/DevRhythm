@@ -31,11 +31,11 @@ export const metadata = {
     title: 'Anupam Debnath – About & Personal Journey | DevRhythm',
     description:
       'Meet Anupam Debnath, the developer behind DevRhythm. Discover why he built a DSA habit‑tracking platform and how it’s helping developers code with rhythm.',
-    url: 'https://devrhythm.vercel.app/about/me',
+    url: 'https://www.devrhythm.space/about/me',
     siteName: 'DevRhythm',
     images: [
       {
-        url: 'https://devrhythm.vercel.app/devrhythm-maker.jpg',
+        url: 'https://www.devrhythm.space/devrhythm-maker.jpg',
         width: 1200,
         height: 630,
         alt: 'Anupam Debnath, creator of DevRhythm',
@@ -49,10 +49,10 @@ export const metadata = {
     title: 'Anupam Debnath – About & Personal Journey | DevRhythm',
     description:
       'Meet Anupam Debnath, the developer behind DevRhythm. Discover why he built a DSA habit‑tracking platform and how it’s helping developers code with rhythm.',
-    images: ['https://devrhythm.vercel.app/devrhythm-maker.jpg'],
+    images: ['https://www.devrhythm.space/devrhythm-maker.jpg'],
   },
   alternates: {
-    canonical: 'https://devrhythm.vercel.app/about/me',
+    canonical: 'https://www.devrhythm.space/about/me',
   },
 };
 
@@ -67,7 +67,7 @@ const projectsData = [
     title: 'DevRhythm',
     description: 'DSA habit platform with spaced repetition, heatmaps, and revision schedules.',
     image: '/images/projects/devrhythm-thumb.png',
-    url: 'https://devrhythm.vercel.app',
+    url: 'https://www.devrhythm.space',
   },
   {
     id: 2,
@@ -104,16 +104,16 @@ export default function AboutPage() {
           __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'Person',
-            '@id': 'https://devrhythm.vercel.app/about/me#person',
+            '@id': 'https://www.devrhythm.space/about/me#person',
             name: 'Anupam Debnath',
-            url: 'https://devrhythm.vercel.app/about/me',
+            url: 'https://www.devrhythm.space/about/me',
             jobTitle: 'Web Developer',
             worksFor: {
               '@type': 'Organization',
               name: 'DevRhythm',
-              url: 'https://devrhythm.vercel.app',
+              url: 'https://www.devrhythm.space',
             },
-            image: 'https://devrhythm.vercel.app/devrhythm-maker.jpg',
+            image: 'https://www.devrhythm.space/devrhythm-maker.jpg',
             sameAs: [
               'https://github.com/anupam6335',
               'https://www.linkedin.com/in/anupamdebnath6335/',

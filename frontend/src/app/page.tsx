@@ -268,11 +268,11 @@ function HomePageContent() {
             '@context': 'https://schema.org',
             '@type': 'WebSite',
             name: 'DevRhythm',
-            url: 'https://devrhythm.vercel.app',
+            url: 'https://www.devrhythm.space',
             description:
               'Rhythm‑based coding practice platform with spaced repetition, heatmaps, and goal tracking.',
-            creator: { '@id': 'https://devrhythm.vercel.app/about/me#person' },
-            author: { '@id': 'https://devrhythm.vercel.app/about/me#person' },
+            creator: { '@id': 'https://www.devrhythm.space/about/me#person' },
+            author: { '@id': 'https://www.devrhythm.space/about/me#person' },
           }),
         }}
       />

@@ -12,8 +12,8 @@ module.exports = {
   port: process.env.PORT || 5000,
   isProduction: process.env.NODE_ENV === 'production',
   apiBaseUrl: process.env.API_BASE_URL || '/api/v1',
-  frontendUrl: process.env.FRONTEND_URL || 'https://devrhythm.vercel.app',
-  backendUrl: process.env.BACKEND_URL || 'https://devrhythm-backend.onrender.com',
+  frontendUrl: process.env.FRONTEND_URL || 'https://www.devrhythm.space',
+  backendUrl: process.env.BACKEND_URL || 'https://api.devrhythm.space',
   
   database: {
     uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/devrhythm',

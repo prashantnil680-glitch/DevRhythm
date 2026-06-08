@@ -12,6 +12,7 @@ import { indentUnit } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Extension } from '@codemirror/state';
+import { undo, redo } from '@codemirror/commands';
 import {
   FiChevronDown,
   FiChevronUp,
@@ -27,6 +28,7 @@ import {
   FiX,
   FiChevronLeft,
   FiChevronRight,
+  FiRotateCw,
 } from 'react-icons/fi';
 import { toast } from '@/shared/components/Toast';
 import styles from './CodeExecutionArea.module.css';
@@ -63,7 +65,7 @@ interface CodeExecutionAreaProps {
   initialHistory: any[];
   activeTab: string;
   onTabChange: (tabId: string) => void;
-  executionStatus?: ExecutionStatus;  // NEW: status for indicator
+  executionStatus?: ExecutionStatus;
 }
 
 const languageOptions = [
@@ -312,7 +314,7 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
   initialHistory,
   activeTab,
   onTabChange,
-  executionStatus = 'idle',  // NEW: default to idle
+  executionStatus = 'idle',
 }) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isDark = useTheme();
@@ -339,6 +341,19 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
   const [replaceText, setReplaceText] = useState('');
   const [showReplace, setShowReplace] = useState(false);
   const findInputRef = useRef<HTMLInputElement>(null);
+
+  // Undo/Redo handlers
+  const handleUndo = useCallback(() => {
+    if (editorViewRef.current) {
+      undo(editorViewRef.current);
+    }
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    if (editorViewRef.current) {
+      redo(editorViewRef.current);
+    }
+  }, []);
 
   // Persistence helpers
   const persistCode = useCallback((newCode: string, lang: string) => {
@@ -707,12 +722,7 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
     ]),
   ], [language, customTheme, indentExtensions]);
 
-  const handleStatusHide = useCallback(() => {
-    // Optionally notify parent or just let the indicator hide itself.
-    // The parent already passes executionStatus, and it will become 'idle' 
-    // only when a new run starts. We don't need to force reset here.
-    // But we can call resetStatus if needed.
-  }, []);
+  const handleStatusHide = useCallback(() => {}, []);
 
   return (
     <div className={styles.container}>
@@ -722,7 +732,6 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
         <div className={styles.languageRow}>
           <Select options={languageOptions} value={language} onChange={setLanguage} className={styles.select} />
         </div>
-        {/* NEW: Execution status indicator */}
         <ExecutionStatusIndicator status={executionStatus} onHide={handleStatusHide} />
         <div className={styles.tabsSwitch}>
           {tabs.map((tab) => (
@@ -738,9 +747,27 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
         </div>
         <div className={styles.actionButtons}>
           {activeTab === 'code' && (
-            <button className={styles.iconButton} onClick={copyToClipboard} aria-label="Copy code" title="Copy code">
-              <FiCopy />
-            </button>
+            <>
+              <button
+                className={styles.iconButton}
+                onClick={handleUndo}
+                aria-label="Undo"
+                title="Undo (Ctrl+Z)"
+              >
+                <FiRotateCcw />
+              </button>
+              <button
+                className={styles.iconButton}
+                onClick={handleRedo}
+                aria-label="Redo"
+                title="Redo (Ctrl+Y / Cmd+Shift+Z)"
+              >
+                <FiRotateCw />
+              </button>
+              <button className={styles.iconButton} onClick={copyToClipboard} aria-label="Copy code" title="Copy code">
+                <FiCopy />
+              </button>
+            </>
           )}
           {isCodeModified && activeTab === 'code' && (
             <button className={styles.iconButton} onClick={handleReset} aria-label="Reset code" title="Reset to starter code">
@@ -760,142 +787,140 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
         </div>
       </div>
 
-      {activeTab === 'code' && (
-        <>
-          <div className={styles.editorWrapper}>
-            <CodeMirror
-              value={code}
-              onChange={handleCodeChange}
-              height={isMobile ? '300px' : '500px'}
-              extensions={editorExtensions}
-              basicSetup={{
-                lineNumbers: true,
-                highlightActiveLineGutter: true,
-                highlightActiveLine: true,
-                foldGutter: true,
-                dropCursor: true,
-                allowMultipleSelections: true,
-                indentOnInput: true,
-                bracketMatching: true,
-                closeBrackets: true,
-                autocompletion: true,
-                rectangularSelection: true,
-                crosshairCursor: true,
-                highlightSelectionMatches: true,
-                closeBracketsKeymap: true,
-                defaultKeymap: true,
-                historyKeymap: true,
-                foldKeymap: true,
-                completionKeymap: true,
-                lintKeymap: true,
-              }}
-              className={styles.editor}
-              onCreateEditor={(view) => { editorViewRef.current = view; }}
-            />
-
-            {showFindPanel && (
-              <div className={styles.findPanel}>
-                <div className={styles.findPanelContent}>
-                  <div className={styles.findRow}>
-                    <input
-                      ref={findInputRef}
-                      type="text"
-                      placeholder="Find"
-                      value={findText}
-                      onChange={(e) => setFindText(e.target.value)}
-                      className={styles.findInput}
-                    />
-                    <button className={styles.findActionButton} onClick={handleFindPrev} title="Previous match">
-                      <FiChevronLeft />
-                    </button>
-                    <button className={styles.findActionButton} onClick={handleFindNext} title="Next match">
-                      <FiChevronRight />
-                    </button>
-                    <button className={styles.findActionButton} onClick={() => setShowReplace(!showReplace)} title="Show replace">
-                      {showReplace ? <FiChevronUp /> : <FiChevronDown />}
-                    </button>
-                    <button className={styles.findCloseButton} onClick={() => setShowFindPanel(false)} aria-label="Close">
-                      <FiX />
-                    </button>
-                  </div>
-                  {showReplace && (
-                    <div className={styles.replaceRow}>
-                      <input
-                        type="text"
-                        placeholder="Replace with"
-                        value={replaceText}
-                        onChange={(e) => setReplaceText(e.target.value)}
-                        className={styles.replaceInput}
-                      />
-                      <button className={styles.replaceButton} onClick={handleReplaceOne}>Replace</button>
-                      <button className={styles.replaceAllButton} onClick={handleReplaceAll}>Replace All</button>
-                    </div>
-                  )}
+      {/* Editor and test cases – always mounted, hidden when not in code tab to preserve undo/redo history */}
+      <div style={{ display: activeTab === 'code' ? 'block' : 'none' }}>
+        <div className={styles.editorWrapper}>
+          <CodeMirror
+            value={code}
+            onChange={handleCodeChange}
+            height={isMobile ? '300px' : '500px'}
+            extensions={editorExtensions}
+            basicSetup={{
+              lineNumbers: true,
+              highlightActiveLineGutter: true,
+              highlightActiveLine: true,
+              foldGutter: true,
+              dropCursor: true,
+              allowMultipleSelections: true,
+              indentOnInput: true,
+              bracketMatching: true,
+              closeBrackets: true,
+              autocompletion: true,
+              rectangularSelection: true,
+              crosshairCursor: true,
+              highlightSelectionMatches: true,
+              closeBracketsKeymap: true,
+              defaultKeymap: true,
+              historyKeymap: true,
+              foldKeymap: true,
+              completionKeymap: true,
+              lintKeymap: true,
+            }}
+            className={styles.editor}
+            onCreateEditor={(view) => { editorViewRef.current = view; }}
+          />
+          {showFindPanel && (
+            <div className={styles.findPanel}>
+              <div className={styles.findPanelContent}>
+                <div className={styles.findRow}>
+                  <input
+                    ref={findInputRef}
+                    type="text"
+                    placeholder="Find"
+                    value={findText}
+                    onChange={(e) => setFindText(e.target.value)}
+                    className={styles.findInput}
+                  />
+                  <button className={styles.findActionButton} onClick={handleFindPrev} title="Previous match">
+                    <FiChevronLeft />
+                  </button>
+                  <button className={styles.findActionButton} onClick={handleFindNext} title="Next match">
+                    <FiChevronRight />
+                  </button>
+                  <button className={styles.findActionButton} onClick={() => setShowReplace(!showReplace)} title="Show replace">
+                    {showReplace ? <FiChevronUp /> : <FiChevronDown />}
+                  </button>
+                  <button className={styles.findCloseButton} onClick={() => setShowFindPanel(false)} aria-label="Close">
+                    <FiX />
+                  </button>
                 </div>
-              </div>
-            )}
-          </div>
-
-          <div className={styles.testCasesSection}>
-            <div className={styles.testCasesHeader}>
-              <strong>Test Cases</strong>
-              <div className={styles.testCasesHeaderActions}>
-                <button className={styles.addButtonSmall} onClick={() => setCustomTestCases((prev) => [...prev, { stdin: '', expected: '' }])}>
-                  <FiPlus /> Add
-                </button>
-                <button className={styles.toggleButton} onClick={() => setTestCasesCollapsed(!testCasesCollapsed)}>
-                  {testCasesCollapsed ? <FiChevronDown /> : <FiChevronUp />}
-                </button>
+                {showReplace && (
+                  <div className={styles.replaceRow}>
+                    <input
+                      type="text"
+                      placeholder="Replace with"
+                      value={replaceText}
+                      onChange={(e) => setReplaceText(e.target.value)}
+                      className={styles.replaceInput}
+                    />
+                    <button className={styles.replaceButton} onClick={handleReplaceOne}>Replace</button>
+                    <button className={styles.replaceAllButton} onClick={handleReplaceAll}>Replace All</button>
+                  </div>
+                )}
               </div>
             </div>
-            {!testCasesCollapsed && (
-              <div className={styles.testCasesList}>
-                <div className={styles.testCasesHeaderRow}>
-                  <div className={styles.testCasesHeaderCell}>Input</div>
-                  <div className={styles.testCasesHeaderCell}>Expected</div>
-                </div>
-                {defaultTestCases.map((tc, idx) => (
-                  <div key={`default-${idx}`} className={styles.testCaseRow}>
-                    <div className={styles.testCaseCell}><code className={styles.mono}>{tc.stdin}</code></div>
-                    <div className={styles.testCaseCell}><code className={styles.mono}>{tc.expected}</code></div>
-                  </div>
-                ))}
-                {customTestCases.map((tc, idx) => (
-                  <div key={`custom-${idx}`} className={styles.testCaseRowEditable}>
-                    <div className={styles.testCaseCell}>
-                      <textarea
-                        value={tc.stdin}
-                        onChange={(e) => {
-                          const newCases = [...customTestCases];
-                          newCases[idx].stdin = e.target.value;
-                          setCustomTestCases(newCases);
-                        }}
-                        className={styles.editableInput}
-                        rows={2}
-                      />
-                    </div>
-                    <div className={styles.testCaseCell}>
-                      <textarea
-                        value={tc.expected}
-                        onChange={(e) => {
-                          const newCases = [...customTestCases];
-                          newCases[idx].expected = e.target.value;
-                          setCustomTestCases(newCases);
-                        }}
-                        className={styles.editableInput}
-                        rows={2}
-                      />
-                    </div>
-                    <button className={styles.deleteButton} onClick={() => setCustomTestCases((prev) => prev.filter((_, i) => i !== idx))}>
-                      <FiTrash2 />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+          )}
+        </div>
+
+        <div className={styles.testCasesSection}>
+          <div className={styles.testCasesHeader}>
+            <strong>Test Cases</strong>
+            <div className={styles.testCasesHeaderActions}>
+              <button className={styles.addButtonSmall} onClick={() => setCustomTestCases((prev) => [...prev, { stdin: '', expected: '' }])}>
+                <FiPlus /> Add
+              </button>
+              <button className={styles.toggleButton} onClick={() => setTestCasesCollapsed(!testCasesCollapsed)}>
+                {testCasesCollapsed ? <FiChevronDown /> : <FiChevronUp />}
+              </button>
+            </div>
           </div>
-        </>
-      )}
+          {!testCasesCollapsed && (
+            <div className={styles.testCasesList}>
+              <div className={styles.testCasesHeaderRow}>
+                <div className={styles.testCasesHeaderCell}>Input</div>
+                <div className={styles.testCasesHeaderCell}>Expected</div>
+              </div>
+              {defaultTestCases.map((tc, idx) => (
+                <div key={`default-${idx}`} className={styles.testCaseRow}>
+                  <div className={styles.testCaseCell}><code className={styles.mono}>{tc.stdin}</code></div>
+                  <div className={styles.testCaseCell}><code className={styles.mono}>{tc.expected}</code></div>
+                </div>
+              ))}
+              {customTestCases.map((tc, idx) => (
+                <div key={`custom-${idx}`} className={styles.testCaseRowEditable}>
+                  <div className={styles.testCaseCell}>
+                    <textarea
+                      value={tc.stdin}
+                      onChange={(e) => {
+                        const newCases = [...customTestCases];
+                        newCases[idx].stdin = e.target.value;
+                        setCustomTestCases(newCases);
+                      }}
+                      className={styles.editableInput}
+                      rows={2}
+                    />
+                  </div>
+                  <div className={styles.testCaseCell}>
+                    <textarea
+                      value={tc.expected}
+                      onChange={(e) => {
+                        const newCases = [...customTestCases];
+                        newCases[idx].expected = e.target.value;
+                        setCustomTestCases(newCases);
+                      }}
+                      className={styles.editableInput}
+                      rows={2}
+                    />
+                  </div>
+                  <button className={styles.deleteButton} onClick={() => setCustomTestCases((prev) => prev.filter((_, i) => i !== idx))}>
+                    <FiTrash2 />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       {activeTab === 'history' && (
         <div className={styles.historyPanel}>
@@ -981,7 +1006,12 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
 
       {activeTab === 'results' && (
         <div className={styles.resultsPanel}>
-          {executionError ? (
+          {isRunning ? (
+            <div className={styles.resultsLoading}>
+              <div className={styles.spinner}></div>
+              <p>Running your code...</p>
+            </div>
+          ) : executionError ? (
             <div className={styles.resultCard}>
               <div className={styles.resultHeader}>
                 <span className={styles.resultFailedIcon}>

@@ -1,126 +1,457 @@
+# DevRhythm – Coding Practice with Spaced Repetition
+
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/3fa4d2aa-4e89-4e0d-a7e6-0a2f4da8dbfb">
-    <source media="(prefers-color-scheme: light)" srcset="https://github.com/user-attachments/assets/3fa4d2aa-4e89-4e0d-a7e6-0a2f4da8dbfb">
-    <img alt="DevRhythm Logo" src="https://github.com/user-attachments/assets/3fa4d2aa-4e89-4e0d-a7e6-0a2f4da8dbfb" width="120" height="120">
-  </picture>
+  <img src="https://github.com/user-attachments/assets/eb8d9235-1329-487d-9233-51ae7f9a9ccd" alt="DevRhythm Logo" width="120" />
 </p>
 
-<h1 align="center">DevRhythm Backend</h1>
+<p align="center">
+  <strong>Learn to code. Never forget.</strong><br/>
+  DevRhythm combines LeetCode‑style problem solving with a spaced repetition system (SRS) to help you retain algorithms and data structures permanently.
+</p>
 
-[![Node Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)]()
-[![NPM Version](https://img.shields.io/badge/npm-%3E%3D9.0.0-blue)]()
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]()
-[![Test Coverage](https://img.shields.io/badge/coverage-85%25-yellowgreen)]()
-[![CodeQL](https://img.shields.io/badge/CodeQL-passing-brightgreen)]()
-[![Dependencies](https://img.shields.io/badge/dependencies-up%20to%20date-brightgreen)]()
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
-[![Last Commit](https://img.shields.io/badge/last%20commit-today-blue)]()
-[![Open Issues](https://img.shields.io/badge/issues-0-success)]()
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)]()
-[![Code Style: Prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)]()
-[![Linter: ESLint](https://img.shields.io/badge/linter-eslint-blue)]()
-[![Documentation](https://img.shields.io/badge/docs-swagger-blue)]()
-[![Made with ❤️ by DevRhythm](https://img.shields.io/badge/made%20with%20%E2%9D%A4%EF%B8%8F-DevRhythm-red)]()
-
-> A comprehensive backend service for the DevRhythm platform, providing APIs for tracking coding progress, managing revision schedules, analyzing patterns, and fostering community engagement through study groups and leaderboards.
+<p align="center">
+  <a href="#"><img src="https://img.shields.io/badge/Node.js-20.x-339933?logo=node.js&logoColor=white" alt="Node.js" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/Express-4.x-000000?logo=express&logoColor=white" alt="Express" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/MongoDB-6.x-47A248?logo=mongodb&logoColor=white" alt="MongoDB" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/Redis-7.x-DC382D?logo=redis&logoColor=white" alt="Redis" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/Next.js-14.x-000000?logo=next.js&logoColor=white" alt="Next.js" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white" alt="TypeScript" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome" /></a>
+</p>
 
 ---
 
-## Features
+## 📌 Project Overview
 
-- **Authentication & Authorization** – OAuth 2.0 with Google and GitHub, session management, JWT tokens.
-- **Progress Tracking** – Log solved problems from platforms like LeetCode, Codeforces, HackerRank; track attempts, time spent, confidence level.
-- **Spaced Repetition Revisions** – Automatic scheduling of revisions with configurable intervals (1, 3, 7, 14, 30 days).
-- **Heatmap Visualizations** – Yearly activity heatmaps with filtering by difficulty, platform, and activity type.
-- **Pattern Mastery** – Analyse and improve proficiency in coding patterns; get recommendations for weak areas.
-- **Goal Setting** – Create daily/weekly goals, track progress, and receive milestone notifications.
-- **Study Groups** – Form groups, create shared goals and challenges, monitor group activity and leaderboards.
-- **Social Features** – Follow other users, view public activity feeds, share progress snapshots.
-- **Leaderboards** – Weekly and monthly rankings based on problems solved, consistency, and streaks.
-- **Notifications** – In-app and email reminders for revisions, goal completions, new followers, and weekly reports.
-- **Performance & Scalability** – Redis caching, Bull job queues, rate limiting, and database indexing.
+DevRhythm is a full‑stack platform for developers who want to master coding problems through deliberate practice and evidence‑based revision. It synchronises with LeetCode (and other OJ platforms), tracks your progress, and automatically schedules revisions using an SRS algorithm – exactly like Anki, but built for coding.
 
----
-
-## Technology Stack
-
-| Layer          | Technologies                                                                 |
-|----------------|------------------------------------------------------------------------------|
-| **Runtime**    | Node.js (v18+)                                                               |
-| **Framework**  | Express.js                                                                   |
-| **Database**   | MongoDB with Mongoose ODM                                                    |
-| **Caching**    | Redis (session store, API caching, rate limiting)                            |
-| **Queue**      | Bull (Redis-based background jobs)                                           |
-| **Auth**       | Passport.js (Google OAuth 2.0, GitHub OAuth)                                |
-| **Validation** | Joi                                                                          |
-| **Logging**    | Winston + Morgan                                                             |
-| **Testing**    | Jest, Supertest                                                              |
-| **Security**   | Helmet, CORS, compression, express-rate-limit                                |
-| **File Upload**| Cloudinary (via multer)                                                      |
-| **Email**      | Nodemailer                                                                   |
-| **PDF**        | PDFKit                                                                       |
+The platform includes:
+- **Dashboard** with heatmaps, streaks, and weekly summaries.
+- **Question library** with filtering by difficulty, pattern, platform, and search.
+- **Code editor** with syntax checking and test case execution (via external providers).
+- **Spaced repetition** – each solved problem generates revision tasks (1, 3, 7, 14, 30 days).
+- **Goals & study plans** – daily, weekly, and custom planned goals.
+- **Sheets** – collaborative problem lists (like “Blind 75” or “Neetcode 150”).
+- **Community features** – follow users, study groups, leaderboards.
+- **Activity feed** and detailed statistics.
 
 ---
 
-## Project Structure
+## ✨ Key Features
+
+| Category | Features |
+|----------|----------|
+| **🧠 Spaced Repetition** | Automatic revision scheduling (1,3,7,14,30 days), overdue tracking, confidence‑based progression |
+| **📊 Progress Tracking** | Heatmap calendar, daily/weekly/monthly trends, mastery rate, time spent analytics |
+| **💻 Code Practice** | Multi‑language support (Python, C++, Java, JS), test case runner, execution history, syntax validation |
+| **🎯 Goals** | Daily / weekly solve goals, custom planned goals (specific question sets), automatic completion tracking |
+| **📚 Sheets** | Create/share curated problem lists, track collective progress, join sheets with target dates |
+| **👥 Social** | Follow other users, view public profiles, study groups with shared challenges and goals |
+| **📈 Insights** | Pattern mastery dashboard, weakest/strongest patterns, revision recommendations |
+| **🔔 Notifications** | Revision reminders, goal completions, new followers, weekly reports (in‑app + email) |
+| **🔗 Platform Integration** | Fetch problems from LeetCode (title, description, test cases, starter code) |
+
+---
+
+## 🧰 Tech Stack
+
+### Backend
+- **Runtime**: Node.js 20.x
+- **Framework**: Express.js
+- **Database**: MongoDB (Mongoose ODM)
+- **Cache & Queues**: Redis (Redis Cloud) + Bull
+- **Authentication**: Passport.js (Google, GitHub)
+- **Code Execution**: external provider (e.g., onlinecompiler.io / Judge0) – *local sandbox also supported*
+- **File Storage**: Cloudinary
+- **Email**: Mailjet (pluggable)
+- **Scheduling**: node-cron
+- **Validation**: Joi
+- **Logging**: Winston + Morgan
+- **Security**: Helmet, CORS, express-rate-limit
+
+### Frontend
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript
+- **State & Data**: React Query (TanStack Query), Zustand
+- **Styling**: CSS Modules + CSS variables (light/dark theme)
+- **UI Components**: Custom design system
+- **HTTP Client**: Axios + interceptors
+- **Code Editor**: Monaco editor
+- **Charts**: Recharts
+- **Heatmap**: Custom implementation
+
+### DevOps & Deployment
+- **Hosting**: Railway (backend), Vercel (frontend)
+- **Domain**: `devrhythm.space`
+- **CI/CD**: Automatic deployments from GitHub branches
+
+---
+
+## 🏗️ System Architecture (High‑Level)
 
 ```
-src/
-├── config/           # Configuration modules (database, redis, cloudinary, oauth, constants)
-├── controllers/      # Request handlers for each feature
-├── jobs/             # Cron jobs for periodic tasks (leaderboards, notifications, snapshots)
-├── middleware/       # Auth, cache, rate limiter, error handler, logger, validator
-├── models/           # Mongoose models
-├── routes/           # API route definitions (v1)
-├── services/         # Business logic, queue handlers, external integrations
-├── utils/            # Helpers, constants, custom errors, validators
-└── server.js         # Application entry point
+                        ┌─────────────────┐
+                        │   Frontend      │
+                        │  (Next.js on    │
+                        │   Vercel)       │
+                        └────────┬────────┘
+                                 │ HTTPS
+                                 ▼
+                        ┌─────────────────┐
+                        │   API Gateway   │
+                        │  (Express)      │
+                        │ on Railway      │
+                        └────────┬────────┘
+              ┌──────────────────┼──────────────────┐
+              │                  │                  │
+              ▼                  ▼                  ▼
+     ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+     │   MongoDB   │    │    Redis    │    │  Bull       │
+     │   Atlas     │    │  Cloud      │    │  Queues     │
+     └─────────────┘    └─────────────┘    └─────────────┘
+                                 │
+                                 ▼
+                        ┌─────────────────┐
+                        │ Code Execution  │
+                        │ Provider        │
+                        └─────────────────┘
 ```
 
 ---
 
-## API Documentation
+## 🔧 Backend Architecture (Detailed)
 
-Interactive API documentation is available via Swagger UI at `/api-docs` when the server is running.  
-For detailed endpoint specifications (request/response formats, authentication requirements), refer to the internal Postman collection or OpenAPI specification (accessible to the development team only).
+### 1. Request Lifecycle
+- HTTP request → Middleware chain (CORS, Helmet, compression, JSON, session, Passport, timezone, rate limiting, logging) → Route handler → Service layer → Database/queue → Formatted JSON response.
+
+### 2. Database Layer (MongoDB)
+- **Mongoose ODM** – 20+ models.
+- **Indexing** – compound indexes for all query patterns.
+- **Soft deletes** – `isActive` flag.
+- **TTL indexes** – for ephemeral data (completed jobs, expired notifications).
+
+### 3. Caching & Session Store (Redis)
+- Session store (`express-session` + `connect-redis`).
+- API response cache (dashboard, user lists, leaderboards) – TTL 15‑60 seconds.
+- Redis‑backed rate limiting.
+- Distributed locks for critical sections.
+- Bull queue storage.
+
+### 4. Background Processing (Bull Queues)
+Three dedicated queues:
+
+| Queue | Purpose | Concurrency |
+|-------|---------|-------------|
+| **Main queue** | Revision creation, goal completion, notifications, sheet imports | 10 |
+| **Fast code exec** | Python, JavaScript submissions | 20 |
+| **Slow code exec** | C++, Java submissions | 5 |
+
+**Job types (examples):**
+- `question.solved` – updates stats, pattern mastery, revision schedule, goals.
+- `revision.completed` – increments revision count, confidence, heatmap.
+- `goal.completed` – fires notifications.
+- `pod.available` – sends Problem‑of‑the‑Day notifications.
+- `sheet.import`, `sheet.create` – async sheet processing.
+- `user.timezone_change` – updates all date fields across collections.
+
+**Reliability:** Idempotent jobs, exponential backoff retries, stale job cleanup.
+
+### 5. Scheduled Cron Jobs
+
+| Job | Schedule | Responsibility |
+|-----|----------|----------------|
+| `dailyQuestionJob` | Every hour | Fetch LeetCode POD, queue notifications. |
+| `leaderboardJobs` | Weekly & Monthly | Compute top 100 users, store snapshots. |
+| `goalSnapshotJob` | Daily & Monthly | Aggregate goal completions for charts. |
+| `expiredGoalsJob` | Daily 00:00 | Mark daily/weekly goals as failed. |
+| `plannedGoalExpiryJob` | Daily 00:00 | Mark planned goals as failed. |
+| `updateOverdueRevisionsJob` | Every hour | Advance revision indices past due dates. |
+| `notificationJobs` | Various | Send revision reminders, weekly reports. |
+| `digestEmailJob` | 17:00 daily | Send daily email digests. |
+| `tempFileCleanupJob` | 02:00 daily | Remove stale temporary files. |
+| `dualQueueCleanupJob` | Every minute | Remove stale code execution jobs. |
+
+### 6. Authentication & Authorisation
+- OAuth2 (Google, GitHub) via Passport.js.
+- JWT access + refresh tokens (exchanged via one‑time code stored in Redis).
+- Internal requests (localhost + header) bypass auth for cron/queue jobs.
+- Admin endpoints protected by static API key.
+
+### 7. Timezone Handling
+- All dates stored in **UTC**.
+- User timezone detected via IP (`geoip-lite`) on first login.
+- Date calculations use `luxon` to convert to user’s local timezone.
+- Revision schedules stored as UTC midnight of the target day in user’s timezone.
+
+### 8. Code Execution Flow
+1. User submits code + test cases.
+2. Syntax validation (Python: `py_compile`, C++: compiler `-fsyntax-only`).
+3. Metadata extraction from starter code (class, method, parameters, return type).
+4. Language‑specific wrapper generator produces a self‑contained script that deserialises JSON input, calls the user’s method, and serialises the output.
+5. Wrapper sent to external provider (onlinecompiler.io / Judge0).
+6. Results compared (order‑insensitive, floating‑point tolerance).
+7. On all tests passed: question marked solved, revision schedule created, execution history saved (keep last successful + last two failures).
+
+### 9. Notification & Email System
+- In‑app notifications stored in MongoDB, expire after 3 days.
+- Email provider pluggable (currently Mailjet).
+- Daily digest emails – one email per user containing all new notifications since last digest.
+
+### 10. Observability & Health
+- Winston + Morgan logging.
+- Health check endpoint (`/api/v1/health`) reports DB/Redis/uptime.
+- Admin queue monitoring endpoints.
+- Central error handler returns consistent JSON.
 
 ---
 
-## Getting Started
+## 🎨 Frontend Architecture (Detailed)
 
-This project is intended for **internal development and deployment** by the DevRhythm team.  
-Setup instructions, environment configuration, and deployment guidelines are maintained in the internal developer documentation.  
-If you are a team member, please refer to the project wiki or contact the lead developer for access.
+### 1. Routing & Pages
+- Next.js App Router – folder‑based routes.
+- Route groups: `(auth)` for unauthenticated, `(main)` for authenticated.
+- Dynamic routes: `questions/[slug]`, `sheets/[slug]/progress/[username]`, `activity/[date]`.
+
+### 2. State Management
+- **React Query** – server state (caching, background refetching, mutations).
+- **Zustand** – client‑side global state (theme, auth token, UI toggles).
+- **Local state** – `useState`/`useReducer` for ephemeral UI.
+
+### 3. Data Fetching & API Integration
+- Axios instance with interceptors (JWT token, 401 handling).
+- Feature‑specific service modules (`questionService.ts`, etc.).
+- Custom React Query hooks (`useQuestions`, `useDashboard`, etc.).
+- Server components for static pages – fetch via server‑side API client.
+
+### 4. UI Component Architecture
+- **Atoms** – `Button`, `Input`, `Card`, `Badge`, `Avatar`.
+- **Molecules** – `SearchBar`, `FilterChip`, `ConfidenceStars`.
+- **Organisms** – `Navbar`, `Heatmap`, `QuestionCard`.
+- **Templates** – page‑level components.
+- **Lazy loading** – `next/dynamic` + Suspense for editor, revision timeline, charts.
+- **Theming** – CSS variables, light/dark toggled via Zustand.
+
+### 5. Authentication Flow
+1. User clicks “Login” – redirected to backend OAuth.
+2. After consent, backend redirects to `/auth/callback?code=`.
+3. Frontend exchanges code for JWT tokens.
+4. Tokens stored in Zustand (and optionally localStorage).
+5. Axios interceptor attaches token to every request.
+6. On 401, refresh token is used; if fails, logout.
+
+### 6. Real‑time & Background Updates
+- Polling (`refetchInterval`) for pending revisions and notification unread count.
+- No WebSockets (simulated via React Query).
+
+### 7. Code Editor & Execution
+- Monaco editor with syntax highlighting for 4 languages.
+- Custom execution results panel.
+- `useRunCode` hook – sync endpoint (or async with polling for long runs).
+- On all tests passed, question status updates automatically (React Query invalidation).
+
+### 8. Performance Optimisations
+- Next.js Image optimisation.
+- Route prefetching.
+- Dynamic imports for large components.
+- React Query aggressive caching.
+- Debounced search.
+- CSS Modules (scoped, small bundle).
+
+### 9. Folder Structure (Simplified)
+```
+frontend/
+├── app/                    # Next.js App Router
+├── features/               # Domain modules (auth, dashboard, question, revision, sheets, goal, activity, etc.)
+├── shared/                 # Reusable components, hooks, lib, types, styles
+├── providers/              # Context providers (Auth, Theme, React Query)
+└── public/                 # Static assets
+```
+
+### 10. Key Design Decisions
+- Feature‑first organisation – scalable.
+- No external UI library – full control.
+- React Query over Redux – server state is primary.
+- Minimal client‑side state.
+- Server components for SEO.
+- Skeleton loading everywhere.
 
 ---
 
-## Contributing
+## 💡 Core Functionality (How It Works)
 
-Contributions from team members are welcome. Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting pull requests.
+### 1. Solving a Problem
+- Write code, run test cases.
+- On all tests passed → problem marked **Solved**.
+- Revision schedule created (1,3,7,14,30 days).
+- Activity log, heatmap, stats, pattern mastery updated.
+- If problem is LeetCode POD → special notification.
 
-- Fork the repository (if applicable)
-- Create a feature branch (`git checkout -b feature/amazing-feature`)
-- Commit your changes (`git commit -m 'Add some amazing feature'`)
-- Push to the branch (`git push origin feature/amazing-feature`)
-- Open a Pull Request
+### 2. Revisions
+- Dashboard shows pending revisions (on‑time + overdue).
+- Mark revision completed after ≥20 minutes or passing all tests again.
+- Revision count, confidence level, heatmap updated.
+- May advance planned goals.
+
+### 3. Goals
+- **Daily/Weekly** – auto‑created, progress increments on any solve within the period.
+- **Planned** – select a set of questions + deadline; track per‑question solve/revision.
+
+### 4. Sheets
+- Curated problem lists with target completion date.
+- Join a sheet, mark problems as solved/revision completed.
+- Progress charts (individual + group).
+- Owner can edit; participants can leave.
+
+### 5. Pattern Mastery
+- Extracts problem patterns from tags.
+- Computes solved count, mastered count, confidence level per pattern.
+- Recommends weakest patterns for improvement.
 
 ---
 
-## License
+## 📁 Folder Structure Overview
 
-Distributed under the MIT License. See `LICENSE` for more information.
+### Backend (`/backend`)
+```
+backend/
+├── src/
+│   ├── app.js
+│   ├── server.js
+│   ├── config/
+│   ├── controllers/
+│   ├── models/
+│   ├── routes/
+│   ├── middleware/
+│   ├── services/
+│   ├── jobs/
+│   ├── utils/
+│   └── scripts/
+├── package.json
+└── .env (not in repo)
+```
+
+### Frontend (simplified)
+```
+frontend/
+├── app/
+├── features/
+├── shared/
+├── providers/
+└── public/
+```
 
 ---
 
-**Note**: This README is for internal use only and does not include any sensitive configuration details. All environment variables and setup procedures are documented separately.
+## 🔌 API Overview (High‑Level)
 
-## 📫 Contact
+All endpoints under `/api/v1`. Authentication via JWT Bearer token.
 
-- **Project Repository:**  https://github.com/anupam6335/DevRhythm
-- **Maintainer:** Anupam Debnath
-- Linkdin : https://linkedin.com/in/anupam-debnath-364b2619a
-- Leetcode : https://leetcode.com/u/anupam_nlogn/ 
+| Resource       | Example Endpoints                                      |
+|----------------|--------------------------------------------------------|
+| **Auth**       | `/auth/google`, `/auth/github`, `/auth/exchange`      |
+| **Users**      | `/users/me`, `/users/:username`, `/users` (list)      |
+| **Questions**  | `/questions`, `/questions/:id/details`, `/questions/search-leetcode` |
+| **Progress**   | `/progress/question/:questionId`, `/progress/attempt/:questionId` |
+| **Revisions**  | `/revisions/today`, `/revisions/question/:questionId/complete` |
+| **Goals**      | `/goals`, `/goals/current`, `/goals/planned`          |
+| **Sheets**     | `/sheets`, `/sheets/:slug`, `/sheets/:slug/join`      |
+| **Activity**   | `/activity`, `/activity/today`, `/activity/day/:date` |
+| **Heatmap**    | `/heatmap`, `/heatmap/:year`                          |
+| **Patterns**   | `/pattern-mastery`, `/pattern-mastery/weakest`        |
+| **Leaderboard**| `/leaderboard/weekly`                                 |
+| **Notifications** | `/notifications`                                  |
+
 ---
 
-*Made with ❤️ by the DevRhythm Team*
+## ⚡ Performance Optimizations
+
+- Database indexing (compound indexes).
+- Redis caching (TTL 15‑60s).
+- Bull queues (fast/slow split).
+- Aggregation pipelines instead of multiple queries.
+- Lazy loading + code splitting in frontend.
+- Image optimisation (Next.js).
+- Timezone‑aware pre‑computed snapshots.
+
+---
+
+## 🧠 Design Decisions
+
+1. Spaced repetition built into core – every solve triggers a revision schedule.
+2. UTC storage + local display – cron jobs respect user’s local day.
+3. Two‑tier code execution queues – isolate slow languages.
+4. Redis for caching and queues – single dependency.
+5. Feature‑first frontend – scalable.
+6. External code execution provider – security.
+7. Own UI component library – full control.
+
+---
+
+## 🧪 Challenges & Learnings
+
+| Challenge | Solution / Lesson |
+|-----------|-------------------|
+| Timezone complexities | Store UTC, convert with `luxon` for user boundaries. |
+| Duplicate revision completions | Distributed locks + idempotency. |
+| Automatic confidence scoring | Increment by 0.25 per solve/revision/time spent (cap at 5). |
+| Heatmap performance | Pre‑generated `HeatmapData` with incremental updates. |
+| CORS with custom domains | Exact `FRONTEND_URL` (no trailing slash). |
+| Queue backpressure | Fast/slow queue split + cleanup jobs. |
+| DNS blocking on Railway | Custom domain (`api.devrhythm.space`) + proper DNS. |
+
+---
+
+## 📸 Screenshots / Demo
+
+> Screenshots will be added in a separate media folder.
+
+Live demo: [https://devrhythm.space](https://devrhythm.space) (requires login)
+
+---
+
+## 🗺️ Future Roadmap
+
+- [ ] AI‑powered hints (LLM).
+- [ ] Mobile app (React Native).
+- [ ] Import from Codeforces / HackerRank.
+- [ ] Teams & organisations.
+- [ ] Retention curves / predicted mastery dates.
+- [ ] Local Docker sandbox for self‑hosted.
+- [ ] OpenAPI specification.
+
+---
+
+## 🔒 Security Approach (High‑Level)
+
+- OAuth2 only (no passwords).
+- JWT access + refresh tokens (HTTP‑only cookie optional).
+- CORS restricted to known origins.
+- Redis‑backed rate limiting.
+- Helmet security headers.
+- Joi input validation.
+- External code execution provider (no local sandbox in production).
+- Secrets never committed; use platform environment variables.
+
+---
+
+## 📄 License
+
+[MIT](LICENSE)
+
+---
+
+## 🙏 Acknowledgements
+
+- LeetCode – problem content and API.
+- OnlineCompiler.io – code execution (free tier).
+- Redis Cloud – managed Redis.
+- Railway – backend hosting.
+- Vercel – frontend hosting.
+- All contributors and users.
+
+---
+
+**Happy coding – and never forget what you learn!** 🚀
+
+*DevRhythm – Turn practice into permanent knowledge.*

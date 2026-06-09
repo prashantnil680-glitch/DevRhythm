@@ -6,6 +6,7 @@ import { tokenStorage } from '../utils/tokenStorage';
 import { useSession } from '../hooks/useSession';
 import apiClient from '@/shared/lib/apiClient';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
+import { isPublicPath } from '@/shared/lib/publicPaths';
 import styles from './AuthCallbackHandler.module.css';
 
 const getBrowserTimezone = (): string => {
@@ -42,14 +43,24 @@ export const AuthCallbackHandler: React.FC = () => {
     if (errorParam) {
       setError(decodeURIComponent(errorParam));
       setIsLoading(false);
-      setTimeout(() => router.push('/login'), 3000);
+      const currentPath = window.location.pathname;
+      if (!isPublicPath(currentPath)) {
+        setTimeout(() => router.push('/login'), 3000);
+      } else {
+        setTimeout(() => router.push('/'), 3000);
+      }
       return;
     }
 
     if (!code) {
       setError('No authentication code provided');
       setIsLoading(false);
-      setTimeout(() => router.push('/login'), 3000);
+      const currentPath = window.location.pathname;
+      if (!isPublicPath(currentPath)) {
+        setTimeout(() => router.push('/login'), 3000);
+      } else {
+        setTimeout(() => router.push('/'), 3000);
+      }
       return;
     }
 
@@ -58,7 +69,6 @@ export const AuthCallbackHandler: React.FC = () => {
         const { token, refreshToken, userId, showWelcome, showWelcomeBack } = response.data;
         tokenStorage.setTokens(token, refreshToken, userId);
 
-        // Store welcome flags in sessionStorage (cleared when tab is closed)
         if (showWelcome === true) {
           sessionStorage.setItem('showWelcome', 'true');
         }
@@ -86,7 +96,12 @@ export const AuthCallbackHandler: React.FC = () => {
         console.error('Code exchange error:', err);
         setError(err.message || 'Authentication failed');
         setIsLoading(false);
-        setTimeout(() => router.push('/login'), 3000);
+        const currentPath = window.location.pathname;
+        if (!isPublicPath(currentPath)) {
+          setTimeout(() => router.push('/login'), 3000);
+        } else {
+          setTimeout(() => router.push('/'), 3000);
+        }
       });
   }, [searchParams, router, refetch]);
 
@@ -95,7 +110,7 @@ export const AuthCallbackHandler: React.FC = () => {
       <div className={styles.error}>
         <h2>Authentication Error</h2>
         <p>{error}</p>
-        <p>Redirecting to login...</p>
+        <p>Redirecting...</p>
       </div>
     );
   }

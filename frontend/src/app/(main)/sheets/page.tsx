@@ -113,7 +113,7 @@ async function getInitialSheets() {
   const defaultParams: GetSheetsParams = {
     page: 1,
     limit: 10,
-    sortBy: 'bookmarkCount',
+    sortBy: 'createdAt',
     sortOrder: 'desc',
   };
   try {

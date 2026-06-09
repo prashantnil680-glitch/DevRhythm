@@ -1,9 +1,13 @@
 'use client';
 
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { usePatternByName } from '@/features/patternMastery';
 import { usePatternMastery } from '@/features/patternMastery';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import NotFoundPage from '@/shared/components/NotFoundPage/NotFoundPage';
+import Modal from '@/shared/components/Modal';
+import Button from '@/shared/components/Button';
 import { slugify } from '@/shared/lib/stringUtils';
 import MetricsCard from './MetricsCard';
 import PatternHeader from './PatternHeader';
@@ -14,9 +18,13 @@ import styles from './PatternDetailsClient.module.css';
 
 interface PatternDetailsClientProps {
   patternName: string;
+  requiresAuth?: boolean;
 }
 
-export default function PatternDetailsClient({ patternName }: PatternDetailsClientProps) {
+export default function PatternDetailsClient({ patternName, requiresAuth = false }: PatternDetailsClientProps) {
+  const router = useRouter();
+  const [authModalOpen, setAuthModalOpen] = useState(requiresAuth);
+
   const {
     data: pattern,
     isLoading: patternLoading,
@@ -30,6 +38,43 @@ export default function PatternDetailsClient({ patternName }: PatternDetailsClie
   });
 
   const isLoading = patternLoading || otherLoading;
+
+  const handleLoginRedirect = () => {
+    const returnTo = encodeURIComponent(window.location.pathname);
+    window.location.href = `/login?returnTo=${returnTo}`;
+  };
+
+  // Show modal if authentication required
+  if (requiresAuth) {
+    return (
+      <>
+        <div className={styles.container} style={{ opacity: 0.5, pointerEvents: 'none' }}>
+          <SkeletonLoader variant="custom" className={styles.metricsSkeleton} />
+        </div>
+        <Modal
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          title="Authentication Required"
+          size="sm"
+          closeOnBackdropClick={false}
+          closeOnEsc={false}
+          showCloseButton={false}
+        >
+          <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+            <p>You need to be logged in to view pattern details and track your progress.</p>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', marginTop: '1.5rem' }}>
+              <Button variant="outline" onClick={() => router.push('/patterns')}>
+                Browse Patterns
+              </Button>
+              <Button variant="primary" onClick={handleLoginRedirect}>
+                Log In
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      </>
+    );
+  }
 
   if (isLoading) {
     return <PatternDetailsSkeleton />;

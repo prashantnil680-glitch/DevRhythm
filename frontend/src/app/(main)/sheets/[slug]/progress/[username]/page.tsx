@@ -2,6 +2,7 @@ import { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 import Breadcrumb from '@/shared/components/Breadcrumb';
 import { ROUTES } from '@/shared/config';
 import { sheetService } from '@/features/sheets/server';
@@ -175,6 +176,12 @@ async function generateSchemas(slug: string, username: string) {
 
 export default async function UserProgressPage({ params }: PageProps) {
   const { slug, username } = await params;
+
+  // Check authentication
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth_token')?.value;
+  const isAuthenticated = !!token;
+
   const sheet = await getSheetMetadata(slug);
   const user = await getUserMetadata(username);
   const schemas = await generateSchemas(slug, username);
@@ -214,7 +221,7 @@ export default async function UserProgressPage({ params }: PageProps) {
         </>
       )}
       <Breadcrumb items={breadcrumbItems} renderLink={renderLink} />
-      <UserProgressPageClient />
+      <UserProgressPageClient requiresAuth={!isAuthenticated} />
     </>
   );
 }

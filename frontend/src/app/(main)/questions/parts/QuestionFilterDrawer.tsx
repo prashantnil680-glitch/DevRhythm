@@ -1,5 +1,4 @@
 'use client';
-
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { IoClose } from 'react-icons/io5';
@@ -7,7 +6,6 @@ import { QuestionFilterControls, Filters } from '@/app/(main)/questions/parts/Qu
 import Button from '@/shared/components/Button';
 import Divider from '@/shared/components/Divider';
 import { QuestionStatistics } from '@/features/question/types/question.types';
-
 import styles from './QuestionFilterDrawer.module.css';
 
 interface QuestionFilterDrawerProps {
@@ -22,6 +20,7 @@ interface QuestionFilterDrawerProps {
   patternOptions: { value: string; label: string }[];
   tagOptions: { value: string; label: string }[];
   sortOptions: { value: string; label: string }[];
+  isAuthenticated?: boolean;
 }
 
 export const QuestionFilterDrawer: React.FC<QuestionFilterDrawerProps> = ({
@@ -36,6 +35,7 @@ export const QuestionFilterDrawer: React.FC<QuestionFilterDrawerProps> = ({
   patternOptions,
   tagOptions,
   sortOptions,
+  isAuthenticated = false,
 }) => {
   if (!isOpen) return null;
 
@@ -57,6 +57,7 @@ export const QuestionFilterDrawer: React.FC<QuestionFilterDrawerProps> = ({
           patternOptions={patternOptions}
           tagOptions={tagOptions}
           sortOptions={sortOptions}
+          isAuthenticated={isAuthenticated}
         />
 
         {stats && (

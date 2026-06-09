@@ -16,6 +16,7 @@ import { QuestionFilterDrawer } from '@/app/(main)/questions/parts/QuestionFilte
 import type { Filters } from '@/app/(main)/questions/parts/QuestionFilterControls';
 import styles from './QuestionsPageClient.module.css';
 import Link from 'next/link';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
 const DEFAULT_FILTERS: Filters = {
   search: '',
@@ -45,6 +46,8 @@ export const QuestionsPageClient: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
+  const isAuthenticated = !!user;
 
   // --- Restore last list URL on mount if current URL is bare ---
   useEffect(() => {
@@ -129,7 +132,6 @@ export const QuestionsPageClient: React.FC = () => {
   // --- Restore page only when URL has NO page parameter ---
   useEffect(() => {
     if (initialPageRestored.current) return;
-
     const storedPage = sessionStorage.getItem('questionsPage');
     if (storedPage) {
       const storedPageNum = parseInt(storedPage, 10);
@@ -296,6 +298,7 @@ export const QuestionsPageClient: React.FC = () => {
               patternOptions={patternOptions}
               tagOptions={tagOptions}
               sortOptions={SORT_OPTIONS}
+              isAuthenticated={isAuthenticated}
             />
           </div>
           <main className={styles.main}>
@@ -370,6 +373,7 @@ export const QuestionsPageClient: React.FC = () => {
             patternOptions={patternOptions}
             tagOptions={tagOptions}
             sortOptions={SORT_OPTIONS}
+            isAuthenticated={isAuthenticated}
           />
         </>
       )}

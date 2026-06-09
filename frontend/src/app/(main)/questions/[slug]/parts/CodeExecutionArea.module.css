@@ -19,7 +19,8 @@
 }
 
 /* Ensure the status indicator does not overflow */
-.topRow > :nth-child(2) { /* ExecutionStatusIndicator */
+.topRow > :nth-child(2) {
+  /* ExecutionStatusIndicator */
   flex-shrink: 1;
   min-width: 0;
   overflow-x: auto;
@@ -525,6 +526,7 @@
   border: 1px solid var(--border);
   color: var(--text-primary);
 }
+
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
   .topRow {
@@ -547,8 +549,7 @@
   .testCasesHeaderRow {
     gap: 0.5rem;
   }
-  .testCaseRow,
-  .testCaseRowEditable {
+  .testCaseRow, .testCaseRowEditable {
     grid-template-columns: 1fr;
     gap: 0.5rem;
   }
@@ -563,6 +564,7 @@
     margin-left: auto;
   }
 }
+
 .editorWrapper {
   position: relative;
 }
@@ -680,7 +682,46 @@
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
+}
+
+/* ===== Login Placeholder (when user is not authenticated) ===== */
+.loginPlaceholder {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2rem;
+  text-align: center;
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loginPlaceholderContent {
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.loginPlaceholderTitle {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.loginPlaceholderCode {
+  background-color: var(--code-bg);
+  padding: 1rem;
+  border-radius: var(--radius);
+  font-family: monospace;
+  font-size: 0.85rem;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  margin: 1rem 0;
+  max-height: 300px;
+  overflow-y: auto;
 }

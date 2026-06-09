@@ -71,11 +71,22 @@ export default function SheetDetailPageClient() {
     refetch,
   } = useSheet(slug, queryParams);
 
-  const { data: aggregatedProgress, isLoading: aggLoading } = useAggregatedProgress(slug);
-  const { data: rankData, isLoading: rankLoading } = useSheetRank(slug);
+  const {
+    data: aggregatedProgress,
+    isLoading: aggLoading,
+    refetch: refetchAggregatedProgress,
+  } = useAggregatedProgress(slug);
+
+  const {
+    data: rankData,
+    isLoading: rankLoading,
+    refetch: refetchRank,
+  } = useSheetRank(slug);
+
   const {
     data: participantsData,
     isLoading: participantsLoading,
+    refetch: refetchParticipants,
   } = useSheetParticipants(slug, { page: participantsPage, limit: participantsLimit });
 
   const joinMutation = useJoinSheet();
@@ -119,6 +130,23 @@ export default function SheetDetailPageClient() {
     }
   }, [page, search, solveStatus, revisionStatus, difficulty, isLoading, sheetData]);
 
+  // Fallback: if aggregated progress, rank, or participants are stuck loading,
+  // force a refetch after 1 second (handles cases where slug timing causes missed requests)
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (aggLoading && slug) {
+        refetchAggregatedProgress();
+      }
+      if (rankLoading && slug) {
+        refetchRank();
+      }
+      if (participantsLoading && slug) {
+        refetchParticipants();
+      }
+    }, 1000);
+    return () => clearTimeout(timeout);
+  }, [aggLoading, rankLoading, participantsLoading, slug, refetchAggregatedProgress, refetchRank, refetchParticipants]);
+
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
   };
@@ -146,7 +174,7 @@ export default function SheetDetailPageClient() {
   const {
     sheet,
     questions,
-    participants: initialParticipants, // not used directly, kept for compatibility
+    participants: initialParticipants,
     stats,
     hasJoined,
     currentUserProgress,
@@ -240,6 +268,7 @@ export default function SheetDetailPageClient() {
           onJoinSheet={() => setJoinModalOpen(true)}
           isJoining={joinMutation.isPending}
           hasJoined={hasJoined}
+          isAuthenticated={isAuthenticated}
         />
       </div>
 
@@ -311,6 +340,7 @@ export default function SheetDetailPageClient() {
           isLoading={participantsLoading}
           onJoinSheet={() => setJoinModalOpen(true)}
           isJoining={joinMutation.isPending}
+          isAuthenticated={isAuthenticated}
         />
         {participantsData?.pagination && participantsData.pagination.totalPages > 1 && (
           <div className={styles.paginationWrapper}>

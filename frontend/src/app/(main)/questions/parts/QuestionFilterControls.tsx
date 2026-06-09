@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import React from 'react';
 import {
@@ -14,6 +14,7 @@ import SearchBar from '@/shared/components/SearchBar';
 import Select from '@/shared/components/Select';
 import FilterChip from '@/shared/components/FilterChip';
 import { MultiSelect } from '@/app/(main)/questions/parts/MultiSelect';
+import {toast} from '@/shared/components/Toast'; 
 import styles from './QuestionFilterControls.module.css';
 
 export interface Filters {
@@ -23,7 +24,7 @@ export interface Filters {
   pattern: string;
   tags: string[];
   sort: string;
-  status: string; // new: '' or 'solved'
+  status: string;
 }
 
 interface QuestionFilterControlsProps {
@@ -34,6 +35,7 @@ interface QuestionFilterControlsProps {
   patternOptions: { value: string; label: string }[];
   tagOptions: { value: string; label: string }[];
   sortOptions: { value: string; label: string }[];
+  isAuthenticated?: boolean;
   className?: string;
 }
 
@@ -45,6 +47,7 @@ export const QuestionFilterControls: React.FC<QuestionFilterControlsProps> = ({
   patternOptions,
   tagOptions,
   sortOptions,
+  isAuthenticated = false,
   className,
 }) => {
   const handleDifficultyChange = (value: string) => {
@@ -52,6 +55,14 @@ export const QuestionFilterControls: React.FC<QuestionFilterControlsProps> = ({
   };
 
   const handleStatusChange = (status: string) => {
+    if (status === 'solved' && !isAuthenticated) {
+      // ✅ show a user‑friendly toast notification
+      toast.error('Please log in to filter by solved status.', {
+        duration: 4000,
+        position: 'top-center',
+      });
+      return;
+    }
     onFilterChange('status', status === 'all' ? '' : status);
   };
 
@@ -109,7 +120,7 @@ export const QuestionFilterControls: React.FC<QuestionFilterControlsProps> = ({
         </div>
       </div>
 
-      {/* Solved Status chip */}
+      {/* Solved Status chip – conditionally disabled */}
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <FiCheckCircle className={styles.sectionIcon} />
@@ -125,25 +136,12 @@ export const QuestionFilterControls: React.FC<QuestionFilterControlsProps> = ({
             label="Solved"
             selected={filters.status === 'solved'}
             onClick={() => handleStatusChange('solved')}
+            disabled={!isAuthenticated}
           />
         </div>
       </div>
 
-      {/* Pattern */}
-      {/* <div className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <FiRepeat className={styles.sectionIcon} />
-          <span className={styles.sectionTitle}>Pattern</span>
-        </div>
-        <Select
-          options={patternOptions}
-          value={filters.pattern}
-          onChange={val => onFilterChange('pattern', val)}
-          placeholder="All patterns"
-        />
-      </div> */}
-
-      {/* Tags (MultiSelect) */}
+      {/* Patterns (MultiSelect) */}
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
            <FiRepeat className={styles.sectionIcon} />
@@ -158,7 +156,7 @@ export const QuestionFilterControls: React.FC<QuestionFilterControlsProps> = ({
       </div>
 
       {/* Sort */}
-      <div className={styles.section}>
+      {/* <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <FiFilter className={styles.sectionIcon} />
           <span className={styles.sectionTitle}>Sort by</span>
@@ -169,7 +167,7 @@ export const QuestionFilterControls: React.FC<QuestionFilterControlsProps> = ({
           onChange={val => onFilterChange('sort', val)}
           placeholder="Select sorting"
         />
-      </div>
+      </div> */}
     </div>
   );
 };

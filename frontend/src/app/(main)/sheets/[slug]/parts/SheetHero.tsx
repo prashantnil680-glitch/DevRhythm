@@ -99,6 +99,11 @@ export default function SheetHero({
     closeMenu();
   };
 
+  const handleLoginRedirect = () => {
+    const returnTo = encodeURIComponent(window.location.pathname);
+    window.location.href = `/login?returnTo=${returnTo}`;
+  };
+
   return (
     <div className={styles.hero}>
       {/* Top row: title + bookmark + primary actions + kebab menu */}
@@ -119,9 +124,15 @@ export default function SheetHero({
             </Tooltip>
           )}
           {!hasJoined && !isOwner && (
-            <Button variant="primary" size="sm" onClick={onJoin} leftIcon={<FiLogIn />}>
-              Join
-            </Button>
+            isAuthenticated ? (
+              <Button variant="primary" size="sm" onClick={onJoin} leftIcon={<FiLogIn />}>
+                Join
+              </Button>
+            ) : (
+              <Button variant="primary" size="sm" onClick={handleLoginRedirect} leftIcon={<FiLogIn />}>
+                Login to Join
+              </Button>
+            )
           )}
           {hasJoined && !isOwner && (
             <Button variant="outline" size="sm" onClick={onLeave} leftIcon={<FiLogOut />}>
@@ -217,19 +228,7 @@ export default function SheetHero({
             <span className={styles.participantCount}>
               {otherParticipantsCount} participant{otherParticipantsCount !== 1 && 's'}
             </span>
-            {/* <div className={styles.avatarGroup}>
-              {displayParticipants.map((p, idx) => (
-                <Link
-                  key={p.userId}
-                  href={ROUTES.SHEETS.PROGRESS(slug, p.username)}
-                  className={styles.avatarLink}
-                  title={`View ${p.username}'s progress`}
-                >
-                  <Avatar src={p.avatarUrl} name={p.username} size="xs" />
-                </Link>
-              ))}
-              {remainingParticipants > 0 && <span className={styles.extraCount}>+{remainingParticipants}</span>}
-            </div> */}
+            {/* Avatar group is commented out in original */}
           </div>
         )}
 

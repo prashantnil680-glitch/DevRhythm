@@ -22,6 +22,7 @@ interface ParticipantListProps {
   isLoading?: boolean;
   onJoinSheet: () => void;
   isJoining?: boolean;
+  isAuthenticated?: boolean;
 }
 
 export default function ParticipantList({
@@ -30,6 +31,7 @@ export default function ParticipantList({
   isLoading,
   onJoinSheet,
   isJoining = false,
+  isAuthenticated = false,
 }: ParticipantListProps) {
   if (isLoading) {
     return (
@@ -45,16 +47,24 @@ export default function ParticipantList({
     return (
       <div className={styles.emptyState}>
         <FiUsers className={styles.emptyIcon} />
-        <p>No participants yet. Be the first to join!</p>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={onJoinSheet}
-          isLoading={isJoining}
-          leftIcon={<FiLogIn />}
-        >
-          Join Sheet
-        </Button>
+        <p>No participants yet.</p>
+        {isAuthenticated ? (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onJoinSheet}
+            isLoading={isJoining}
+            leftIcon={<FiLogIn />}
+          >
+            Join Sheet
+          </Button>
+        ) : (
+          <Link href="/login">
+            <Button variant="primary" size="sm" leftIcon={<FiLogIn />}>
+              Log in to Join
+            </Button>
+          </Link>
+        )}
       </div>
     );
   }

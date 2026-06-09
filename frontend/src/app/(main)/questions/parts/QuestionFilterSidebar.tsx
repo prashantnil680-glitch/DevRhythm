@@ -18,6 +18,7 @@ interface QuestionFilterSidebarProps {
   patternOptions: { value: string; label: string }[];
   tagOptions: { value: string; label: string }[];
   sortOptions: { value: string; label: string }[];
+  isAuthenticated?: boolean;
 }
 
 export const QuestionFilterSidebar: React.FC<QuestionFilterSidebarProps> = ({
@@ -30,6 +31,7 @@ export const QuestionFilterSidebar: React.FC<QuestionFilterSidebarProps> = ({
   patternOptions,
   tagOptions,
   sortOptions,
+  isAuthenticated = false,
 }) => {
   return (
     <aside className={styles.sidebar}>
@@ -48,6 +50,7 @@ export const QuestionFilterSidebar: React.FC<QuestionFilterSidebarProps> = ({
         patternOptions={patternOptions}
         tagOptions={tagOptions}
         sortOptions={sortOptions}
+        isAuthenticated={isAuthenticated}
       />
 
         {stats && (

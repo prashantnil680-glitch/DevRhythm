@@ -36,10 +36,20 @@ export default function SheetsClient({ initialData }: SheetsClientProps) {
 
   const [search, setSearch] = useState('');
   const [viewFilter, setViewFilter] = useState<'all' | 'mine' | 'bookmarked'>('all');
-  const [sortBy, setSortBy] = useState<'createdAt' | 'name' | 'updatedAt' | 'bookmarkCount'>('bookmarkCount');
+  const [sortBy, setSortBy] = useState<'createdAt' | 'name' | 'updatedAt' | 'bookmarkCount'>(
+    isLoggedIn ? 'bookmarkCount' : 'createdAt'
+  );
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const limit = 10;
+
+  // Reset to default view when authentication changes
+  useEffect(() => {
+    setViewFilter('all');
+    setSortBy(isLoggedIn ? 'bookmarkCount' : 'createdAt');
+    setSortOrder('desc');
+    setPage(1);
+  }, [isLoggedIn]);
 
   const [debouncedSearch, setDebouncedSearch] = useState('');
   useEffect(() => {
@@ -52,21 +62,24 @@ export default function SheetsClient({ initialData }: SheetsClientProps) {
     scrollToTop();
   }, [debouncedSearch, viewFilter, sortBy, sortOrder]);
 
-  const useBookmarks = viewFilter === 'bookmarked';
+  // Unauthenticated users cannot use 'bookmarked' or 'mine' filters
+  const effectiveViewFilter = !isLoggedIn ? 'all' : viewFilter;
+  const useBookmarks = effectiveViewFilter === 'bookmarked';
+  const useMySheets = effectiveViewFilter === 'mine';
 
   const params = useBookmarks
     ? undefined
     : {
         search: debouncedSearch || undefined,
-        mySheets: viewFilter === 'mine' ? true : undefined,
+        mySheets: useMySheets ? true : undefined,
         sortBy,
         sortOrder,
         page,
         limit,
       };
 
-  // Only use server‑side initial data for non‑logged‑in users on the default view
-  const useInitialData = !isLoggedIn && !useBookmarks && page === 1 && !debouncedSearch && viewFilter === 'all' && sortBy === 'bookmarkCount' && sortOrder === 'desc';
+  // Only use initial data for unauthenticated users on default view
+  const useInitialData = !isLoggedIn && !useBookmarks && page === 1 && !debouncedSearch && sortBy === 'bookmarkCount' && sortOrder === 'desc';
 
   const {
     data: sheetsData,
@@ -203,13 +216,13 @@ export default function SheetsClient({ initialData }: SheetsClientProps) {
       {!isLoading && !error && sheets.length === 0 && (
         <div className={styles.emptyState}>
           <p>
-            {viewFilter === 'bookmarked'
+            {effectiveViewFilter === 'bookmarked'
               ? 'No bookmarked sheets found.'
-              : viewFilter === 'mine'
+              : effectiveViewFilter === 'mine'
               ? 'No sheets found.'
               : 'No sheets found.'}
           </p>
-          {!search && viewFilter === 'all' && (
+          {!search && effectiveViewFilter === 'all' && (
             <Link href={ROUTES.SHEETS.CREATE}>
               <Button variant="primary">Create your first sheet →</Button>
             </Link>

@@ -144,7 +144,6 @@ class SheetService {
 
         // Step 2c: Final fallback – text search (same as manual tab)
         if (!found) {
-          // Note: requires a text index on Question.title (already present in your schema)
           const byText = await Question.findOne({
             $text: { $search: search },
             isActive: true,
@@ -175,7 +174,6 @@ class SheetService {
     return Array.from(resolvedIds).map(id => new mongoose.Types.ObjectId(id));
   }
 
-
     /**
      * Create a sheet from already‑resolved question IDs (no identifier resolution).
      * Used by async queue handler to separate resolution from creation.
@@ -202,7 +200,7 @@ class SheetService {
         error.data = { existingSheetSlug: existingSheet.slug };
         throw error;
       }
-  
+
       // Generate unique slug
       let baseSlug = slugify(name);
       let slug = baseSlug;
@@ -211,7 +209,7 @@ class SheetService {
         slug = `${baseSlug}-${counter}`;
         counter++;
       }
-  
+
       const sheet = await Sheet.create({
         ownerId,
         name,
@@ -223,13 +221,13 @@ class SheetService {
         originalSourceName: originalSourceName || null,
         originalSourceUrl: originalSourceUrl || null,
       });
-  
+
       // Automatically create owner membership and progress
       await this._initializeOwnerMembership(sheet._id, ownerId, questionIds, targetDate);
-  
+
       // Invalidate caches
       await this._invalidateSheetCaches(sheet._id, sheet.slug, ownerId);
-  
+
       return sheet;
     }
 
@@ -699,8 +697,6 @@ class SheetService {
     const sheets = bookmarks.map(b => b.sheet);
 
     // Get total count for pagination
-    const countPipeline = pipeline.slice(0, -3); // remove $skip, $limit, and $project? Actually careful: we need a separate count pipeline.
-    // Simpler: we can count bookmarks separately
     const countQuery = SheetBookmark.find({ userId });
     if (search && search.trim()) {
       const searchSlug = slugify(search);
@@ -829,8 +825,6 @@ class SheetService {
     }));
 
     // ========== OPTIMIZED: Get per‑question participant and solved counts via aggregation ==========
-    // Instead of looping over sheet.questions and running countDocuments per question,
-    // we aggregate all progress records for this sheet in one go.
     const progressAggregation = await SheetProgress.aggregate([
       { $match: { sheetId: sheet._id } },
       {
@@ -851,7 +845,7 @@ class SheetService {
       solvedCountMap.set(qidStr, item.solvedCount);
     }
 
-    // Fill the per‑question counts for all questions in the sheet (including those not in the current page)
+    // Fill the per‑question counts for all questions in the sheet
     const perQuestionParticipantCounts = {};
     const perQuestionSolvedCounts = {};
     for (const qid of sheet.questions) {
@@ -861,9 +855,7 @@ class SheetService {
     }
     // ========== END OPTIMIZATION ==========
 
-    // Participants list – limit to first 10 (or keep all? For sheet details we may keep all, but the frontend only shows 6)
-    // To reduce payload, we can limit participants to e.g., 20. We'll keep all for backward compatibility,
-    // but we can optionally paginate participants later. For now, we keep as is.
+    // Participants list
     const memberships = await SheetMembership.find({ sheetId: sheet._id })
       .populate('userId', 'username avatarUrl displayName')
       .sort({ joinedAt: 1 })
@@ -919,14 +911,14 @@ class SheetService {
 
     const hasJoined = !!currentUserProgress;
 
-    // Owner display name (unchanged)
+    // Owner display name
     let ownerDisplayName = 'Anonymous User';
     if (sheet.ownerId) {
       const owner = await User.findById(sheet.ownerId).select('displayName username').lean();
       ownerDisplayName = owner?.displayName || owner?.username || 'Anonymous User';
     }
 
-    // Bookmark status (unchanged)
+    // Bookmark status
     let isBookmarked = false;
     if (currentUserId) {
       const bookmark = await SheetBookmark.findOne({ userId: currentUserId, sheetId: sheet._id }).lean();
@@ -1120,8 +1112,7 @@ class SheetService {
       lastUpdated: doc.lastUpdated || null,
     }));
 
-    // ========== OPTIMIZED: Compute overall stats (without fetching all progress documents) ==========
-    // Instead of .find() which loads all progress records, use a single aggregation to sum solved and revisionCompleted.
+    // ========== OPTIMIZED: Compute overall stats ==========
     const overallStats = await SheetProgress.aggregate([
       { $match: { sheetId: sheet._id, userId: targetUserId } },
       {
@@ -1140,7 +1131,7 @@ class SheetService {
 
     const shareLink = `${config.frontendUrl}/sheets/${sheetSlug}/progress/${username}`;
 
-    // Pagination metadata (always present)
+    // Pagination metadata
     const totalPages = Math.max(1, Math.ceil(total / limit)) || 1;
     const paginationMeta = {
       page,
@@ -1171,7 +1162,7 @@ class SheetService {
     };
   }
 
-   /**
+  /**
    * Get chart‑ready progress data for a user.
    * @param {string} sheetSlug
    * @param {string} currentUserId
@@ -1179,7 +1170,6 @@ class SheetService {
    * @returns {Promise<Object>}
    */
   static async getUserProgressChart(sheetSlug, currentUserId, username) {
-    // Get progress data without any filters (all questions)
     const progressData = await this.getUserProgress(sheetSlug, currentUserId, username, {});
     const { stats } = progressData;
     const totalQuestions = stats.totalQuestions;
@@ -1208,9 +1198,10 @@ class SheetService {
    * @param {Object} filters - { search, ownerId, sortBy, sortOrder, mySheets }
    * @param {Object} pagination - { page, limit }
    * @param {string|null} currentUserId - required if mySheets=true
+   * @param {boolean} _fallbackAttempted - internal flag to prevent infinite recursion
    * @returns {Promise<Object>}
    */
-  static async getSheetsList(filters = {}, pagination = {}, currentUserId = null) {
+  static async getSheetsList(filters = {}, pagination = {}, currentUserId = null, _fallbackAttempted = false) {
     const { search, ownerId, sortBy, sortOrder = 'desc', mySheets = false } = filters;
     let { page = 1, limit = 20 } = pagination;
 
@@ -1253,6 +1244,18 @@ class SheetService {
         Sheet.find(match).sort(sort).skip(skipNum).limit(limitNum).select('-questions').lean(),
         Sheet.countDocuments(match),
       ]);
+
+      // ---------- FALLBACK SORTING (only on first page, empty result, bookmarkCount sort, no search, no mySheets) ----------
+      if (!_fallbackAttempted && pageNum === 1 && sheets.length === 0 && total === 0 && sortBy === 'bookmarkCount' && !search && !mySheets) {
+        // Retry with sorting by createdAt desc (most recent first)
+        return this.getSheetsList(
+          { ...filters, sortBy: 'createdAt', sortOrder: 'desc' },
+          pagination,
+          currentUserId,
+          true // prevent further recursion
+        );
+      }
+      // ----------------------------------------------------------------------------------------------------------------
 
       const sheetIds = sheets.map(s => s._id);
 
@@ -1457,7 +1460,7 @@ class SheetService {
         slug: s.slug,
         description: s.description,
         ownerDisplayName,
-        ownerUsername,   // NEW field
+        ownerUsername,
         specialTag: s.specialTag,
         originalSourceName: s.originalSourceName,
         originalSourceUrl: s.originalSourceUrl,
@@ -1466,11 +1469,6 @@ class SheetService {
         isBookmarked: bookmarkedSet.has(s._id.toString()),
         participantCount: countBySheet.get(s._id.toString()) || 0,
         participants: limitedParticipants.get(s._id.toString()) || [],
-        // Remove aggregation helper fields
-        userMembership: undefined,
-        allMembers: undefined,
-        isOwner: undefined,
-        hasMembership: undefined,
       };
     });
 
@@ -1595,7 +1593,7 @@ class SheetService {
     }
   }
 
-    /**
+  /**
    * Get aggregated progress chart data for all participants in a sheet.
    * @param {string} sheetSlug
    * @returns {Promise<Object>}
@@ -1650,10 +1648,10 @@ class SheetService {
     };
   }
 
-    /**
+  /**
    * Get top 4 participants and current user's rank for a sheet.
    * @param {string} sheetSlug
-   * @param {string} currentUserId
+   * @param {string|null} currentUserId - can be null for unauthenticated
    * @returns {Promise<Object>}
    */
   static async getSheetRank(sheetSlug, currentUserId) {
@@ -1662,54 +1660,7 @@ class SheetService {
       throw new AppError('Sheet not found', 404);
     }
 
-    // Check if current user has joined
-    const membership = await SheetMembership.findOne({ sheetId: sheet._id, userId: currentUserId }).lean();
-    const hasJoined = !!membership;
-
-    // Get current user's own stats (solvedCount, revisionCompletedCount)
-    let currentUserStats = null;
-    let currentUserRank = null;
-    if (hasJoined) {
-      const stats = await SheetProgress.aggregate([
-        { $match: { sheetId: sheet._id, userId: currentUserId } },
-        {
-          $group: {
-            _id: null,
-            solvedCount: { $sum: { $cond: ['$solved', 1, 0] } },
-            revisionCompletedCount: { $sum: { $cond: ['$revisionCompleted', 1, 0] } },
-          },
-        },
-      ]);
-      currentUserStats = stats[0] || { solvedCount: 0, revisionCompletedCount: 0 };
-
-      // Compute rank: count participants with better stats
-      const betterCount = await SheetProgress.aggregate([
-        { $match: { sheetId: sheet._id, userId: { $ne: currentUserId } } },
-        {
-          $group: {
-            _id: '$userId',
-            solvedCount: { $sum: { $cond: ['$solved', 1, 0] } },
-            revisionCompletedCount: { $sum: { $cond: ['$revisionCompleted', 1, 0] } },
-          },
-        },
-        {
-          $match: {
-            $or: [
-              { solvedCount: { $gt: currentUserStats.solvedCount } },
-              {
-                solvedCount: currentUserStats.solvedCount,
-                revisionCompletedCount: { $gt: currentUserStats.revisionCompletedCount },
-              },
-            ],
-          },
-        },
-        { $count: 'count' },
-      ]);
-      const better = betterCount[0]?.count || 0;
-      currentUserRank = better + 1;
-    }
-
-    // Get top 4 participants
+    // Get top 4 participants (always public)
     const topRankings = await SheetProgress.aggregate([
       { $match: { sheetId: sheet._id } },
       {
@@ -1724,7 +1675,7 @@ class SheetService {
         $sort: {
           solvedCount: -1,
           revisionCompletedCount: -1,
-          lastUpdated: 1, // earlier completion first
+          lastUpdated: 1,
         },
       },
       { $limit: 4 },
@@ -1749,13 +1700,57 @@ class SheetService {
       },
     ]);
 
-    // Add rank number to top rankings (1-based index)
     const topRanks = topRankings.map((r, idx) => ({ rank: idx + 1, ...r }));
 
-    // Prepare current user info
+    // If no current user or not logged in, return only top ranks
+    if (!currentUserId) {
+      return { topRanks, currentUser: null };
+    }
+
+    // Check if current user has joined
+    const membership = await SheetMembership.findOne({ sheetId: sheet._id, userId: currentUserId }).lean();
+    const hasJoined = !!membership;
+
     let currentUserInfo = null;
-    if (hasJoined && currentUserStats) {
-      // Fetch user details for current user
+    if (hasJoined) {
+      const stats = await SheetProgress.aggregate([
+        { $match: { sheetId: sheet._id, userId: currentUserId } },
+        {
+          $group: {
+            _id: null,
+            solvedCount: { $sum: { $cond: ['$solved', 1, 0] } },
+            revisionCompletedCount: { $sum: { $cond: ['$revisionCompleted', 1, 0] } },
+          },
+        },
+      ]);
+      const currentUserStats = stats[0] || { solvedCount: 0, revisionCompletedCount: 0 };
+
+      // Count participants with better stats
+      const betterCount = await SheetProgress.aggregate([
+        { $match: { sheetId: sheet._id, userId: { $ne: currentUserId } } },
+        {
+          $group: {
+            _id: '$userId',
+            solvedCount: { $sum: { $cond: ['$solved', 1, 0] } },
+            revisionCompletedCount: { $sum: { $cond: ['$revisionCompleted', 1, 0] } },
+          },
+        },
+        {
+          $match: {
+            $or: [
+              { solvedCount: { $gt: currentUserStats.solvedCount } },
+              {
+                solvedCount: currentUserStats.solvedCount,
+                revisionCompletedCount: { $gt: currentUserStats.revisionCompletedCount },
+              },
+            ],
+          },
+        },
+        { $count: 'count' },
+      ]);
+      const better = betterCount[0]?.count || 0;
+      const currentUserRank = better + 1;
+
       const user = await User.findById(currentUserId).select('username displayName avatarUrl').lean();
       if (user) {
         currentUserInfo = {
@@ -1776,11 +1771,11 @@ class SheetService {
   /**
    * Get total count of public sheets.
    * @returns {Promise<number>}
-  */
+   */
   static async getSheetsCount() {
     return Sheet.countDocuments({ isActive: true });
   }
-  
+
   /**
    * Get paginated list of participants for a sheet, sorted by rank.
    * @param {string} sheetSlug
@@ -1798,7 +1793,7 @@ class SheetService {
     const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
     const skip = (pageNum - 1) * limitNum;
 
-    // Aggregation pipeline to get participant stats (solvedCount, revisionCompletedCount, lastUpdated)
+    // Aggregation pipeline to get participant stats
     const pipeline = [
       { $match: { sheetId: sheet._id } },
       {
@@ -1813,7 +1808,7 @@ class SheetService {
         $sort: {
           solvedCount: -1,
           revisionCompletedCount: -1,
-          lastUpdated: 1, // earlier completion first as tie-breaker
+          lastUpdated: 1,
         },
       },
       { $skip: skip },
@@ -1845,7 +1840,7 @@ class SheetService {
     const totalParticipants = await SheetProgress.distinct('userId', { sheetId: sheet._id });
     const total = totalParticipants.length;
 
-    // Assign rank numbers (based on the sorted order)
+    // Assign rank numbers
     const participants = participantsData.map((p, index) => ({
       rank: skip + index + 1,
       userId: p.userId,
@@ -1853,7 +1848,6 @@ class SheetService {
       displayName: p.displayName,
       avatarUrl: p.avatarUrl,
       totalQuestionsSolved: p.solvedCount,
-      // optionally include revisionCompletedCount if needed
     }));
 
     return {

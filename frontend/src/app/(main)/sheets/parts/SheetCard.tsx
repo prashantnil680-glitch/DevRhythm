@@ -71,9 +71,7 @@ function SheetCard({
   const remainingCount = Math.max(0, participantCount - 4);
 
   const showViewButton = isOwner || isJoined;
-  const buttonText = showViewButton ? 'View' : 'Join';
-  const buttonVariant = showViewButton ? 'outline' : 'primary';
-  const buttonIcon = buttonText === 'Join' ? <FiLogIn /> : undefined;
+  const isJoinMode = !showViewButton;
 
   const handleAction = () => {
     if (showViewButton) {
@@ -81,6 +79,11 @@ function SheetCard({
     } else {
       onJoin();
     }
+  };
+
+  const handleLoginRedirect = () => {
+    const returnTo = encodeURIComponent(window.location.pathname);
+    window.location.href = `/login?returnTo=${returnTo}`;
   };
 
   const hasParticipants = participants.length > 0;
@@ -104,15 +107,37 @@ function SheetCard({
             </Link>
           </h3>
           <div className={styles.actionGroup}>
-            <Button
-              variant={buttonVariant}
-              size="sm"
-              onClick={handleAction}
-              className={styles.actionButton}
-              leftIcon={buttonIcon}
-            >
-              {buttonText}
-            </Button>
+            {showViewButton ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAction}
+                className={styles.actionButton}
+              >
+                View
+              </Button>
+            ) : isAuthenticated ? (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleAction}
+                className={styles.actionButton}
+                leftIcon={<FiLogIn />}
+              >
+                Join
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleLoginRedirect}
+                className={styles.actionButton}
+                leftIcon={<FiLogIn />}
+              >
+                Login to Join
+              </Button>
+            )}
+
             {isAuthenticated && (
               <Tooltip content={isBookmarked ? 'Remove bookmark' : 'Bookmark this sheet'}>
                 <button

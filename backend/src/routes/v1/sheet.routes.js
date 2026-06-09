@@ -176,9 +176,10 @@ router.get(
   sheetController.getMyProgressChart
 );
 
+// 🔓 Made public (optionalAuth) for community chart on public sheet pages
 router.get(
   '/:slug/progress/chart',
-  auth,
+  optionalAuth,
   rateLimiters.progressLimiter,
   validate(sheetValidator.sheetIdParam, 'params'),
   sheetController.getSheetProgressChart
@@ -213,20 +214,22 @@ router.get(
 );
 
 // ========== Rank route (must be before /:slug) ==========
+// 🔓 Made public (optionalAuth) for public sheet rank display
 router.get(
   '/:slug/rank',
-  auth,
-  rateLimiters.rankParticipantsLimiter, 
+  optionalAuth,
+  rateLimiters.rankParticipantsLimiter,
   cache(30, 'sheet:rank'),
   validate(sheetValidator.sheetIdParam, 'params'),
   sheetController.getSheetRank
 );
 
 // ========== Participants list route (must be before /:slug) ==========
+// 🔓 Made public (optionalAuth) for public participant list
 router.get(
   '/:slug/participants',
-  auth,
-  rateLimiters.rankParticipantsLimiter, 
+  optionalAuth,
+  rateLimiters.rankParticipantsLimiter,
   cache(30, 'sheet:participants'),
   validate(sheetValidator.sheetIdParam, 'params'),
   validate(Joi.object({

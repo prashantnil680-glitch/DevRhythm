@@ -38,7 +38,6 @@ def sorted_list(iterable=None):
 
 /**
  * Returns a string of standard C++ includes and using namespace std.
- * Injected before the user's code to reduce boilerplate.
  * @returns {string}
  */
 function getCppIncludes() {
@@ -70,4 +69,24 @@ using namespace std;
 `.trim();
 }
 
-module.exports = { getPythonImports, getCppIncludes };
+/**
+ * Prepend C++ auto-includes to user code if no #include directive exists.
+ * This ensures that the code has the same environment as actual execution.
+ * @param {string} code - Original C++ source code
+ * @returns {string} Code with auto-includes prepended if necessary
+ */
+function prependCppAutoIncludes(code) {
+  // Check if code already contains any #include directive (with optional leading whitespace)
+  const hasIncludes = /^\s*#include\s*[<"]/m.test(code);
+  if (hasIncludes) {
+    return code;
+  }
+  const includes = getCppIncludes();
+  return includes + '\n\n' + code;
+}
+
+module.exports = {
+  getPythonImports,
+  getCppIncludes,
+  prependCppAutoIncludes,
+};

@@ -2,6 +2,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { prependCppAutoIncludes } = require('./autoImports');
 
 /**
  * Detect available C++ compiler.
@@ -22,6 +23,7 @@ function getCppCompiler() {
 
 /**
  * Validates C++ code syntax using compiler's -fsyntax-only flag.
+ * Auto-includes standard headers and using namespace std; if missing.
  * @param {string} code - C++ source code
  * @returns {string|null} Clean error message if invalid, otherwise null.
  */
@@ -31,9 +33,12 @@ function validateCppSyntax(code) {
     return 'C++ compiler not found. Please install g++ or clang++ and ensure it is in PATH.';
   }
 
+  // Prepend auto-includes to ensure standard library types are recognized
+  const fullCode = prependCppAutoIncludes(code);
+
   const tempFile = path.join(os.tmpdir(), `_syntax_check_${Date.now()}.cpp`);
   try {
-    fs.writeFileSync(tempFile, code, 'utf8');
+    fs.writeFileSync(tempFile, fullCode, 'utf8');
     // Use -fsyntax-only to check syntax without generating output
     execSync(`${compiler} -fsyntax-only "${tempFile}"`, { stdio: 'pipe', shell: true });
     return null;

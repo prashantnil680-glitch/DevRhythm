@@ -30,7 +30,7 @@ const { updateUserActivity } = require('../user.service');
 const { atomicUpdateQuestionProgressOnSolve, atomicIncrementUserStats } = require('../../utils/atomicUpdate');
 const { validatePythonSyntax } = require('../../utils/pythonSyntaxValidator');
 const { validateCppSyntax } = require('../../utils/cppSyntaxValidator');
-const { getPythonImports, getCppIncludes } = require('../../utils/autoImports');
+const { getPythonImports, getCppIncludes, prependCppAutoIncludes } = require('../../utils/autoImports');
 const { client: redisClient } = require('../../config/redis');
 
 // Lazy load jobQueue to avoid circular dependency
@@ -214,11 +214,8 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
 
   // ========== AUTO-INJECT INCLUDES FOR C++ ==========
   if (language === 'cpp') {
-    const autoIncludes = getCppIncludes();
-    const hasIncludes = /^\s*#include\s*[<"]/m.test(code);
-    if (!hasIncludes && !code.includes('// === Auto-injected includes (LeetCode‑style) ===')) {
-      code = autoIncludes + '\n\n' + code;
-    }
+    // Use shared function that prepends includes only if missing
+    code = prependCppAutoIncludes(code);
   }
 
   const [question, userProgress] = await Promise.all([
@@ -291,6 +288,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
     if (cached) {
       syntaxError = cachedError;
     } else {
+      // Note: validateCppSyntax internally uses prependCppAutoIncludes, so it's safe to pass the raw code
       syntaxError = validateCppSyntax(code);
       await setCachedSyntaxValidation('cpp', codeHash, syntaxError);
     }

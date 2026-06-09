@@ -1,7 +1,9 @@
+
+
 # DevRhythm – Coding Practice with Spaced Repetition
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/eb8d9235-1329-487d-9233-51ae7f9a9ccd" alt="DevRhythm Logo" width="120" />
+  <img src="https://github.com/user-attachments/assets/eb8d9235-1329-487d-9233-51ae7f9a9ccd" alt="DevRhythm Logo" width="240" />
 </p>
 
 <p align="center">
@@ -14,7 +16,8 @@
   <a href="#"><img src="https://img.shields.io/badge/Express-4.x-000000?logo=express&logoColor=white" alt="Express" /></a>
   <a href="#"><img src="https://img.shields.io/badge/MongoDB-6.x-47A248?logo=mongodb&logoColor=white" alt="MongoDB" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Redis-7.x-DC382D?logo=redis&logoColor=white" alt="Redis" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/Next.js-14.x-000000?logo=next.js&logoColor=white" alt="Next.js" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/Next.js-16.x-000000?logo=next.js&logoColor=white" alt="Next.js" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/React-19.x-61DAFB?logo=react&logoColor=black" alt="React" /></a>
   <a href="#"><img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white" alt="TypeScript" /></a>
   <a href="#"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License" /></a>
   <a href="#"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome" /></a>
@@ -71,15 +74,20 @@ The platform includes:
 - **Security**: Helmet, CORS, express-rate-limit
 
 ### Frontend
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 16 (App Router)
+- **UI Library**: React 19
 - **Language**: TypeScript
-- **State & Data**: React Query (TanStack Query), Zustand
-- **Styling**: CSS Modules + CSS variables (light/dark theme)
-- **UI Components**: Custom design system
-- **HTTP Client**: Axios + interceptors
-- **Code Editor**: Monaco editor
-- **Charts**: Recharts
-- **Heatmap**: Custom implementation
+- **Code Editor**: CodeMirror 6 (`@codemirror/lang-*`)
+- **State & Data**: React Query (`@tanstack/react-query`), `react-hook-form` + Zod
+- **Styling**: CSS Modules + CSS variables (light/dark theme via `next-themes`)
+- **HTTP Client**: Axios
+- **Charts**: Chart.js (`react-chartjs-2`)
+- **Animations**: Framer Motion
+- **Markdown**: `react-markdown` + `remark-gfm`
+- **Syntax Highlighting**: `react-syntax-highlighter`
+- **Date Handling**: `date-fns`, `react-datepicker`
+- **Notifications**: `react-hot-toast`
+- **Analytics & Monitoring**: `@vercel/analytics`, `@vercel/speed-insights`
 
 ### DevOps & Deployment
 - **Hosting**: Railway (backend), Vercel (frontend)
@@ -213,13 +221,14 @@ Three dedicated queues:
 - Route groups: `(auth)` for unauthenticated, `(main)` for authenticated.
 - Dynamic routes: `questions/[slug]`, `sheets/[slug]/progress/[username]`, `activity/[date]`.
 
-### 2. State Management
-- **React Query** – server state (caching, background refetching, mutations).
+### 2. State & Data Management
+- **React Query** – server state caching, background refetching, mutations.
+- **`react-hook-form` + Zod** – form handling and validation.
 - **Zustand** – client‑side global state (theme, auth token, UI toggles).
-- **Local state** – `useState`/`useReducer` for ephemeral UI.
+- **Local state** – `useState`/`useReducer`.
 
 ### 3. Data Fetching & API Integration
-- Axios instance with interceptors (JWT token, 401 handling).
+- Axios instance with interceptors (JWT token, 401 handling, refresh logic).
 - Feature‑specific service modules (`questionService.ts`, etc.).
 - Custom React Query hooks (`useQuestions`, `useDashboard`, etc.).
 - Server components for static pages – fetch via server‑side API client.
@@ -230,7 +239,8 @@ Three dedicated queues:
 - **Organisms** – `Navbar`, `Heatmap`, `QuestionCard`.
 - **Templates** – page‑level components.
 - **Lazy loading** – `next/dynamic` + Suspense for editor, revision timeline, charts.
-- **Theming** – CSS variables, light/dark toggled via Zustand.
+- **Theming** – CSS variables, light/dark toggled via `next-themes` and Zustand.
+- **Animations** – Framer Motion for smooth transitions.
 
 ### 5. Authentication Flow
 1. User clicks “Login” – redirected to backend OAuth.
@@ -245,18 +255,19 @@ Three dedicated queues:
 - No WebSockets (simulated via React Query).
 
 ### 7. Code Editor & Execution
-- Monaco editor with syntax highlighting for 4 languages.
-- Custom execution results panel.
+- **CodeMirror 6** editor with language support for Python, C++, Java, JS.
+- Custom execution results panel with test case output.
 - `useRunCode` hook – sync endpoint (or async with polling for long runs).
 - On all tests passed, question status updates automatically (React Query invalidation).
 
 ### 8. Performance Optimisations
 - Next.js Image optimisation.
 - Route prefetching.
-- Dynamic imports for large components.
-- React Query aggressive caching.
+- Dynamic imports for large components (CodeMirror, charts).
+- React Query aggressive caching + stale‑while‑revalidate.
 - Debounced search.
 - CSS Modules (scoped, small bundle).
+- Bundle analyzer (`@next/bundle-analyzer`) integrated.
 
 ### 9. Folder Structure (Simplified)
 ```
@@ -272,16 +283,17 @@ frontend/
 - Feature‑first organisation – scalable.
 - No external UI library – full control.
 - React Query over Redux – server state is primary.
-- Minimal client‑side state.
-- Server components for SEO.
-- Skeleton loading everywhere.
+- CodeMirror over Monaco – smaller bundle, better Next.js compatibility.
+- Zod + `react-hook-form` – type‑safe form handling.
+- Framer Motion – adds polish without performance overhead.
+- Server components for SEO – critical content delivered immediately.
 
 ---
 
 ## 💡 Core Functionality (How It Works)
 
 ### 1. Solving a Problem
-- Write code, run test cases.
+- Write code in CodeMirror editor, run test cases.
 - On all tests passed → problem marked **Solved**.
 - Revision schedule created (1,3,7,14,30 days).
 - Activity log, heatmap, stats, pattern mastery updated.
@@ -438,17 +450,6 @@ Live demo: [https://devrhythm.space](https://devrhythm.space) (requires login)
 ## 📄 License
 
 [MIT](LICENSE)
-
----
-
-## 🙏 Acknowledgements
-
-- LeetCode – problem content and API.
-- OnlineCompiler.io – code execution (free tier).
-- Redis Cloud – managed Redis.
-- Railway – backend hosting.
-- Vercel – frontend hosting.
-- All contributors and users.
 
 ---
 

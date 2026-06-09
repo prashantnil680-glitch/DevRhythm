@@ -1,4 +1,5 @@
-"use client"
+'use client';
+
 import React, { useState } from 'react';
 import { FiSettings, FiCalendar, FiStar, FiUsers, FiTarget, FiAward } from 'react-icons/fi';
 import { FaFire, FaTrophy, FaLeaf, FaRegGem, FaStar } from 'react-icons/fa';
@@ -6,7 +7,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import clsx from 'clsx';
 import { format } from 'date-fns';
-
 import { Avatar } from '@/shared/components/Avatar';
 import Button from '@/shared/components/Button';
 import Divider from '@/shared/components/Divider';
@@ -20,7 +20,6 @@ import { userService } from '@/features/user/services/userService';
 import { userKeys } from '@/shared/lib/react-query';
 import { formatNumber } from '@/shared/lib/stringUtils';
 import type { User } from '@/shared/types';
-
 import styles from './ProfileHeader.module.css';
 
 export interface ProfileHeaderProps {
@@ -67,7 +66,6 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   const followMutation = useMutation({
     mutationFn: () => followService.followUser(user._id),
     onSuccess: () => {
-      // Invalidate follow status and any follow lists
       queryClient.invalidateQueries({ queryKey: ['follow', 'status', currentUser?._id, user._id] });
       queryClient.invalidateQueries({ queryKey: ['follow'] });
       toast.success(`You are now following ${user.displayName || user.username}`);
@@ -97,9 +95,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     }
   };
 
-  // Determine online status from backend field
   const isOnline = user?.isOnline ?? false;
-
   const badges = computeBadges(user);
   const memberSince = format(new Date(user?.accountCreated), 'MMM yyyy');
 
@@ -135,12 +131,10 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     const { displayName, dailyGoal, weeklyGoal, timezone, notifications } = data;
     const payload: Partial<User> = {};
 
-    // Display name
     if (displayName !== user?.displayName) {
       payload.displayName = displayName;
     }
 
-    // Preferences – build a complete preferences object with changes merged
     const newPreferences = {
       ...user?.preferences,
       dailyGoal,
@@ -152,7 +146,6 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
       },
     };
 
-    // Only send preferences if any field actually changed
     if (
       newPreferences.dailyGoal !== user?.preferences?.dailyGoal ||
       newPreferences.weeklyGoal !== user?.preferences?.weeklyGoal ||
@@ -171,7 +164,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   return (
     <>
       <div className={clsx(styles.container, className)}>
-        {/* Avatar with ripple and status dot */}
+        {/* Avatar with triple ripple effect */}
         <div className={styles.avatarWrapper}>
           <Avatar
             src={user?.avatarUrl}
@@ -181,6 +174,8 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             className={styles.avatar}
           />
           <div className={styles.ripple} aria-hidden="true" />
+          <div className={styles.ripple} aria-hidden="true" />
+          <div className={styles.ripple} aria-hidden="true" />
         </div>
 
         {/* Name and action button(s) */}
@@ -188,11 +183,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           <div className={styles.nameRow}>
             <h1 className={styles.displayName}>{user?.displayName}</h1>
             {isOwnProfile ? (
-              <button
-                className={styles.settingsButton}
-                onClick={() => setModalOpen(true)}
-                aria-label="Open settings"
-              >
+              <button className={styles.settingsButton} onClick={() => setModalOpen(true)} aria-label="Open settings">
                 <FiSettings />
               </button>
             ) : (
@@ -275,14 +266,9 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           showCloseButton
         >
           <form onSubmit={handleSubmit(onSubmit)} className={styles.modalForm}>
-            {/* Display Name Field */}
             <div className={styles.formGroup}>
               <label htmlFor="displayName">Display Name</label>
-              <input
-                id="displayName"
-                type="text"
-                {...control.register('displayName')}
-              />
+              <input id="displayName" type="text" {...control.register('displayName')} />
             </div>
 
             {/* <div className={styles.formGroup}>
@@ -319,72 +305,45 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 name="notifications.revisionReminders"
                 control={control}
                 render={({ field }) => (
-                  <Checkbox
-                    label="Revision Reminders"
-                    checked={field.value}
-                    onChange={field.onChange}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                  />
+                  <Checkbox label="Revision Reminders" checked={field.value} onChange={field.onChange} />
                 )}
               />
               <Controller
                 name="notifications.goalTracking"
                 control={control}
                 render={({ field }) => (
-                  <Checkbox
-                    label="Goal Tracking"
-                    checked={field.value}
-                    onChange={field.onChange}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                  />
+                  <Checkbox label="Goal Tracking" checked={field.value} onChange={field.onChange} />
                 )}
               />
               <Controller
                 name="notifications.socialInteractions"
                 control={control}
                 render={({ field }) => (
-                  <Checkbox
-                    label="Social Interactions"
-                    checked={field.value}
-                    onChange={field.onChange}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                  />
+                  <Checkbox label="Social Interactions" checked={field.value} onChange={field.onChange} />
                 )}
               />
               <Controller
                 name="notifications.weeklyReports"
                 control={control}
                 render={({ field }) => (
-                  <Checkbox
-                    label="Weekly Reports"
-                    checked={field.value}
-                    onChange={field.onChange}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                  />
+                  <Checkbox label="Weekly Reports" checked={field.value} onChange={field.onChange} />
                 )}
               />
             </fieldset>
+
             <Divider />
+
             <div className={styles.themeSection}>
               <span>Theme</span>
               <ThemeToggle variant="both" />
             </div>
           </form>
 
-          {/* Modal footer with action buttons */}
           <div className={styles.modalActions}>
             <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              isLoading={isSubmitting}
-              onClick={handleSubmit(onSubmit)}
-            >
+            <Button type="submit" isLoading={isSubmitting} onClick={handleSubmit(onSubmit)}>
               Save
             </Button>
           </div>

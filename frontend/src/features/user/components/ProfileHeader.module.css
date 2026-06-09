@@ -1,12 +1,10 @@
-/* frontend/src/features/user/components/ProfileHeader.module.css */
-
 .container {
   position: relative;
   width: 100%;
   margin-bottom: var(--spacing-xl);
 }
 
-/* ===== Avatar ===== */
+/* ===== Avatar with triple ripple ===== */
 .avatarWrapper {
   position: relative;
   display: inline-block;
@@ -23,24 +21,33 @@
 
 .ripple {
   position: absolute;
-  top: -4px;
-  left: -4px;
-  right: -4px;
-  bottom: -4px;
+  inset: 0;
   border-radius: 50%;
   border: 2px solid var(--accent-moss);
   opacity: 0;
-  animation: ripple 2s infinite;
+  animation: ripple 4.5s infinite ease-out;
   pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.ripple:nth-of-type(2) {
+  animation-delay: 1.5s;
+}
+
+.ripple:nth-of-type(3) {
+  animation-delay: 3s;
 }
 
 @keyframes ripple {
   0% {
-    transform: scale(0.8);
-    opacity: 0.5;
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  30% {
+    opacity: 0.3;
   }
   100% {
-    transform: scale(1.2);
+    transform: scale(1.25);
     opacity: 0;
   }
 }
@@ -126,7 +133,6 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  margin-left: auto; /* pushes to the right in flex row */
 }
 
 .settingsButton:hover {
@@ -199,7 +205,7 @@
   color: var(--accent-moss);
 }
 
-/* ===== Desktop Layout (≥940px = --breakpoint-desktop) ===== */
+/* ===== Desktop Layout (≥940px) ===== */
 @media (min-width: 940px) {
   .container {
     display: grid;
@@ -207,34 +213,28 @@
     align-items: start;
     gap: var(--spacing-lg);
   }
-
   .avatarWrapper {
     grid-row: 1 / span 2;
   }
-
   .trunk {
     grid-column: 2;
     grid-row: 1;
     margin-left: var(--spacing-md);
   }
-
   .statPills {
     grid-column: 2;
     grid-row: 2;
     margin-top: 0;
   }
-
   .nameSection {
     grid-column: 3;
     grid-row: 1;
     text-align: right;
     align-items: flex-end;
   }
-
   .nameRow {
     justify-content: flex-end;
   }
-
   .badges {
     grid-column: 3;
     grid-row: 2;
@@ -243,37 +243,32 @@
   }
 }
 
-/* ===== Tablet Layout (≥768px and <940px = --breakpoint-tablet) ===== */
+/* ===== Tablet Layout (768px–939px) ===== */
 @media (min-width: 768px) and (max-width: 939px) {
   .container {
     display: grid;
     grid-template-columns: auto 1fr;
     gap: var(--spacing-lg);
   }
-
   .avatarWrapper {
     grid-row: 1 / span 2;
   }
-
   .nameSection {
     grid-column: 2;
     grid-row: 1;
     text-align: left;
     align-items: flex-start;
   }
-
   .trunk {
     grid-column: 2;
     grid-row: 2;
     margin-left: 0;
   }
-
   .statPills {
     grid-column: 2;
     grid-row: 3;
     margin-top: var(--spacing-sm);
   }
-
   .badges {
     grid-column: 1 / -1;
     grid-row: 4;
@@ -282,7 +277,7 @@
   }
 }
 
-/* ===== Mobile Layout (≤480px = --breakpoint-mobile) ===== */
+/* ===== Mobile Layout (≤480px) ===== */
 @media (max-width: 480px) {
   .container {
     display: flex;
@@ -291,41 +286,32 @@
     text-align: center;
     gap: var(--spacing-md);
   }
-
   .avatarWrapper {
     margin-bottom: var(--spacing-sm);
   }
-
   .nameSection {
     align-items: center;
   }
-
   .nameRow {
     justify-content: center;
   }
-
   .statPills {
     justify-content: center;
   }
-
   .badges {
     justify-content: center;
   }
 }
 
-/* Settings Modal specific adjustments */
-.settingsModal {
-  /* optional container styling */
-}
-
+/* ===== Settings Modal styles ===== */
 .modalForm {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md); /* reduced from lg for compactness */
+  gap: var(--spacing-md);
   padding: var(--spacing-md) 0;
-  max-height: 50vh;        /* limit height */
-  overflow-y: auto;        /* make form scrollable */
-  padding-right: calc(var(--spacing-sm) + 4px); /* extra space for scrollbar */
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-right: calc(var(--spacing-sm) + 4px);
 }
 
 .formGroup {
@@ -376,7 +362,7 @@
   display: flex;
   gap: var(--spacing-md);
   justify-content: flex-end;
-  margin-top: var(--spacing-md); /* reduced from lg */
+  margin-top: var(--spacing-md);
   padding-top: var(--spacing-sm);
   border-top: 1px solid var(--divider);
 }

@@ -8,7 +8,7 @@ let internalUserCache = null;
 
 const getInternalUser = async () => {
   if (internalUserCache) return internalUserCache;
-  const email = 'internal@devrhythm.com';
+  const email = 'internal@devrhythm.space';
   let user = await User.findOne({ email });
   if (!user) {
     user = await User.create({

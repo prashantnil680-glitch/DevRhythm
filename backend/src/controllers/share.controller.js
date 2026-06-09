@@ -205,7 +205,7 @@ const createShare = async (req, res, next) => {
     
     res.status(201).json(formatResponse('Share created successfully', {
       share,
-      shareUrl: `${process.env.FRONTEND_URL || 'https://devrhythm.com'}/share/${shareToken}`
+      shareUrl: `${process.env.FRONTEND_URL || 'https://devrhythm.space'}/share/${shareToken}`
     }));
   } catch (error) {
     next(error);
@@ -391,7 +391,7 @@ const resetShareToken = async (req, res, next) => {
     invalidateCache(`share:token:${oldToken}`).catch(console.error);
     res.json(formatResponse('Share token reset successfully', {
       newToken: share.shareToken,
-      newShareUrl: `${process.env.FRONTEND_URL || 'https://devrhythm.com'}/share/${share.shareToken}`
+      newShareUrl: `${process.env.FRONTEND_URL || 'https://devrhythm.space'}/share/${share.shareToken}`
     }));
   } catch (error) {
     next(error);

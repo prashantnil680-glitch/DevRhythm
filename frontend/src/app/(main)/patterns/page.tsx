@@ -6,7 +6,7 @@ import { ROUTES } from '@/shared/config/routes';
 import PatternsDashboardClient from './parts/PatternsDashboardClient';
 import { PatternDashboardSkeleton } from './parts/PatternDashboardSkeleton';
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://devrhythm.com';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://devrhythm.space';
 const OG_IMAGE_URL = `${APP_URL}/images/logos/main-logo.png`;
 
 export const metadata: Metadata = {

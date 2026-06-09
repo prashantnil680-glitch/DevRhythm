@@ -67,7 +67,7 @@ module.exports = {
 
   email: {
     provider: process.env.EMAIL_PROVIDER || 'mailjet',
-    fromAddress: process.env.EMAIL_FROM_ADDRESS || 'noreply@devrhythm.com',
+    fromAddress: process.env.EMAIL_FROM_ADDRESS || 'noreply@devrhythm.space',
     fromName: process.env.EMAIL_FROM_NAME || 'DevRhythm',
     mailjet: {
       apiKey: process.env.MAILJET_API_KEY,

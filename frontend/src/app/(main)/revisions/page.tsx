@@ -6,7 +6,7 @@ import { ROUTES } from '@/shared/config/routes';
 import RevisionDashboardClient from './parts/RevisionDashboardClient';
 import { RevisionDashboardSkeleton } from './parts/RevisionDashboardSkeleton';
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://devrhythm.com';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://devrhythm.space';
 
 export const metadata: Metadata = {
   title: 'Revision Dashboard · DevRhythm',

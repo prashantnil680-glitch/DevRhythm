@@ -8,7 +8,7 @@ import Link from 'next/link';
 import GoalDashboardDataProvider from './GoalDashboardDataProvider';
 
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://devrhythm.com';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://devrhythm.space';
 
 export const metadata: Metadata = {
   title: 'Goal Tracker & Coding Progress Dashboard | DevRhythm',

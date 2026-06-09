@@ -10,6 +10,8 @@ import Breadcrumb from '@/shared/components/Breadcrumb';
 import type { BreadcrumbItem } from '@/shared/components/Breadcrumb';
 import Pagination from '@/shared/components/Pagination';
 import NotFoundPage from '@/shared/components/NotFoundPage';
+import Modal from '@/shared/components/Modal';
+import Button from '@/shared/components/Button';
 import UserProgressHeader from './parts/UserProgressHeader';
 import UserQuestionList from './parts/UserQuestionList';
 import UserProgressChart from './parts/UserProgressChart';
@@ -17,10 +19,15 @@ import UserProgressSkeleton from './parts/UserProgressSkeleton';
 import QuestionsFilterBar from '../../parts/QuestionsFilterBar';
 import styles from './page.module.css';
 
-export default function UserProgressPageClient() {
+interface UserProgressPageClientProps {
+  requiresAuth?: boolean;
+}
+
+export default function UserProgressPageClient({ requiresAuth = false }: UserProgressPageClientProps) {
   const { slug, username } = useParams<{ slug: string; username: string }>();
   const router = useRouter();
   const { user } = useUser();
+  const [loginModalOpen, setLoginModalOpen] = useState(requiresAuth);
 
   // Fetch sheet name separately
   const { data: sheetData, isLoading: sheetLoading } = useSheet(slug);
@@ -100,6 +107,55 @@ export default function UserProgressPageClient() {
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
   };
+
+  const handleLoginRedirect = () => {
+    const returnTo = encodeURIComponent(window.location.pathname);
+    window.location.href = `/login?returnTo=${returnTo}`;
+  };
+
+  // If authentication is required, show modal and prevent data fetching
+  if (requiresAuth) {
+    return (
+      <>
+        {sheetLoading ? <UserProgressSkeleton /> : (
+          <div className={styles.container}>
+            <Breadcrumb
+              items={[
+                { label: 'Home', href: ROUTES.DASHBOARD },
+                { label: 'Sheets', href: ROUTES.SHEETS.ROOT },
+                { label: 'Sheet', href: ROUTES.SHEETS.DETAIL(slug) },
+                { label: `Progress of ${username}` },
+              ]}
+              renderLink={(item, props) => (
+                item.href ? <Link href={item.href} className={props.className}>{props.children}</Link> : <span {...props}>{props.children}</span>
+              )}
+            />
+            <Modal
+              isOpen={loginModalOpen}
+              onClose={() => setLoginModalOpen(false)}
+              title="Authentication Required"
+              size="sm"
+              closeOnBackdropClick={false}
+              closeOnEsc={false}
+              showCloseButton={false}
+            >
+              <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+                <p>You need to be logged in to view user progress.</p>
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', marginTop: '1.5rem' }}>
+                  <Button variant="outline" onClick={() => router.push(ROUTES.SHEETS.DETAIL(slug))}>
+                    Go Back
+                  </Button>
+                  <Button variant="primary" onClick={handleLoginRedirect}>
+                    Log In
+                  </Button>
+                </div>
+              </div>
+            </Modal>
+          </div>
+        )}
+      </>
+    );
+  }
 
   if (isLoading || sheetLoading) return <UserProgressSkeleton />;
   if (error || !data) {

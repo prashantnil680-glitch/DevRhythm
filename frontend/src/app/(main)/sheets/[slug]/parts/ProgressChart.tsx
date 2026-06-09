@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import {
   Chart as ChartJS,
@@ -25,14 +25,45 @@ interface ProgressChartProps {
   onJoinSheet: () => void;
   isJoining?: boolean;
   hasJoined: boolean;
+  isAuthenticated?: boolean;
 }
 
-export default function ProgressChart({ slug, onJoinSheet, isJoining = false, hasJoined }: ProgressChartProps) {
+export default function ProgressChart({
+  slug,
+  onJoinSheet,
+  isJoining = false,
+  hasJoined,
+  isAuthenticated = false,
+}: ProgressChartProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
-  const { data: aggData, isLoading: aggLoading } = useAggregatedProgress(slug);
-  const { data: rankData, isLoading: rankLoading } = useSheetRank(slug);
+  const {
+    data: aggData,
+    isLoading: aggLoading,
+    error: aggError,
+    refetch: refetchAgg,
+  } = useAggregatedProgress(slug);
+
+  const {
+    data: rankData,
+    isLoading: rankLoading,
+    error: rankError,
+    refetch: refetchRank,
+  } = useSheetRank(slug);
+
+  // Fallback: if still loading after 1 second, force a refetch (handles race conditions)
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (aggLoading && slug) refetchAgg();
+      if (rankLoading && slug) refetchRank();
+    }, 1000);
+    return () => clearTimeout(timeout);
+  }, [aggLoading, rankLoading, slug, refetchAgg, refetchRank]);
+
+  // If rank data failed, treat as empty (no rank information)
+  const effectiveRankData = rankError ? { topRanks: [], currentUser: null } : rankData;
+  const isLoading = aggLoading || (rankLoading && !rankError);
 
   const chartData = useMemo(() => {
     if (!aggData) return null;
@@ -86,8 +117,7 @@ export default function ProgressChart({ slug, onJoinSheet, isJoining = false, ha
     };
   }, [chartData]);
 
-  const isLoading = aggLoading || rankLoading;
-  if (isLoading || !aggData || !rankData || !chartData) {
+  if (isLoading || !aggData || !chartData) {
     return (
       <div className={styles.container}>
         <div className={styles.leftColumn}>
@@ -108,7 +138,7 @@ export default function ProgressChart({ slug, onJoinSheet, isJoining = false, ha
   const revisionPercentage = metadata.revisionCompletedPercentage;
   const overallPercentage = (solvedPercentage + revisionPercentage) / 2;
 
-  const { topRanks, currentUser } = rankData;
+  const { topRanks, currentUser } = effectiveRankData || { topRanks: [], currentUser: null };
 
   return (
     <div className={styles.container}>
@@ -146,11 +176,21 @@ export default function ProgressChart({ slug, onJoinSheet, isJoining = false, ha
               {topRanks.map((entry) => (
                 <div key={entry.userId} className={styles.rankItem}>
                   <span className={styles.rankNumber}>#{entry.rank}</span>
-                  <Link href={`/sheets/${slug}/progress/${entry.username}`} className={styles.rankLink}>
-                    <Avatar src={entry.avatarUrl} name={entry.displayName || entry.username} size="sm" />
+                  <Link
+                    href={`/sheets/${slug}/progress/${entry.username}`}
+                    className={styles.rankLink}
+                  >
+                    <Avatar
+                      src={entry.avatarUrl}
+                      name={entry.displayName || entry.username}
+                      size="sm"
+                    />
                   </Link>
                   <div className={styles.rankUserInfo}>
-                    <Link href={`/sheets/${slug}/progress/${entry.username}`} className={styles.rankNameLink}>
+                    <Link
+                      href={`/sheets/${slug}/progress/${entry.username}`}
+                      className={styles.rankNameLink}
+                    >
                       <span className={styles.rankName}>{entry.displayName || entry.username}</span>
                     </Link>
                     <div className={styles.rankStats}>
@@ -167,11 +207,23 @@ export default function ProgressChart({ slug, onJoinSheet, isJoining = false, ha
             <div className={styles.yourRank}>
               <span className={styles.yourRankLabel}>Your Rank:</span>
               <span className={styles.yourRankValue}>#{currentUser.rank}</span>
-              <Link href={`/sheets/${slug}/progress/${currentUser.username}`} className={styles.rankLink}>
-                <Avatar src={currentUser.avatarUrl} name={currentUser.displayName || currentUser.username} size="sm" />
+              <Link
+                href={`/sheets/${slug}/progress/${currentUser.username}`}
+                className={styles.rankLink}
+              >
+                <Avatar
+                  src={currentUser.avatarUrl}
+                  name={currentUser.displayName || currentUser.username}
+                  size="sm"
+                />
               </Link>
-              <Link href={`/sheets/${slug}/progress/${currentUser.username}`} className={styles.rankNameLink}>
-                <span className={styles.yourRankName}>{currentUser.displayName || currentUser.username}</span>
+              <Link
+                href={`/sheets/${slug}/progress/${currentUser.username}`}
+                className={styles.rankNameLink}
+              >
+                <span className={styles.yourRankName}>
+                  {currentUser.displayName || currentUser.username}
+                </span>
               </Link>
               <div className={styles.yourRankStats}>
                 <span>✓ {currentUser.solvedCount}</span>
@@ -179,6 +231,7 @@ export default function ProgressChart({ slug, onJoinSheet, isJoining = false, ha
               </div>
             </div>
           ) : !hasJoined ? (
+            isAuthenticated ? (
               <div className={styles.joinPrompt}>
                 <p>You have not joined this sheet. Join to see your rank.</p>
                 <Button
@@ -191,6 +244,16 @@ export default function ProgressChart({ slug, onJoinSheet, isJoining = false, ha
                   Join Sheet
                 </Button>
               </div>
+            ) : (
+              <div className={styles.loginPrompt}>
+                <p>Log in to join this sheet and track your progress.</p>
+                <Link href="/login">
+                  <Button variant="primary" size="sm" leftIcon={<FiLogIn />}>
+                    Log in
+                  </Button>
+                </Link>
+              </div>
+            )
           ) : null}
         </div>
       </div>

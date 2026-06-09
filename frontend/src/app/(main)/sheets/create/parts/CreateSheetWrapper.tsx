@@ -6,13 +6,19 @@ import { useCreateSheet, useImportSheet } from '@/features/sheets';
 import { ROUTES } from '@/shared/config';
 import Tabs from '@/shared/components/Tabs';
 import Button from '@/shared/components/Button';
+import Modal from '@/shared/components/Modal';
 import ManualTab from './ManualTab';
 import ImportTab from './ImportTab';
 import styles from './CreateSheetWrapper.module.css';
 
-export function CreateSheetWrapper() {
+interface CreateSheetWrapperProps {
+  isAuthenticated: boolean;
+}
+
+export function CreateSheetWrapper({ isAuthenticated }: CreateSheetWrapperProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [authModalOpen, setAuthModalOpen] = useState(!isAuthenticated);
 
   // Read tab from URL query parameter
   const tabParam = searchParams.get('tab');
@@ -64,6 +70,58 @@ export function CreateSheetWrapper() {
   };
 
   const isSubmitting = createMutation.isPending || importMutation.isPending;
+
+  const handleLoginRedirect = () => {
+    const returnTo = encodeURIComponent(window.location.pathname);
+    window.location.href = `/login?returnTo=${returnTo}`;
+  };
+
+  // If not authenticated, show a modal overlay
+  if (!isAuthenticated) {
+    return (
+      <>
+        <div className={styles.container} style={{ opacity: 0.5, pointerEvents: 'none' }}>
+          <div className={styles.header}>
+            <Tabs
+              activeTab={activeTab}
+              onChange={(tab) => setActiveTab(tab as 'manual' | 'import')}
+              tabs={[
+                { id: 'manual', label: 'Manual' },
+                { id: 'import', label: 'Import' },
+              ]}
+              className={styles.tabs}
+            />
+          </div>
+          <div className={styles.content}>
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              Loading form...
+            </div>
+          </div>
+        </div>
+        <Modal
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          title="Authentication Required"
+          size="sm"
+          closeOnBackdropClick={false}
+          closeOnEsc={false}
+          showCloseButton={false}
+        >
+          <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+            <p>You need to be logged in to create a sheet.</p>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', marginTop: '1.5rem' }}>
+              <Button variant="outline" onClick={() => router.push(ROUTES.SHEETS.ROOT)}>
+                Go to Sheets
+              </Button>
+              <Button variant="primary" onClick={handleLoginRedirect}>
+                Log In
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      </>
+    );
+  }
 
   return (
     <div className={styles.container}>

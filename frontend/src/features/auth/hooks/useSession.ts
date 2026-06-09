@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { tokenStorage } from '../utils/tokenStorage';
 import apiClient from '@/shared/lib/apiClient';
+import { isPublicPath } from '@/shared/lib/publicPaths';
 import type { User } from '../types/auth.types';
 
 const fetchCurrentUser = async (): Promise<User> => {
@@ -30,14 +31,12 @@ export const useSession = () => {
     if (typeof window !== 'undefined') {
       const currentPath = window.location.pathname + window.location.search + window.location.hash;
       const existingReturnTo = localStorage.getItem('returnTo');
-
       if (!existingReturnTo || existingReturnTo === '/login' || existingReturnTo === '/') {
         if (!currentPath.startsWith('/login') && currentPath !== '/') {
           localStorage.setItem('returnTo', currentPath);
         }
       }
     }
-
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
     const redirectUri = `${window.location.origin}/auth/callback`;
     window.location.href = `${baseUrl}/auth/${provider}?redirect_uri=${encodeURIComponent(redirectUri)}`;
@@ -50,28 +49,26 @@ export const useSession = () => {
         localStorage.setItem('returnTo', currentPath);
       }
     }
-
     try {
       await apiClient.post('/auth/logout');
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
-      // Clear tokens
       tokenStorage.clearTokens();
 
-      // Invalidate all user‑related queries
       await queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       await queryClient.invalidateQueries({ queryKey: ['users'] });
 
-      // Explicitly set user data to null for both auth hooks
       queryClient.setQueryData(['currentUser'], null);
       queryClient.setQueryData(['users', 'me'], null);
-
-      // Clear entire cache
       queryClient.clear();
 
-      // Force hard redirect to break any cookie session
-      window.location.href = '/login';
+      const currentPath = window.location.pathname;
+      if (!isPublicPath(currentPath)) {
+        window.location.href = '/login';
+      } else {
+        window.location.reload();
+      }
     }
   };
 

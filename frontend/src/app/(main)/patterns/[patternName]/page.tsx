@@ -1,6 +1,7 @@
 import { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import Breadcrumb from '@/shared/components/Breadcrumb';
 import { ROUTES } from '@/shared/config/routes';
 import PatternDetailsClient from './parts/PatternDetailsClient';
@@ -106,6 +107,11 @@ export default async function PatternDetailPage({ params }: PageProps) {
   const { patternName: slug } = await params;
   const originalName = slugToPatternName(decodeURIComponent(slug));
 
+  // Check authentication
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth_token')?.value;
+  const isAuthenticated = !!token;
+
   const { breadcrumbSchema, webpageSchema, itemListSchema } = generateSchemas(originalName, slug);
 
   const breadcrumbItems = [
@@ -142,7 +148,7 @@ export default async function PatternDetailPage({ params }: PageProps) {
           </Link>
         )}
       />
-      <PatternDetailsClient patternName={originalName} />
+      <PatternDetailsClient patternName={originalName} requiresAuth={!isAuthenticated} />
     </>
   );
 }

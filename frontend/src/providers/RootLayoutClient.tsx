@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useLayoutEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
@@ -13,28 +13,44 @@ import { useSession } from '@/features/auth/hooks/useSession';
 import { usePendingRevisions } from '@/features/revision/hooks/usePendingRevisions';
 import { useCurrentGoalProgress } from '@/features/goal/hooks/useCurrentGoalProgress';
 import { AddProgressModal } from '@/features/progress/components/AddProgressModal';
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
+import { isPublicPath } from '@/shared/lib/publicPaths';
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [isReady, setIsReady] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const { user } = useSession();
   const isDesktop = useMediaQuery('(min-width: 940px)');
   const isMobile = useMediaQuery('(max-width: 768px)');
 
-  const isHomepageUnauthenticated = pathname === '/' && !user;
-  const shouldShowNavbar = !isHomepageUnauthenticated;
-  const shouldShowFooter = isDesktop && !isHomepageUnauthenticated;
+  // Wait for pathname to be available
+  useLayoutEffect(() => {
+    if (pathname) {
+      setIsReady(true);
+    }
+  }, [pathname]);
 
-  // ✅ Only enable hooks when navbar is shown (prevents API calls on unauthenticated homepage)
-  const { pendingCount } = usePendingRevisions({ enabled: shouldShowNavbar });
-  const { daily } = useCurrentGoalProgress({ enabled: shouldShowNavbar });
+  // Enable user‑specific hooks only on private pages or when user is logged in
+  const shouldEnableUserHooks = isReady && pathname
+    ? (!isPublicPath(pathname) || !!user)
+    : false;
 
+  const { pendingCount } = usePendingRevisions({ enabled: shouldEnableUserHooks });
+  const { daily } = useCurrentGoalProgress({ enabled: shouldEnableUserHooks });
   const dailyGoalProgress = {
     completed: daily?.completed ?? 0,
     target: daily?.target ?? 3,
   };
+
+  if (!isReady || !pathname) {
+    return null;
+  }
+
+  // ✅ Always show navbar and footer, regardless of authentication or path
+  const shouldShowNavbar = true;
+  const shouldShowFooter = isDesktop;
 
   return (
     <>

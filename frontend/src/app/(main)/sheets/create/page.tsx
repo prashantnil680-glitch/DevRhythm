@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { Metadata, Viewport } from 'next';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import Breadcrumb from '@/shared/components/Breadcrumb';
 import { ROUTES } from '@/shared/config';
 import { CreateSheetWrapper } from './parts/CreateSheetWrapper';
@@ -28,7 +29,11 @@ const breadcrumbItems = [
   { label: 'Create Sheet' },
 ];
 
-export default function CreateSheetPage() {
+export default async function CreateSheetPage() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth_token')?.value;
+  const isAuthenticated = !!token;
+
   return (
     <>
       <Breadcrumb
@@ -40,7 +45,7 @@ export default function CreateSheetPage() {
         )}
       />
       <Suspense fallback={<CreateSheetSkeleton />}>
-        <CreateSheetWrapper />
+        <CreateSheetWrapper isAuthenticated={isAuthenticated} />
       </Suspense>
     </>
   );

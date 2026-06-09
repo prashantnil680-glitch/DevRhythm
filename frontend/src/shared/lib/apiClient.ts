@@ -1,9 +1,6 @@
-import axios, {
-  AxiosError,
-  AxiosInstance,
-  InternalAxiosRequestConfig,
-} from 'axios';
+import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import type { ApiResponse, PaginatedResponse } from '@/shared/types';
+import { isPublicPath } from './publicPaths';
 
 // ========== Configuration ==========
 const getBaseUrl = (): string => {
@@ -46,13 +43,11 @@ export interface ApiClientResponse<T = any> {
 
 export function isPaginatedResponse<T>(
   response: ApiClientResponse<T>
-): response is ApiClientResponse<T> & {
-  meta: { pagination: NonNullable<PaginatedResponse<T>['meta']['pagination']> };
-} {
+): response is ApiClientResponse<T> & { meta: { pagination: NonNullable<PaginatedResponse<T>['meta']['pagination']> } } {
   return !!response.meta?.pagination;
 }
 
-// ========== Create Axios Instance (safe on server) ==========
+// ========== Create Axios Instance ==========
 const apiClient: AxiosInstance = axios.create({
   baseURL: getBaseUrl(),
   timeout: 30000,
@@ -61,12 +56,9 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// ========== Token Refresh Queue (only used on client) ==========
+// ========== Token Refresh Queue ==========
 let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (value?: unknown) => void;
-  reject: (reason?: any) => void;
-}> = [];
+let failedQueue: Array<{ resolve: (value?: unknown) => void; reject: (reason?: any) => void; }> = [];
 let isRedirecting = false;
 
 const processQueue = (error: Error | null, token: string | null = null) => {
@@ -80,22 +72,28 @@ const processQueue = (error: Error | null, token: string | null = null) => {
   failedQueue = [];
 };
 
+// 🔧 MODIFIED: Check public path before redirect
 const clearTokensAndRedirect = () => {
   if (typeof window === 'undefined') return;
   if (isRedirecting) return;
-  isRedirecting = true;
 
-  const isLoginPage = window.location.pathname === '/login';
-  const isCallbackPage = window.location.pathname === '/auth/callback';
+  const currentPath = window.location.pathname;
+  // ✅ Do not redirect if on a public path
+  if (isPublicPath(currentPath)) {
+    console.log('Skipping redirect – public path:', currentPath);
+    return;
+  }
+
+  isRedirecting = true;
+  const isLoginPage = currentPath === '/login';
+  const isCallbackPage = currentPath === '/auth/callback';
 
   localStorage.removeItem('auth_token');
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('user_id');
 
   const secure = window.location.protocol === 'https:';
-  document.cookie = `auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=strict${
-    secure ? '; secure' : ''
-  }`;
+  document.cookie = `auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=strict${secure ? '; secure' : ''}`;
 
   if (isLoginPage || isCallbackPage) {
     isRedirecting = false;
@@ -154,10 +152,13 @@ if (typeof window !== 'undefined') {
 
       // ---- Guards to prevent loops ----
       const pathname = window.location.pathname;
+      if (isPublicPath(pathname)) {
+        // ✅ If on a public page, do not redirect – just reject the error
+        return Promise.reject(error);
+      }
       if (pathname === '/login' || pathname === '/auth/callback') {
         return Promise.reject(error);
       }
-
       if (requestUrl.includes('/auth/refresh') || requestUrl.includes('/auth/exchange')) {
         return Promise.reject(error);
       }
@@ -167,7 +168,6 @@ if (typeof window !== 'undefined') {
       }
 
       originalRequest._retry = true;
-
       const refreshToken = localStorage.getItem('refresh_token');
       if (!refreshToken) {
         clearTokensAndRedirect();
@@ -188,26 +188,18 @@ if (typeof window !== 'undefined') {
       }
 
       isRefreshing = true;
-
       try {
         const refreshResponse = await axios.post(
           `${getBaseUrl()}/auth/refresh`,
           { refreshToken },
           { headers: { 'Content-Type': 'application/json' } }
         );
-
         const { token: newAccessToken, refreshToken: newRefreshToken } = refreshResponse.data.data;
-
         localStorage.setItem('auth_token', newAccessToken);
         localStorage.setItem('refresh_token', newRefreshToken);
-
         const secure = window.location.protocol === 'https:';
-        document.cookie = `auth_token=${newAccessToken}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=strict${
-          secure ? '; secure' : ''
-        }`;
-
+        document.cookie = `auth_token=${newAccessToken}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=strict${secure ? '; secure' : ''}`;
         processQueue(null, newAccessToken);
-
         if (originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         }

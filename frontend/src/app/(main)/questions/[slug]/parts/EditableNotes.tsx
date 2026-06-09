@@ -2,6 +2,9 @@
 
 import React, { useState, useCallback } from 'react';
 import { FiEdit2, FiSave, FiX, FiFileText, FiZap } from 'react-icons/fi';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useRouter } from 'next/navigation';
+import Button from '@/shared/components/Button';
 import styles from './EditableNotes.module.css';
 
 interface EditableNotesProps {
@@ -15,6 +18,10 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
   initialKeyInsights = '',
   onSave,
 }) => {
+  const { user } = useAuth();
+  const router = useRouter();
+  const isLoggedIn = !!user;
+
   const [notes, setNotes] = useState(initialNotes);
   const [keyInsights, setKeyInsights] = useState(initialKeyInsights);
   const [isEditingNotes, setIsEditingNotes] = useState(false);
@@ -25,7 +32,6 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
   const [isSavingKeyInsights, setIsSavingKeyInsights] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset error after 3 seconds
   const resetError = useCallback(() => {
     const timer = setTimeout(() => setError(null), 3000);
     return () => clearTimeout(timer);
@@ -33,6 +39,7 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
 
   // Start editing notes
   const handleEditNotes = () => {
+    if (!isLoggedIn) return;
     setTempNotes(notes);
     setIsEditingNotes(true);
     setError(null);
@@ -47,6 +54,7 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
 
   // Save notes
   const handleSaveNotes = async () => {
+    if (!isLoggedIn) return;
     if (tempNotes === notes) {
       setIsEditingNotes(false);
       return;
@@ -67,6 +75,7 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
 
   // Start editing key insights
   const handleEditKeyInsights = () => {
+    if (!isLoggedIn) return;
     setTempKeyInsights(keyInsights);
     setIsEditingKeyInsights(true);
     setError(null);
@@ -81,6 +90,7 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
 
   // Save key insights
   const handleSaveKeyInsights = async () => {
+    if (!isLoggedIn) return;
     if (tempKeyInsights === keyInsights) {
       setIsEditingKeyInsights(false);
       return;
@@ -99,15 +109,70 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
     }
   };
 
+  // If not logged in, show a read‑only view with a login button
+  if (!isLoggedIn) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <h3>
+            <FiFileText className={styles.headerIcon} />
+            Notes & Key Insights
+          </h3>
+        </div>
+        <div className={styles.loginPlaceholder}>
+          <div className={styles.loginPlaceholderContent}>
+            <p className={styles.loginPlaceholderTitle}>🔒 Login to add notes</p>
+            <p className={styles.loginPlaceholderText}>
+              Save your personal notes and key insights for this question.
+            </p>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => router.push('/login')}
+              className={styles.loginButton}
+            >
+              Login to Save
+            </Button>
+          </div>
+        </div>
+        <div className={styles.readOnlySection}>
+          <div className={styles.column}>
+            <div className={styles.label}>Notes</div>
+            <div className={styles.readOnlyContent}>
+              {initialNotes.trim() ? (
+                <p className={styles.contentText}>{initialNotes}</p>
+              ) : (
+                <p className={styles.placeholder}>— no notes yet —</p>
+              )}
+            </div>
+          </div>
+          <div className={styles.column}>
+            <div className={styles.label}>
+              <FiZap className={styles.labelIcon} /> Key Insights
+            </div>
+            <div className={styles.readOnlyContent}>
+              {initialKeyInsights.trim() ? (
+                <p className={styles.contentText}>{initialKeyInsights}</p>
+              ) : (
+                <p className={styles.placeholder}>— add key insights —</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Logged‑in view (original component)
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <h3>
-          <FiFileText className={styles.headerIcon} /> Notes & Key Insights
+          <FiFileText className={styles.headerIcon} />
+          Notes & Key Insights
         </h3>
       </div>
 
-      {/* Error message */}
       {error && <div className={styles.errorMessage}>{error}</div>}
 
       <div className={styles.content}>

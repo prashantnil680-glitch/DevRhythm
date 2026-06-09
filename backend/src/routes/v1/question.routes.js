@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const questionController = require('../../controllers/question.controller');
 const { getQuestionsByPattern } = require('../../controllers/question.controller');
-const { auth } = require('../../middleware/auth');
+const { auth, optionalAuth } = require('../../middleware/auth');
 const { attachUserTimeZone } = require('../../middleware/timezone'); 
 const validate = require('../../middleware/validator');
 const { questionValidator } = require('../../utils/validators');
@@ -33,14 +33,14 @@ router.get('/daily',
   questionController.getDailyProblemAndGoal
 );
 
-router.get('/', auth, rateLimiters.userLimiter, cache(300, 'questions:list'), validate(questionValidator.getQuestions, 'query'), questionController.getQuestions);
-router.get('/patterns', auth, rateLimiters.userLimiter, cache(1800, 'questions:patterns'), questionController.getPatterns);
-router.get('/tags', auth, rateLimiters.userLimiter, cache(1800, 'questions:tags'), questionController.getTags);
-router.get('/statistics', auth, rateLimiters.userLimiter, cache(3600, 'questions:statistics'), questionController.getStatistics);
+router.get('/',optionalAuth, rateLimiters.userLimiter, cache(300, 'questions:list'), validate(questionValidator.getQuestions, 'query'), questionController.getQuestions);
+router.get('/patterns',optionalAuth, rateLimiters.userLimiter, cache(1800, 'questions:patterns'), questionController.getPatterns);
+router.get('/tags',optionalAuth, rateLimiters.userLimiter, cache(1800, 'questions:tags'), questionController.getTags);
+router.get('/statistics',optionalAuth, rateLimiters.userLimiter, cache(3600, 'questions:statistics'), questionController.getStatistics);
 router.get('/deleted', auth, rateLimiters.userLimiter, cache(300, 'questions:deleted'), validate(questionValidator.getQuestions, 'query'), questionController.getDeletedQuestions);
-router.get('/platform/:platform/:platformQuestionId', auth, rateLimiters.userLimiter, cache(3600, 'question:platform'), validate(questionValidator.getQuestionByPlatformId, 'params'), questionController.getQuestionByPlatformId);
+router.get('/platform/:platform/:platformQuestionId',optionalAuth, rateLimiters.userLimiter, cache(3600, 'question:platform'), validate(questionValidator.getQuestionByPlatformId, 'params'), questionController.getQuestionByPlatformId);
 router.get('/platform/:platform/:platformQuestionId/details',
-  auth,
+  optionalAuth,
   attachUserTimeZone,  
   rateLimiters.userLimiter,
   cache(30, 'question-details:platform'),

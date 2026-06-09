@@ -269,9 +269,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                     >
                       <FiUser /> Profile
                     </Link>
-                    <Link href={ROUTES.SHARES.ROOT} className={styles.dropdownItem}>
+                    {/* <Link href={ROUTES.SHARES.ROOT} className={styles.dropdownItem}>
                       <FiShare2 /> Shares
-                    </Link>
+                    </Link> */}
                     <div className={styles.dropdownDivider} />
                     <button onClick={logout} className={styles.dropdownItem}>
                       <FiLogOut /> Logout
@@ -437,9 +437,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                   >
                     Profile
                   </Link>
-                  <Link href={ROUTES.SHARES.ROOT} onClick={() => setIsDrawerOpen(false)}>
+                  {/* <Link href={ROUTES.SHARES.ROOT} onClick={() => setIsDrawerOpen(false)}>
                     Shares
-                  </Link>
+                  </Link> */}
                   <Link href="/settings" onClick={() => setIsDrawerOpen(false)}>
                     Settings
                   </Link>
@@ -487,7 +487,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </Link>
 
           {/* Notifications (only for logged in users) */}
-          {user && (
+          {/* {user && (
             <Link
               href={ROUTES.NOTIFICATIONS.ROOT}
               className={clsx(styles.mobileNavItem, isActive(ROUTES.NOTIFICATIONS.ROOT) && styles.active)}
@@ -501,7 +501,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </span>
               )}
             </Link>
-          )}
+          )} */}
 
           {/* Quick add (plus) – unchanged */}
           <Link

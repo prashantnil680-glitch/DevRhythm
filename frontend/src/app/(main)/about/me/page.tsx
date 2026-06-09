@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import Script from 'next/script';
 import dynamic from 'next/dynamic';
+import type { Metadata, Viewport } from 'next';
 import {
   FiHeart,
   FiTrendingUp,
@@ -22,20 +23,47 @@ import Breadcrumb from '@/shared/components/Breadcrumb';
 import { Avatar } from '@/shared/components/Avatar';
 import styles from './page.module.css';
 
-// Metadata for SEO (server‑side)
-export const metadata = {
-  title: 'Anupam Debnath – About & Personal Journey | DevRhythm',
+const SITE_URL = 'https://www.devrhythm.space';
+const OG_IMAGE = `${SITE_URL}/devrhythm-maker.jpg`;
+
+export const metadata: Metadata = {
+  title: 'Anupam Debnath – Creator of DevRhythm | Web Developer & DSA Enthusiast',
   description:
-    'Meet Anupam Debnath, the web developer behind DevRhythm. Discover why he built a DSA habit‑tracking platform and how it’s helping developers code with rhythm.',
+    'Meet Anupam Debnath, the web developer behind DevRhythm. Learn why he built a DSA habit‑tracking platform using spaced repetition, heatmaps, and revision schedules to help developers code with rhythm.',
+  keywords: [
+    'Anupam Debnath',
+    'web developer',
+    'DevRhythm creator',
+    'DSA habit tracker',
+    'spaced repetition',
+    'coding rhythm',
+    'full stack developer',
+    'leetcode tracker',
+    'coding habits',
+  ].join(', '),
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-snippet': -1,
+      'max-image-preview': 'large',
+      'max-video-preview': -1,
+    },
+  },
+  alternates: {
+    canonical: `${SITE_URL}/about/me`,
+  },
   openGraph: {
-    title: 'Anupam Debnath – About & Personal Journey | DevRhythm',
+    title: 'Anupam Debnath – Creator of DevRhythm',
     description:
-      'Meet Anupam Debnath, the developer behind DevRhythm. Discover why he built a DSA habit‑tracking platform and how it’s helping developers code with rhythm.',
-    url: 'https://www.devrhythm.space/about/me',
+      'Meet the developer behind DevRhythm. Discover why he built a DSA habit‑tracking platform and how it helps developers code with rhythm.',
+    url: `${SITE_URL}/about/me`,
     siteName: 'DevRhythm',
     images: [
       {
-        url: 'https://www.devrhythm.space/devrhythm-maker.jpg',
+        url: OG_IMAGE,
         width: 1200,
         height: 630,
         alt: 'Anupam Debnath, creator of DevRhythm',
@@ -46,14 +74,17 @@ export const metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Anupam Debnath – About & Personal Journey | DevRhythm',
+    title: 'Anupam Debnath – Creator of DevRhythm',
     description:
-      'Meet Anupam Debnath, the developer behind DevRhythm. Discover why he built a DSA habit‑tracking platform and how it’s helping developers code with rhythm.',
-    images: ['https://www.devrhythm.space/devrhythm-maker.jpg'],
+      'Meet the developer behind DevRhythm. Discover why he built a DSA habit‑tracking platform.',
+    images: [OG_IMAGE],
+    site: '@devrhythm',
   },
-  alternates: {
-    canonical: 'https://www.devrhythm.space/about/me',
-  },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 };
 
 const breadcrumbItems = [
@@ -95,7 +126,24 @@ const projectsData = [
 export default function AboutPage() {
   return (
     <>
-      {/* JSON‑LD Structured Data for Person with @id */}
+      {/* BreadcrumbList Schema */}
+      <Script
+        id="schema-breadcrumb"
+        type="application/ld+json"
+        strategy="beforeInteractive"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/` },
+              { '@type': 'ListItem', position: 2, name: 'About Me', item: `${SITE_URL}/about/me` },
+            ],
+          }),
+        }}
+      />
+
+      {/* ProfilePage + Person Schema */}
       <Script
         id="schema-person"
         type="application/ld+json"
@@ -103,33 +151,40 @@ export default function AboutPage() {
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org',
-            '@type': 'Person',
-            '@id': 'https://www.devrhythm.space/about/me#person',
-            name: 'Anupam Debnath',
-            url: 'https://www.devrhythm.space/about/me',
-            jobTitle: 'Web Developer',
-            worksFor: {
-              '@type': 'Organization',
-              name: 'DevRhythm',
-              url: 'https://www.devrhythm.space',
+            '@type': 'ProfilePage',
+            '@id': `${SITE_URL}/about/me#profilepage`,
+            url: `${SITE_URL}/about/me`,
+            name: 'About Anupam Debnath',
+            isPartOf: { '@id': `${SITE_URL}/#website` },
+            mainEntity: {
+              '@type': 'Person',
+              '@id': `${SITE_URL}/about/me#person`,
+              name: 'Anupam Debnath',
+              url: `${SITE_URL}/about/me`,
+              jobTitle: 'Web Developer',
+              worksFor: {
+                '@type': 'Organization',
+                name: 'DevRhythm',
+                url: SITE_URL,
+              },
+              image: OG_IMAGE,
+              sameAs: [
+                'https://github.com/anupam6335',
+                'https://www.linkedin.com/in/anupamdebnath6335/',
+                'https://leetcode.com/u/anupam_nlogn/',
+                'https://anupamdebnath.vercel.app/',
+              ],
+              knowsAbout: [
+                'Data Structures & Algorithms',
+                'Spaced Repetition Systems',
+                'Full-Stack Development',
+                'Next.js',
+                'React',
+                'Node.js',
+              ],
+              description:
+                'Anupam Debnath is a web developer who built DevRhythm to help himself and others master DSA through consistent, rhythmic practice – using spaced repetition, heatmaps, and revision schedules.',
             },
-            image: 'https://www.devrhythm.space/devrhythm-maker.jpg',
-            sameAs: [
-              'https://github.com/anupam6335',
-              'https://www.linkedin.com/in/anupamdebnath6335/',
-              'https://leetcode.com/u/anupam_nlogn/',
-              'https://anupamdebnath.vercel.app/',
-            ],
-            knowsAbout: [
-              'Data Structures & Algorithms',
-              'Spaced Repetition Systems',
-              'Full-Stack Development',
-              'Next.js',
-              'React',
-              'Node.js',
-            ],
-            description:
-              'Anupam Debnath is a web developer who built DevRhythm to help himself and others master DSA through consistent, rhythmic practice – using spaced repetition, heatmaps, and revision schedules.',
           }),
         }}
       />

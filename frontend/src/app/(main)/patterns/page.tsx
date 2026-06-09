@@ -1,4 +1,5 @@
-import { Metadata } from 'next';
+import { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import Breadcrumb from '@/shared/components/Breadcrumb';
@@ -7,16 +8,39 @@ import PatternsDashboardClient from './parts/PatternsDashboardClient';
 import { PatternDashboardSkeleton } from './parts/PatternDashboardSkeleton';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://devrhythm.space';
-const OG_IMAGE_URL = `${APP_URL}/images/logos/main-logo.png`;
+const OG_IMAGE_URL = `${APP_URL}/images/logos/og-patterns.png`;
 
 export const metadata: Metadata = {
-  title: 'Pattern Mastery Dashboard · DevRhythm',
+  title: 'Pattern Mastery Dashboard · DevRhythm – Track Your Coding Patterns',
   description:
-    'Track your progress across coding patterns. View strongest/weakest patterns, mastery rates, and recent solved questions.',
-  keywords:
-    'coding patterns, problem solving, mastery tracking, DSA patterns, LeetCode patterns, coding progress, DevRhythm',
-  authors: [{ name: 'DevRhythm Team', url: APP_URL }],
-  robots: 'index, follow',
+    'Track your progress across coding patterns like Two Pointers, Sliding Window, Dynamic Programming, and more. Identify strengths, improve weaknesses, and master DSA patterns.',
+  keywords: [
+    'coding patterns',
+    'DSA patterns',
+    'pattern mastery',
+    'algorithm patterns',
+    'LeetCode patterns',
+    'data structures',
+    'coding interview prep',
+    'problem solving patterns',
+    'DevRhythm patterns',
+    'two pointers',
+    'sliding window',
+    'dynamic programming',
+    'backtracking',
+    'graph algorithms',
+  ].join(', '),
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-snippet': -1,
+      'max-image-preview': 'large',
+      'max-video-preview': -1,
+    },
+  },
   alternates: {
     canonical: `${APP_URL}/patterns`,
   },
@@ -26,14 +50,16 @@ export const metadata: Metadata = {
       'Track your progress across coding patterns. View strongest/weakest patterns, mastery rates, and recent solved questions.',
     type: 'website',
     url: `${APP_URL}/patterns`,
+    siteName: 'DevRhythm',
     images: [
       {
         url: OG_IMAGE_URL,
-        width: 512,
-        height: 512,
-        alt: 'DevRhythm Logo',
+        width: 1200,
+        height: 630,
+        alt: 'DevRhythm Patterns Dashboard – Master coding patterns with rhythm',
       },
     ],
+    locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
@@ -41,7 +67,13 @@ export const metadata: Metadata = {
     description:
       'Track your progress across coding patterns. View strongest/weakest patterns, mastery rates, and recent solved questions.',
     images: [OG_IMAGE_URL],
+    site: '@devrhythm',
   },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 };
 
 const breadcrumbItems = [
@@ -106,19 +138,45 @@ const generateHowToSchema = () => ({
   ],
 });
 
+const generateWebPageSchema = () => ({
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  '@id': `${APP_URL}/patterns#webpage`,
+  url: `${APP_URL}/patterns`,
+  name: 'Pattern Mastery Dashboard · DevRhythm',
+  isPartOf: { '@id': `${APP_URL}/#website` },
+  description:
+    'Track your progress across coding patterns like Two Pointers, Sliding Window, Dynamic Programming, and more.',
+  primaryImageOfPage: {
+    '@type': 'ImageObject',
+    url: OG_IMAGE_URL,
+  },
+});
+
 export default async function PatternsPage() {
   const breadcrumbSchema = generateBreadcrumbSchema();
   const howToSchema = generateHowToSchema();
+  const webPageSchema = generateWebPageSchema();
 
   return (
     <>
-      <script
+      <Script
+        id="schema-breadcrumb"
         type="application/ld+json"
+        strategy="beforeInteractive"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
-      <script
+      <Script
+        id="schema-howto"
         type="application/ld+json"
+        strategy="beforeInteractive"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(howToSchema) }}
+      />
+      <Script
+        id="schema-webpage"
+        type="application/ld+json"
+        strategy="beforeInteractive"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageSchema) }}
       />
       <Breadcrumb
         items={breadcrumbItems}

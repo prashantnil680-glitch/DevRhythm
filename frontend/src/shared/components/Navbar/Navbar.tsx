@@ -100,6 +100,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       ? `/login?returnTo=${encodeURIComponent(pathname)}`
       : '/login';
 
+  const isAuthenticated = !!user;
+
   // Desktop navigation
   if (!isMobile) {
     return (
@@ -126,9 +128,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <Link href={ROUTES.SHEETS.ROOT} className={styles.dropdownItem}>
                     All Sheets
                   </Link>
-                  <Link href={ROUTES.SHEETS.CREATE} className={styles.dropdownItem}>
-                    Create Sheet
-                  </Link>
+                  {isAuthenticated && (
+                    <Link href={ROUTES.SHEETS.CREATE} className={styles.dropdownItem}>
+                      Create Sheet
+                    </Link>
+                  )}
                 </div>
               )}
             </div>
@@ -212,9 +216,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <Link href={ROUTES.GROUPS.MY} className={styles.dropdownItem}>
                     My Groups
                   </Link>
-                  <Link href={ROUTES.GROUPS.CREATE} className={styles.dropdownItem}>
-                    Create Group
-                  </Link>
+                  {isAuthenticated && (
+                    <Link href={ROUTES.GROUPS.CREATE} className={styles.dropdownItem}>
+                      Create Group
+                    </Link>
+                  )}
                 </div>
               )}
             </div>
@@ -321,17 +327,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <ThemeToggle variant="both" />
               </div>
 
-                {/* Notifications section (only for logged in users) */}
-                {user && (
-                  <div className={styles.drawerSection}>
-                    <h3>Notifications</h3>
-                    <Link href={ROUTES.NOTIFICATIONS.ROOT} onClick={() => setIsDrawerOpen(false)}>
-                      View Notifications
-                      {unreadCount > 0 && <span className={styles.drawerBadge}>{unreadCount}</span>}
-                    </Link>
-                  </div>
-                )}
-
+              {/* Notifications section (only for logged in users) */}
+              {user && (
+                <div className={styles.drawerSection}>
+                  <h3>Notifications</h3>
+                  <Link href={ROUTES.NOTIFICATIONS.ROOT} onClick={() => setIsDrawerOpen(false)}>
+                    View Notifications
+                    {unreadCount > 0 && <span className={styles.drawerBadge}>{unreadCount}</span>}
+                  </Link>
+                </div>
+              )}
 
               {user ? (
                 <Link
@@ -375,9 +380,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <Link href={ROUTES.SHEETS.ROOT} onClick={() => setIsDrawerOpen(false)}>
                   All Sheets
                 </Link>
-                <Link href={ROUTES.SHEETS.CREATE} onClick={() => setIsDrawerOpen(false)}>
-                  Create Sheet
-                </Link>
+                {isAuthenticated && (
+                  <Link href={ROUTES.SHEETS.CREATE} onClick={() => setIsDrawerOpen(false)}>
+                    Create Sheet
+                  </Link>
+                )}
               </div>
 
               {/* Questions section */}
@@ -411,21 +418,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <Link href={ROUTES.GROUPS.MY} onClick={() => setIsDrawerOpen(false)}>
                   My Groups
                 </Link>
-                <Link href={ROUTES.GROUPS.CREATE} onClick={() => setIsDrawerOpen(false)}>
-                  Create Group
-                </Link>
-              </div>
-
-              {/* Notifications section (only for logged in users) */}
-              {user && (
-                <div className={styles.drawerSection}>
-                  <h3>Notifications</h3>
-                  <Link href={ROUTES.NOTIFICATIONS.ROOT} onClick={() => setIsDrawerOpen(false)}>
-                    View Notifications
-                    {unreadCount > 0 && <span className={styles.drawerBadge}>{unreadCount}</span>}
+                {isAuthenticated && (
+                  <Link href={ROUTES.GROUPS.CREATE} onClick={() => setIsDrawerOpen(false)}>
+                    Create Group
                   </Link>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Profile section */}
               {user && (
@@ -437,12 +435,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                   >
                     Profile
                   </Link>
-                  {/* <Link href={ROUTES.SHARES.ROOT} onClick={() => setIsDrawerOpen(false)}>
-                    Shares
-                  </Link> */}
-                  <Link href="/settings" onClick={() => setIsDrawerOpen(false)}>
+                  {/* <Link href="/settings" onClick={() => setIsDrawerOpen(false)}>
                     Settings
-                  </Link>
+                  </Link> */}
                   <Button
                     variant="ghost"
                     className={styles.drawerLogout}
@@ -485,23 +480,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className={styles.mobileBadge}>{pendingRevisionsCount}</span>
             )}
           </Link>
-
-          {/* Notifications (only for logged in users) */}
-          {/* {user && (
-            <Link
-              href={ROUTES.NOTIFICATIONS.ROOT}
-              className={clsx(styles.mobileNavItem, isActive(ROUTES.NOTIFICATIONS.ROOT) && styles.active)}
-              aria-label="Notifications"
-            >
-              <FiBell className={styles.mobileIcon} />
-              <span className={styles.mobileLabel}>Alerts</span>
-              {unreadCount > 0 && (
-                <span className={styles.mobileBadge}>
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </Link>
-          )} */}
 
           {/* Quick add (plus) – unchanged */}
           <Link

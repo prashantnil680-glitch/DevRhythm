@@ -137,6 +137,18 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
     </div>
   ) : null;
 
+  // Build Community links conditionally
+  const communityLinks: Array<{ label: string; href: string }> = [
+    { label: 'All Sheets', href: ROUTES.SHEETS.ROOT },
+  ];
+  if (isLoggedIn) {
+    communityLinks.push({ label: 'Create Sheet', href: ROUTES.SHEETS.CREATE });
+  }
+  communityLinks.push({ label: 'My Groups', href: ROUTES.GROUPS.MY });
+  if (isLoggedIn) {
+    communityLinks.push({ label: 'Create Group', href: ROUTES.GROUPS.CREATE });
+  }
+
   return (
     <footer className={clsx(styles.footer, className)}>
       <div className={styles.container}>
@@ -167,7 +179,7 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
             title="Learn"
             links={[
               { label: 'Questions', href: ROUTES.QUESTIONS.ROOT },
-              { label: 'Patterns', href: ROUTES.QUESTIONS.PATTERNS },
+              { label: 'Patterns', href: '/patterns' },
               { label: 'Visualizer Algo', href: 'https://sortopia.vercel.app/' },
             ]}
           />
@@ -181,15 +193,7 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
             ]}
           />
 
-          <LinkGroup
-            title="Community"
-            links={[
-              { label: 'All Sheets', href: ROUTES.SHEETS.ROOT },
-              { label: 'Create Sheet', href: ROUTES.SHEETS.CREATE },
-              { label: 'My Groups', href: ROUTES.GROUPS.MY },
-              { label: 'Create Group', href: ROUTES.GROUPS.CREATE },
-            ]}
-          />
+          <LinkGroup title="Community" links={communityLinks} />
 
           <LinkGroup
             title="Account"

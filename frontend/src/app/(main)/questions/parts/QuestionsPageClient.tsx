@@ -277,9 +277,11 @@ export const QuestionsPageClient: React.FC = () => {
               Filter
             </Button>
           )}
-          <Button asChild size={!isDesktop ? 'sm' : 'md'}>
-            <Link href="/questions/create">Create New</Link>
-          </Button>
+          {isAuthenticated && (
+            <Button asChild size={!isDesktop ? 'sm' : 'md'}>
+              <Link href="/questions/create">Create New</Link>
+            </Button>
+          )}
         </div>
       </div>
       <Divider />

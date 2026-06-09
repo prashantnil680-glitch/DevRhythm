@@ -1,360 +1,194 @@
-'use client';
-
-import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import Link from 'next/link';
-import {
-  useSheet,
-  useJoinSheet,
-  useLeaveSheet,
-  useUpdateTargetDate,
-  useDeleteSheet,
-  useToggleBookmark,
-  useAggregatedProgress,
-  useSheetRank,
-  useSheetParticipants,
-} from '@/features/sheets';
-import { useUser } from '@/features/user';
-import { ROUTES } from '@/shared/config';
+import { notFound } from 'next/navigation';
 import Breadcrumb from '@/shared/components/Breadcrumb';
-import Button from '@/shared/components/Button';
-import Pagination from '@/shared/components/Pagination';
-import type { BreadcrumbItem } from '@/shared/components/Breadcrumb';
-import JoinSheetModal from '../parts/JoinSheetModal';
-import UpdateTargetDateModal from './parts/UpdateTargetDateModal';
-import DeleteSheetModal from './parts/DeleteSheetModal';
-import LeaveSheetModal from './parts/LeaveSheetModal';
-import SheetHero from './parts/SheetHero';
-import ProgressChart from './parts/ProgressChart';
-import QuestionList from './parts/QuestionList';
-import ParticipantList from './parts/ParticipantList';
-import QuestionsFilterBar from './parts/QuestionsFilterBar';
-import SheetDetailSkeleton from './parts/SheetDetailSkeleton';
-import styles from './page.module.css';
+import { ROUTES } from '@/shared/config';
+import { sheetService } from '@/features/sheets/server';
+import SheetDetailPageClient from './SheetDetailPageClient';
 
-export default function SheetDetailPage() {
-  const { slug } = useParams<{ slug: string }>();
-  const router = useRouter();
-  const { user } = useUser();
-  const isAuthenticated = !!user;
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://devrhythm.space';
+const DEFAULT_OG_IMAGE = `${SITE_URL}/images/logos/og-sheets.png`;
 
-  // Filter states for questions
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [solveStatus, setSolveStatus] = useState('');
-  const [revisionStatus, setRevisionStatus] = useState('');
-  const [difficulty, setDifficulty] = useState('');
-  const limit = 20;
+interface PageProps {
+  params: Promise<{ slug: string }>;
+}
 
-  // Participants pagination state
-  const [participantsPage, setParticipantsPage] = useState(1);
-  const participantsLimit = 10;
-
-  // Reset page when filters change
-  useEffect(() => {
-    setPage(1);
-  }, [search, solveStatus, revisionStatus, difficulty]);
-
-  const queryParams = {
-    page,
-    limit,
-    search: search || undefined,
-    solveStatus: solveStatus || undefined,
-    revisionStatus: revisionStatus || undefined,
-    difficulty: difficulty || undefined,
-  };
-
-  const {
-    data: sheetData,
-    isLoading,
-    error,
-    refetch,
-  } = useSheet(slug, queryParams);
-
-  const { data: aggregatedProgress, isLoading: aggLoading } = useAggregatedProgress(slug);
-  const { data: rankData, isLoading: rankLoading } = useSheetRank(slug);
-  const {
-    data: participantsData,
-    isLoading: participantsLoading,
-  } = useSheetParticipants(slug, { page: participantsPage, limit: participantsLimit });
-
-  const joinMutation = useJoinSheet();
-  const leaveMutation = useLeaveSheet();
-  const updateTargetDateMutation = useUpdateTargetDate();
-  const deleteMutation = useDeleteSheet();
-  const toggleBookmarkMutation = useToggleBookmark();
-
-  const [joinModalOpen, setJoinModalOpen] = useState(false);
-  const [targetDateModalOpen, setTargetDateModalOpen] = useState(false);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
-
-  const handleToggleBookmark = async () => {
-    await toggleBookmarkMutation.mutateAsync(slug);
-    refetch();
-  };
-
-  // Sticky filter logic (same as progress page)
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const filterWrapperRef = useRef<HTMLDivElement>(null);
-  const [isSticky, setIsSticky] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (sentinelRef.current) {
-        const sentinelRect = sentinelRef.current.getBoundingClientRect();
-        const newSticky = sentinelRect.bottom <= 0;
-        setIsSticky(prev => (prev === newSticky ? prev : newSticky));
-      }
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll(); // initial check
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const questionsSectionRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!isLoading && sheetData) {
-      questionsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+// Fetch sheet data on the server – handle the actual API response shape
+async function getSheetMetadata(slug: string) {
+  try {
+    const response = await sheetService.getSheetBySlug(slug);
+    // The API returns { success: boolean, data: { sheet, ... } }
+    // We cast to any to bypass TypeScript limitations of the current type definition
+    const result = response as any;
+    if (!result?.success || !result.data?.sheet) {
+      return null;
     }
-  }, [page, search, solveStatus, revisionStatus, difficulty, isLoading, sheetData]);
+    return result.data.sheet;
+  } catch (error) {
+    console.error(`Failed to fetch sheet metadata for slug: ${slug}`, error);
+    return null;
+  }
+}
 
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage);
-  };
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const sheet = await getSheetMetadata(slug);
 
-  const handleClearFilters = () => {
-    setSearch('');
-    setSolveStatus('');
-    setRevisionStatus('');
-    setDifficulty('');
-    setPage(1);
-  };
-
-  if (isLoading || !sheetData) return <SheetDetailSkeleton />;
-  if (error) {
-    return (
-      <div className={styles.errorContainer}>
-        <p>Sheet not found or an error occurred.</p>
-        <Button variant="outline" onClick={() => router.push(ROUTES.SHEETS.ROOT)}>
-          Back to Sheets
-        </Button>
-      </div>
-    );
+  if (!sheet) {
+    return {
+      title: 'Sheet Not Found | DevRhythm',
+      description: 'The requested coding sheet could not be found.',
+      robots: 'noindex, nofollow',
+    };
   }
 
-  const {
-    sheet,
-    questions,
-    participants: initialParticipants, // not used directly, kept for compatibility
-    stats,
-    hasJoined,
-    currentUserProgress,
-    pagination,
-  } = sheetData;
+  const title = `${sheet.name} · Coding Sheet | DevRhythm`;
+  const description = sheet.description
+    ? `${sheet.description.substring(0, 160)} ${sheet.specialTag ? `Category: ${sheet.specialTag}.` : ''} ${sheet.totalQuestions} questions.`
+    : `A curated coding sheet with ${sheet.totalQuestions} questions. ${sheet.specialTag ? `Category: ${sheet.specialTag}.` : ''} Practice and track your progress.`;
+  const keywords = [
+    sheet.name,
+    sheet.specialTag,
+    'coding sheet',
+    'problem set',
+    'DSA practice',
+    'DevRhythm sheets',
+    sheet.originalSourceName,
+  ].filter(Boolean).join(', ');
+  const canonicalUrl = `${SITE_URL}/sheets/${slug}`;
 
-  const isOwner = user ? sheet.ownerId === user._id : false;
-  const targetDate = currentUserProgress?.targetDate;
-
-  const handleJoin = (targetDateStr: string) => {
-    joinMutation.mutate(
-      { slug, targetDate: targetDateStr },
-      {
-        onSuccess: () => {
-          setJoinModalOpen(false);
-          refetch();
+  return {
+    title,
+    description,
+    keywords,
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-snippet': -1,
+        'max-image-preview': 'large',
+        'max-video-preview': -1,
+      },
+    },
+    alternates: {
+      canonical: canonicalUrl,
+    },
+    openGraph: {
+      title,
+      description,
+      url: canonicalUrl,
+      siteName: 'DevRhythm',
+      images: [
+        {
+          url: sheet.ogImageUrl || DEFAULT_OG_IMAGE,
+          width: 1200,
+          height: 630,
+          alt: `${sheet.name} – Coding Sheet`,
         },
-      }
-    );
+      ],
+      locale: 'en_US',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [sheet.ogImageUrl || DEFAULT_OG_IMAGE],
+      site: '@devrhythm',
+    },
   };
+}
 
-  const handleLeave = () => {
-    leaveMutation.mutate(
-      { slug },
-      {
-        onSuccess: () => {
-          setLeaveModalOpen(false);
-          refetch();
-          router.push(ROUTES.SHEETS.ROOT);
-        },
-        onError: () => setLeaveModalOpen(false),
-      }
-    );
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+};
+
+// Generate structured data
+async function generateSchemas(slug: string) {
+  const sheet = await getSheetMetadata(slug);
+  if (!sheet) return null;
+
+  const canonicalUrl = `${SITE_URL}/sheets/${slug}`;
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Sheets', item: `${SITE_URL}/sheets` },
+      { '@type': 'ListItem', position: 3, name: sheet.name, item: canonicalUrl },
+    ],
   };
-
-  const handleUpdateTargetDate = (newTargetDate: string) => {
-    updateTargetDateMutation.mutate(
-      { slug, targetDate: newTargetDate },
-      {
-        onSuccess: () => refetch(),
-      }
-    );
-    setTargetDateModalOpen(false);
+  const webpageSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    '@id': `${canonicalUrl}#webpage`,
+    url: canonicalUrl,
+    name: `${sheet.name} · Coding Sheet | DevRhythm`,
+    isPartOf: { '@id': `${SITE_URL}/#website` },
+    description: sheet.description || `A curated coding sheet with ${sheet.totalQuestions} questions.`,
+    primaryImageOfPage: { '@type': 'ImageObject', url: sheet.ogImageUrl || DEFAULT_OG_IMAGE },
   };
-
-  const handleDelete = () => {
-    deleteMutation.mutate(
-      { slug },
-      {
-        onSuccess: () => router.push(ROUTES.SHEETS.ROOT),
-      }
-    );
-    setDeleteModalOpen(false);
+  const itemListSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: `Questions in ${sheet.name}`,
+    description: `List of coding problems in the ${sheet.name} sheet.`,
+    numberOfItems: sheet.totalQuestions || 0,
+    itemListElement: [],
   };
+  return { breadcrumbSchema, webpageSchema, itemListSchema };
+}
 
-  const breadcrumbItems: BreadcrumbItem[] = [
+export default async function SheetDetailPage({ params }: PageProps) {
+  const { slug } = await params;
+  const sheet = await getSheetMetadata(slug);
+  const schemas = await generateSchemas(slug);
+
+  if (!sheet) {
+    notFound();
+  }
+
+  const breadcrumbItems = [
     { label: 'Home', href: ROUTES.DASHBOARD },
     { label: 'Sheets', href: ROUTES.SHEETS.ROOT },
     { label: sheet.name },
   ];
 
-  const renderLink = (item: BreadcrumbItem, props: { className: string; children: React.ReactNode }) => {
+  const renderLink = (item: { href?: string }, props: { className: string; children: React.ReactNode }) => {
     if (!item.href) return <span {...props}>{props.children}</span>;
     return <Link href={item.href} className={props.className}>{props.children}</Link>;
   };
 
   return (
-    <div className={styles.container}>
+    <>
+      {schemas && (
+        <>
+          <Script
+            id="schema-breadcrumb"
+            type="application/ld+json"
+            strategy="beforeInteractive"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(schemas.breadcrumbSchema) }}
+          />
+          <Script
+            id="schema-webpage"
+            type="application/ld+json"
+            strategy="beforeInteractive"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(schemas.webpageSchema) }}
+          />
+          <Script
+            id="schema-itemlist"
+            type="application/ld+json"
+            strategy="beforeInteractive"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(schemas.itemListSchema) }}
+          />
+        </>
+      )}
       <Breadcrumb items={breadcrumbItems} renderLink={renderLink} />
-
-      <SheetHero
-        sheet={sheet}
-        participants={initialParticipants}
-        totalParticipants={stats.totalParticipants}
-        hasJoined={hasJoined}
-        isOwner={isOwner}
-        targetDate={targetDate}
-        isAuthenticated={isAuthenticated}
-        onJoin={() => setJoinModalOpen(true)}
-        onLeave={() => setLeaveModalOpen(true)}
-        onUpdateTargetDate={() => setTargetDateModalOpen(true)}
-        onEdit={() => router.push(`${ROUTES.SHEETS.ROOT}/${slug}/edit`)}
-        onDelete={() => setDeleteModalOpen(true)}
-        onToggleBookmark={handleToggleBookmark}
-        isBookmarkPending={toggleBookmarkMutation.isPending}
-      />
-
-      <div className={styles.communityProgressSection}>
-        <ProgressChart
-          slug={slug}
-          onJoinSheet={() => setJoinModalOpen(true)}
-          isJoining={joinMutation.isPending}
-          hasJoined={hasJoined}
-        />
-      </div>
-
-      {/* Sentinel for sticky detection */}
-      <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />
-
-      <div
-        ref={filterWrapperRef}
-        className={`${styles.filterWrapper} ${isSticky ? styles.sticky : ''}`}
-      >
-        <QuestionsFilterBar
-          search={search}
-          onSearchChange={setSearch}
-          solveStatus={solveStatus}
-          onSolveStatusChange={setSolveStatus}
-          revisionStatus={revisionStatus}
-          onRevisionStatusChange={setRevisionStatus}
-          difficulty={difficulty}
-          onDifficultyChange={setDifficulty}
-          onClearFilters={handleClearFilters}
-        />
-      </div>
-
-      <div ref={questionsSectionRef} className={styles.questionsSection}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Questions</h2>
-          <Link href="/questions" className={styles.viewAllLink}>
-            View All →
-          </Link>
-        </div>
-
-        {questions.length === 0 ? (
-          <p className={styles.emptyState}>No questions match your filters.</p>
-        ) : (
-          <>
-            <QuestionList
-              questions={questions}
-              perQuestionParticipantCounts={stats.perQuestionParticipantCounts}
-              perQuestionSolvedCounts={stats.perQuestionSolvedCounts}
-              userProgressDetails={currentUserProgress?.details}
-              isJoined={hasJoined}
-            />
-            {pagination && pagination.pages > 1 && (
-              <div className={styles.paginationWrapper}>
-                <Pagination
-                  currentPage={pagination.page}
-                  totalPages={pagination.pages}
-                  onPageChange={handlePageChange}
-                  showFirstLast
-                  showPrevNext
-                  size="md"
-                />
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      <div className={styles.participantsSection}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Participants</h2>
-          <Link href="/users" className={styles.viewAllLink}>
-            View All Participants →
-          </Link>
-        </div>
-        <ParticipantList
-          participants={participantsData?.participants || []}
-          sheetSlug={slug}
-          isLoading={participantsLoading}
-          onJoinSheet={() => setJoinModalOpen(true)}
-          isJoining={joinMutation.isPending}
-        />
-        {participantsData?.pagination && participantsData.pagination.totalPages > 1 && (
-          <div className={styles.paginationWrapper}>
-            <Pagination
-              currentPage={participantsPage}
-              totalPages={participantsData.pagination.totalPages}
-              onPageChange={setParticipantsPage}
-              siblingCount={0}
-              showFirstLast
-              showPrevNext
-              size="md"
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Modals */}
-      <JoinSheetModal
-        isOpen={joinModalOpen}
-        onClose={() => setJoinModalOpen(false)}
-        onConfirm={handleJoin}
-        isLoading={joinMutation.isPending}
-      />
-      <UpdateTargetDateModal
-        isOpen={targetDateModalOpen}
-        onClose={() => setTargetDateModalOpen(false)}
-        currentTargetDate={targetDate}
-        onConfirm={handleUpdateTargetDate}
-        isLoading={updateTargetDateMutation.isPending}
-      />
-      <DeleteSheetModal
-        isOpen={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        sheetName={sheet.name}
-        onConfirm={handleDelete}
-        isLoading={deleteMutation.isPending}
-      />
-      <LeaveSheetModal
-        isOpen={leaveModalOpen}
-        onClose={() => setLeaveModalOpen(false)}
-        sheetName={sheet.name}
-        onConfirm={handleLeave}
-        isLoading={leaveMutation.isPending}
-      />
-    </div>
+      <SheetDetailPageClient />
+    </>
   );
 }

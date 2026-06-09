@@ -184,10 +184,10 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
           <LinkGroup
             title="Community"
             links={[
-              { label: 'My Groups', href: ROUTES.GROUPS.MY },
-              { label: 'Create Group', href: ROUTES.GROUPS.CREATE },
               { label: 'All Sheets', href: ROUTES.SHEETS.ROOT },
               { label: 'Create Sheet', href: ROUTES.SHEETS.CREATE },
+              { label: 'My Groups', href: ROUTES.GROUPS.MY },
+              { label: 'Create Group', href: ROUTES.GROUPS.CREATE },
             ]}
           />
 
@@ -198,7 +198,7 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
                 label: 'Profile',
                 href: user ? ROUTES.USER_PROFILE.OWN(user.username) : ROUTES.LOGIN,
               },
-              { label: 'Shares', href: ROUTES.SHARES.ROOT },
+              { label: 'Other User', href: '/users'},
             ]}
           />
 

@@ -1,5 +1,6 @@
 import { Metadata, Viewport } from 'next';
 import { Suspense } from 'react';
+import Script from 'next/script';
 import { GoalDashboardSkeleton } from './parts/GoalDashboardSkeleton';
 import GoalDashboardClient from './parts/GoalDashboardClient';
 import Breadcrumb from '@/shared/components/Breadcrumb';
@@ -7,13 +8,13 @@ import { ROUTES } from '@/shared/config';
 import Link from 'next/link';
 import GoalDashboardDataProvider from './GoalDashboardDataProvider';
 
-
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://devrhythm.space';
+const OG_IMAGE_URL = `${APP_URL}/images/logos/og-goals.png`;
 
 export const metadata: Metadata = {
-  title: 'Goal Tracker & Coding Progress Dashboard | DevRhythm',
+  title: 'Goal Tracker & Coding Progress Dashboard · DevRhythm – Set, Track, Achieve',
   description:
-    'Set daily and weekly coding goals, track your completion trends, plan question sets, and master DSA patterns. Stay consistent with smart goal reminders and performance analytics.',
+    'Set daily, weekly, and planned coding goals. Track completion trends, monitor streaks, and master DSA patterns with smart goal reminders and performance analytics. Stay consistent.',
   keywords: [
     'coding goals',
     'daily goal tracker',
@@ -25,9 +26,21 @@ export const metadata: Metadata = {
     'programming consistency',
     'leetcode goals',
     'coding streak tracker',
+    'goal completion',
+    'productivity for developers',
   ].join(', '),
   authors: [{ name: 'DevRhythm Team', url: APP_URL }],
-  robots: 'index, follow',
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-snippet': -1,
+      'max-image-preview': 'large',
+      'max-video-preview': -1,
+    },
+  },
   alternates: {
     canonical: `${APP_URL}/goals`,
   },
@@ -40,25 +53,25 @@ export const metadata: Metadata = {
     siteName: 'DevRhythm',
     images: [
       {
-        url: `${APP_URL}/images/logos/og-goals.png`,
+        url: OG_IMAGE_URL,
         width: 1200,
         height: 630,
         alt: 'DevRhythm Goals Dashboard – Track your coding progress',
       },
     ],
+    locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Goal Tracker & Coding Progress Dashboard | DevRhythm',
     description:
       'Set daily and weekly coding goals, track completion trends, and manage planned question sets. Visualise your momentum with river‑style timelines and smart analytics.',
-    images: [`${APP_URL}/images/logos/og-goals.png`],
+    images: [OG_IMAGE_URL],
     site: '@devrhythm',
   },
   category: 'productivity',
 };
 
-// Separate viewport export (Next.js 15)
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -70,7 +83,7 @@ const breadcrumbItems = [
   { label: 'Goals' },
 ];
 
-// Structured data: BreadcrumbList + HowTo for goal setting
+// Structured data: BreadcrumbList + HowTo + WebPage
 const generateBreadcrumbSchema = () => ({
   '@context': 'https://schema.org',
   '@type': 'BreadcrumbList',
@@ -80,6 +93,21 @@ const generateBreadcrumbSchema = () => ({
     name: item.label,
     ...(item.href && { item: `${APP_URL}${item.href}` }),
   })),
+});
+
+const generateWebPageSchema = () => ({
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  '@id': `${APP_URL}/goals#webpage`,
+  url: `${APP_URL}/goals`,
+  name: 'Goal Tracker & Coding Progress Dashboard | DevRhythm',
+  isPartOf: { '@id': `${APP_URL}/#website` },
+  description:
+    'Set daily and weekly coding goals, track completion trends, and manage planned question sets. Visualise your momentum with river‑style timelines and smart analytics.',
+  primaryImageOfPage: {
+    '@type': 'ImageObject',
+    url: OG_IMAGE_URL,
+  },
 });
 
 const generateHowToSchema = () => ({
@@ -103,6 +131,7 @@ const generateHowToSchema = () => ({
       '@type': 'HowToStep',
       name: 'Set a daily goal',
       text: 'Choose how many problems you want to solve each day. The dashboard will track your completion and display a progress ring.',
+      image: OG_IMAGE_URL,
     },
     {
       '@type': 'HowToStep',
@@ -129,16 +158,27 @@ const generateHowToSchema = () => ({
 
 export default function GoalsPage() {
   const breadcrumbSchema = generateBreadcrumbSchema();
+  const webPageSchema = generateWebPageSchema();
   const howToSchema = generateHowToSchema();
 
   return (
     <>
-      <script
+      <Script
+        id="schema-breadcrumb"
         type="application/ld+json"
+        strategy="beforeInteractive"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
-      <script
+      <Script
+        id="schema-webpage"
         type="application/ld+json"
+        strategy="beforeInteractive"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageSchema) }}
+      />
+      <Script
+        id="schema-howto"
+        type="application/ld+json"
+        strategy="beforeInteractive"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(howToSchema) }}
       />
       <Breadcrumb

@@ -105,14 +105,14 @@ const projectsData = [
     title: 'Sortopia',
     description: 'A algorithm visualizer',
     image: '/images/projects/sortopia-thumb.png',
-    url: 'https://sortopia.vercel.app/',
+    url: 'https://sortopia.devrhythm.space',
   },
   {
     id: 3,
     title: 'Apna Time',
     description: 'A Modern Advanced Todo List Application',
     image: '/images/projects/todo-thumb.png',
-    url: 'https://donow.vercel.app/',
+    url: 'https://donow.devrhythm.space',
   },
   {
     id: 4,

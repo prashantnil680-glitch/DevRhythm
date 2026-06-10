@@ -16,7 +16,7 @@
 
 .filterPanel.sticky {
   position: sticky;
-  top: 4rem;
+  top: 3.5rem;
   z-index: 10;
   border-radius: 0;
   border-bottom-left-radius: 1.2rem;

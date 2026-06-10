@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server';
 const PUBLIC_PATHS = [
   '/',
   '/login',
+  '/auth/callback', 
   '/about/me',
   '/privacy',
   '/terms',
@@ -21,7 +22,7 @@ export function middleware(request: NextRequest) {
     (path) => pathname === path || pathname.startsWith(`${path}/`)
   );
 
-  console.log(`[Middleware] path=${pathname}, token=${!!token}, isPublic=${isPublic}`);
+  // console.log(`[Middleware] path=${pathname}, token=${!!token}, isPublic=${isPublic}`);
 
   if (isPublic) {
     return NextResponse.next();

@@ -1,3 +1,4 @@
+/* ========== Existing styles (preserved) ========== */
 .parallaxDots {
   position: fixed;
   top: 0;
@@ -92,10 +93,68 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
-    opacity: 1;
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ========== New styles for lazy loading & improved UX ========== */
+.listContainer {
+  min-height: 400px; /* Prevents layout shift when lazy content loads */
+}
+
+.placeholderArea {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.placeholderCard {
+  height: 90px; /* Match skeletonCard height for consistency */
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 0.8rem;
+}
+
+.errorState {
+  text-align: center;
+  padding: 48px 24px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 12px;
+  margin: 24px 0;
+  color: var(--text-primary);
+}
+
+.emptyState {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-secondary);
+}
+
+.emptyStateHint {
+  font-size: 0.875rem;
+  margin-top: 8px;
+  opacity: 0.8;
+}
+
+/* Responsive adjustments for new elements */
+@media (max-width: 768px) {
+  .errorState, .emptyState {
+    padding: 32px 16px;
   }
-  50% {
-    opacity: 0.5;
+  .placeholderCard {
+    height: 80px;
+  }
+}
+
+@media (max-width: 450px) {
+  .listContainer {
+    min-height: 300px;
+  }
+  .placeholderCard {
+    height: 70px;
+  }
+  .errorState, .emptyState {
+    padding: 24px 12px;
+    font-size: 0.9rem;
   }
 }

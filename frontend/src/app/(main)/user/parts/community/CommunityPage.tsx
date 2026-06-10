@@ -6,13 +6,13 @@ import { useUsers } from '@/features/community/hooks/useUsers';
 import FilterPanel, { type SortItem } from './FilterPanel';
 import Pagination from '@/shared/components/Pagination';
 import Breadcrumb from '@/shared/components/Breadcrumb';
+import Button from '@/shared/components/Button'; // 👈 import shared Button
 import dynamic from 'next/dynamic';
 import { useInView } from 'react-intersection-observer';
 import styles from './CommunityPage.module.css';
 
 const PAGE_SIZE = 20;
 
-// Lazy load UserList with skeleton
 const UserList = dynamic(
   () => import('./UserList'),
   {
@@ -35,12 +35,11 @@ export default function CommunityPage() {
   const dotsRef = useRef<HTMLDivElement>(null);
 
   const { ref: listRef, inView } = useInView({
-    triggerOnce: true,      // Load only once when first seen
-    rootMargin: '200px',    // Start loading 200px before it enters viewport
+    triggerOnce: true,
+    rootMargin: '200px',
     threshold: 0,
   });
 
-  // Parallax effect
   useEffect(() => {
     const handleScroll = () => {
       if (dotsRef.current) {
@@ -51,7 +50,6 @@ export default function CommunityPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Reset page when search or sorts change
   useEffect(() => {
     setCurrentPage(1);
   }, [search, sorts]);
@@ -65,7 +63,12 @@ export default function CommunityPage() {
 
   const { sortBy, sortOrder } = buildSortParams();
 
-  const { data, isLoading, error, refetch } = useUsers(
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+  } = useUsers(
     {
       page: currentPage,
       limit: PAGE_SIZE,
@@ -73,7 +76,7 @@ export default function CommunityPage() {
       sortBy,
       sortOrder,
     },
-    { enabled: true }
+    { enabled: inView }
   );
 
   const handleFiltersChange = (filters: { sorts: SortItem[] }) => {
@@ -114,16 +117,49 @@ export default function CommunityPage() {
           initialSorts={sorts}
         />
 
-        {/* Lazy-loaded UserList – only loads when scrolled into view */}
-        <div ref={listRef}>
-          {inView && (
-            <UserList
-              users={users}
-              isLoading={isLoading}
-              error={error as Error | null}
-              isAuthenticated={!!user}
-              onRetry={() => refetch()}
-            />
+        <div ref={listRef} className={styles.listContainer} aria-live="polite" aria-busy={isLoading}>
+          {inView ? (
+            <>
+              {error ? (
+                <div className={styles.errorState}>
+                  <p>Failed to load community members.</p>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={() => refetch()}
+                  >
+                    Try again
+                  </Button>
+                </div>
+              ) : isLoading ? (
+                <div className={styles.userList}>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className={styles.skeletonCard} />
+                  ))}
+                </div>
+              ) : users.length === 0 ? (
+                <div className={styles.emptyState}>
+                  <p>No community members found.</p>
+                  <p className={styles.emptyStateHint}>Try adjusting your search or filters.</p>
+                </div>
+              ) : (
+                <UserList
+                  users={users}
+                  isLoading={isLoading}
+                  error={null}
+                  isAuthenticated={!!user}
+                  onRetry={() => refetch()}
+                />
+              )}
+            </>
+          ) : (
+            <div className={styles.placeholderArea} aria-hidden="true">
+              <div className={styles.userList}>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className={styles.placeholderCard} />
+                ))}
+              </div>
+            </div>
           )}
         </div>
 

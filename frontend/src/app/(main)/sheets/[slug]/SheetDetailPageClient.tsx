@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -55,15 +55,22 @@ export default function SheetDetailPageClient() {
     setPage(1);
   }, [search, solveStatus, revisionStatus, difficulty]);
 
-  const queryParams = {
+  // Memoised query parameters
+  const queryParams = useMemo(() => ({
     page,
     limit,
     search: search || undefined,
     solveStatus: solveStatus || undefined,
     revisionStatus: revisionStatus || undefined,
     difficulty: difficulty || undefined,
-  };
+  }), [page, search, solveStatus, revisionStatus, difficulty]);
 
+  const participantsParams = useMemo(() => ({
+    page: participantsPage,
+    limit: participantsLimit,
+  }), [participantsPage]);
+
+  // Data fetching hooks
   const {
     data: sheetData,
     isLoading,
@@ -87,7 +94,7 @@ export default function SheetDetailPageClient() {
     data: participantsData,
     isLoading: participantsLoading,
     refetch: refetchParticipants,
-  } = useSheetParticipants(slug, { page: participantsPage, limit: participantsLimit });
+  } = useSheetParticipants(slug, participantsParams);
 
   const joinMutation = useJoinSheet();
   const leaveMutation = useLeaveSheet();
@@ -100,12 +107,71 @@ export default function SheetDetailPageClient() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
 
-  const handleToggleBookmark = async () => {
+  // Memoised callbacks
+  const handleToggleBookmark = useCallback(async () => {
     await toggleBookmarkMutation.mutateAsync(slug);
     refetch();
-  };
+  }, [toggleBookmarkMutation, slug, refetch]);
 
-  // Sticky filter logic (same as progress page)
+  const handleJoin = useCallback((targetDateStr: string) => {
+    joinMutation.mutate(
+      { slug, targetDate: targetDateStr },
+      {
+        onSuccess: () => {
+          setJoinModalOpen(false);
+          refetch();
+        },
+      }
+    );
+  }, [joinMutation, slug, refetch]);
+
+  const handleLeave = useCallback(() => {
+    leaveMutation.mutate(
+      { slug },
+      {
+        onSuccess: () => {
+          setLeaveModalOpen(false);
+          refetch();
+          router.push(ROUTES.SHEETS.ROOT);
+        },
+        onError: () => setLeaveModalOpen(false),
+      }
+    );
+  }, [leaveMutation, slug, refetch, router]);
+
+  const handleUpdateTargetDate = useCallback((newTargetDate: string) => {
+    updateTargetDateMutation.mutate(
+      { slug, targetDate: newTargetDate },
+      {
+        onSuccess: () => refetch(),
+      }
+    );
+    setTargetDateModalOpen(false);
+  }, [updateTargetDateMutation, slug, refetch]);
+
+  const handleDelete = useCallback(() => {
+    deleteMutation.mutate(
+      { slug },
+      {
+        onSuccess: () => router.push(ROUTES.SHEETS.ROOT),
+      }
+    );
+    setDeleteModalOpen(false);
+  }, [deleteMutation, slug, router]);
+
+  const handlePageChange = useCallback((newPage: number) => {
+    setPage(newPage);
+  }, []);
+
+  const handleClearFilters = useCallback(() => {
+    setSearch('');
+    setSolveStatus('');
+    setRevisionStatus('');
+    setDifficulty('');
+    setPage(1);
+  }, []);
+
+  // Sticky filter logic with requestAnimationFrame
   const sentinelRef = useRef<HTMLDivElement>(null);
   const filterWrapperRef = useRef<HTMLDivElement>(null);
   const [isSticky, setIsSticky] = useState(false);
@@ -115,7 +181,9 @@ export default function SheetDetailPageClient() {
       if (sentinelRef.current) {
         const sentinelRect = sentinelRef.current.getBoundingClientRect();
         const newSticky = sentinelRect.bottom <= 0;
-        setIsSticky(prev => (prev === newSticky ? prev : newSticky));
+        requestAnimationFrame(() => {
+          setIsSticky(prev => (prev === newSticky ? prev : newSticky));
+        });
       }
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -130,8 +198,7 @@ export default function SheetDetailPageClient() {
     }
   }, [page, search, solveStatus, revisionStatus, difficulty, isLoading, sheetData]);
 
-  // Fallback: if aggregated progress, rank, or participants are stuck loading,
-  // force a refetch after 1 second (handles cases where slug timing causes missed requests)
+  // Fallback refetch for stuck loading states
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (aggLoading && slug) {
@@ -147,17 +214,26 @@ export default function SheetDetailPageClient() {
     return () => clearTimeout(timeout);
   }, [aggLoading, rankLoading, participantsLoading, slug, refetchAggregatedProgress, refetchRank, refetchParticipants]);
 
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage);
-  };
+  // Memoised derived values
+  const isOwner = useMemo(() => user ? sheetData?.sheet?.ownerId === user._id : false, [user, sheetData?.sheet?.ownerId]);
+  const targetDate = useMemo(() => sheetData?.currentUserProgress?.targetDate, [sheetData?.currentUserProgress?.targetDate]);
 
-  const handleClearFilters = () => {
-    setSearch('');
-    setSolveStatus('');
-    setRevisionStatus('');
-    setDifficulty('');
-    setPage(1);
-  };
+  const breadcrumbItems = useMemo<BreadcrumbItem[]>(() => {
+    if (!sheetData?.sheet) return [
+      { label: 'Home', href: ROUTES.DASHBOARD },
+      { label: 'Sheets', href: ROUTES.SHEETS.ROOT },
+    ];
+    return [
+      { label: 'Home', href: ROUTES.DASHBOARD },
+      { label: 'Sheets', href: ROUTES.SHEETS.ROOT },
+      { label: sheetData.sheet.name },
+    ];
+  }, [sheetData?.sheet]);
+
+  const renderLink = useCallback((item: BreadcrumbItem, props: { className: string; children: React.ReactNode }) => {
+    if (!item.href) return <span {...props}>{props.children}</span>;
+    return <Link href={item.href} className={props.className}>{props.children}</Link>;
+  }, []);
 
   if (isLoading || !sheetData) return <SheetDetailSkeleton />;
   if (error) {
@@ -180,66 +256,6 @@ export default function SheetDetailPageClient() {
     currentUserProgress,
     pagination,
   } = sheetData;
-
-  const isOwner = user ? sheet.ownerId === user._id : false;
-  const targetDate = currentUserProgress?.targetDate;
-
-  const handleJoin = (targetDateStr: string) => {
-    joinMutation.mutate(
-      { slug, targetDate: targetDateStr },
-      {
-        onSuccess: () => {
-          setJoinModalOpen(false);
-          refetch();
-        },
-      }
-    );
-  };
-
-  const handleLeave = () => {
-    leaveMutation.mutate(
-      { slug },
-      {
-        onSuccess: () => {
-          setLeaveModalOpen(false);
-          refetch();
-          router.push(ROUTES.SHEETS.ROOT);
-        },
-        onError: () => setLeaveModalOpen(false),
-      }
-    );
-  };
-
-  const handleUpdateTargetDate = (newTargetDate: string) => {
-    updateTargetDateMutation.mutate(
-      { slug, targetDate: newTargetDate },
-      {
-        onSuccess: () => refetch(),
-      }
-    );
-    setTargetDateModalOpen(false);
-  };
-
-  const handleDelete = () => {
-    deleteMutation.mutate(
-      { slug },
-      {
-        onSuccess: () => router.push(ROUTES.SHEETS.ROOT),
-      }
-    );
-    setDeleteModalOpen(false);
-  };
-
-  const breadcrumbItems: BreadcrumbItem[] = [
-    { label: 'Home', href: ROUTES.DASHBOARD },
-    { label: 'Sheets', href: ROUTES.SHEETS.ROOT },
-    { label: sheet.name },
-  ];
-
-  const renderLink = (item: BreadcrumbItem, props: { className: string; children: React.ReactNode }) => {
-    if (!item.href) return <span {...props}>{props.children}</span>;
-    return <Link href={item.href} className={props.className}>{props.children}</Link>;
-  };
 
   return (
     <div className={styles.container}>

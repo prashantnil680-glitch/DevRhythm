@@ -3,17 +3,15 @@
   margin: 0 auto;
   padding: 1rem 0;
   width: 100%;
-  animation: fadeInUp 0.4s ease-out both;
+  animation: fadeInUp 0.3s ease-out both;
 }
 
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -38,8 +36,8 @@
 .sheetsList {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;        /* was 1rem – tighter between cards */
-  margin: 1rem 0;     /* reduced margin */
+  gap: 0.5rem;
+  margin: 1rem 0;
 }
 
 .paginationWrapper {
@@ -102,8 +100,6 @@
   }
 }
 
-
-
 /* Sentinel – hidden element for scroll detection */
 .sentinel {
   height: 1px;
@@ -118,7 +114,7 @@
 /* Sticky state – applied when scrolled past sentinel */
 .filterWrapper.sticky {
   position: sticky;
-  top: 3rem; /* adjust based on navbar height */
+  top: 3rem;
   z-index: 10;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
@@ -126,11 +122,6 @@
   margin-bottom: 1rem;
   padding-top: 0.2rem;
   padding-bottom: 0.5rem;
-}
-
-/* Ensure the filter bar inside uses full width */
-.filterWrapper.sticky .filterBar {
-  /* no extra margin/padding changes needed */
 }
 
 /* Tablet and mobile adjustments */

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -92,7 +92,7 @@ export default function ManualTab({
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const { data, isLoading: searchLoading } = useQuestionSearch(debouncedTerm, debouncedTerm.length >= 2);
-  const searchResults = data?.questions || [];
+  const searchResults = useMemo(() => data?.questions || [], [data]);
 
   const {
     register,
@@ -154,10 +154,7 @@ export default function ManualTab({
   // Auto-save draft (only when valid and changed, after hydration)
   useEffect(() => {
     if (isHydrating) return;
-    if (isEditMode) {
-      // For edit mode, we don't auto-save to backend; could keep localStorage if needed, but we skip for now.
-      return;
-    }
+    if (isEditMode) return;
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
@@ -187,17 +184,17 @@ export default function ManualTab({
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const addQuestion = (q: { _id: string; title: string }) => {
+  const addQuestion = useCallback((q: { _id: string; title: string }) => {
     if (!selectedQuestions.some(sq => sq.id === q._id)) {
       setSelectedQuestions(prev => [...prev, { id: q._id, title: q.title }]);
     }
     setSearchTerm('');
     setIsSearchOpen(false);
-  };
+  }, [selectedQuestions]);
 
-  const removeQuestion = (id: string) => {
+  const removeQuestion = useCallback((id: string) => {
     setSelectedQuestions(prev => prev.filter(sq => sq.id !== id));
-  };
+  }, []);
 
   const pollProgress = useCallback(async (id: string) => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
@@ -211,7 +208,6 @@ export default function ManualTab({
           setShowProgressModal(false);
           setIsAsyncCreating(false);
           onSuccess();
-          // Delete draft after successful creation
           sheetService.deleteDraft('manual').catch(err => console.error('Failed to delete draft:', err));
           if (res.sheetSlug) {
             window.location.href = `/sheets/${res.sheetSlug}`;
@@ -229,7 +225,7 @@ export default function ManualTab({
     }, 2000);
   }, [onSuccess]);
 
-  const handleAsyncSubmit = async (data: ManualFormData) => {
+  const handleAsyncSubmit = useCallback(async (data: ManualFormData) => {
     if (selectedQuestions.length === 0) return;
     setIsAsyncCreating(true);
     setShowProgressModal(true);
@@ -253,9 +249,9 @@ export default function ManualTab({
       setShowProgressModal(false);
       setIsAsyncCreating(false);
     }
-  };
+  }, [selectedQuestions, pollProgress]);
 
-  const handleClearDraft = async () => {
+  const handleClearDraft = useCallback(async () => {
     await sheetService.deleteDraft('manual');
     setBackendDraftData(null);
     setValue('name', '');
@@ -269,18 +265,18 @@ export default function ManualTab({
     setValue('originalSourceUrl', '');
     setSelectedQuestions([]);
     lastSavedDraftRef.current = null;
-  };
+  }, [setValue]);
 
-  const getStageIndex = () => {
+  const getStageIndex = useCallback(() => {
     if (!progressData) return 0;
     const stageKey = progressData.stage;
     const index = STAGES.findIndex(s => s.key === stageKey);
     return index >= 0 ? index : 0;
-  };
+  }, [progressData]);
 
   const currentStageIndex = getStageIndex();
 
-  const renderProgressContent = () => {
+  const renderProgressContent = useCallback(() => {
     if (!progressData) return null;
     const { stage, totalQuestions, processed, matched, skipped, unresolved, error } = progressData;
 
@@ -347,10 +343,29 @@ export default function ManualTab({
         )}
       </>
     );
-  };
+  }, [progressData, currentStageIndex, formValues.name]);
 
   const isFormDisabled = isAsyncCreating || externalIsSubmitting;
   const showClearDraftButton = backendDraftData !== null && !isHydrating && !isEditMode;
+
+  // Memoised search results rendering
+  const searchDropdown = useMemo(() => {
+    if (!isSearchOpen || debouncedTerm.length < 2) return null;
+    return (
+      <div className={styles.searchDropdown}>
+        {searchResults.length === 0 && !searchLoading && <div className={styles.noResults}>No questions found</div>}
+        {searchResults.map((q: any) => {
+          const isSelected = selectedQuestions.some(sq => sq.id === q._id);
+          return (
+            <button key={q._id} type="button" className={styles.searchResult} onClick={() => addQuestion(q)} disabled={isSelected}>
+              <span className={styles.resultTitle}>{q.title}</span>
+              <span className={styles.resultId}>{q.platformQuestionId}</span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }, [isSearchOpen, debouncedTerm, searchResults, searchLoading, selectedQuestions, addQuestion]);
 
   return (
     <>
@@ -432,51 +447,38 @@ export default function ManualTab({
           </div>
 
           <div className={styles.rightPanel}>
-              <section className={styles.detailsSection}>
-                <h2 className={styles.sectionTitle}><FiPlus className={styles.sectionIcon} /> Questions</h2>
-                <div className={styles.searchWrapper}>
-                  <div className={styles.searchInputWrapper}>
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => { setSearchTerm(e.target.value); setIsSearchOpen(true); }}
-                      onFocus={() => setIsSearchOpen(true)}
-                      onBlur={() => setTimeout(() => setIsSearchOpen(false), 200)}
-                      placeholder="Search questions by title..."
-                      disabled={isFormDisabled}
-                      className={styles.searchInput}
-                    />
-                    {searchLoading && <Loader size="sm" className={styles.spinner} />}
-                  </div>
-                  {isSearchOpen && debouncedTerm.length >= 2 && (
-                    <div className={styles.searchDropdown}>
-                      {searchResults.length === 0 && !searchLoading && <div className={styles.noResults}>No questions found</div>}
-                      {searchResults.map((q: any) => {
-                        const isSelected = selectedQuestions.some(sq => sq.id === q._id);
-                        return (
-                          <button key={q._id} type="button" className={styles.searchResult} onClick={() => addQuestion(q)} disabled={isSelected}>
-                            <span className={styles.resultTitle}>{q.title}</span>
-                            <span className={styles.resultId}>{q.platformQuestionId}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+            <section className={styles.detailsSection}>
+              <h2 className={styles.sectionTitle}><FiPlus className={styles.sectionIcon} /> Questions</h2>
+              <div className={styles.searchWrapper}>
+                <div className={styles.searchInputWrapper}>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => { setSearchTerm(e.target.value); setIsSearchOpen(true); }}
+                    onFocus={() => setIsSearchOpen(true)}
+                    onBlur={() => setTimeout(() => setIsSearchOpen(false), 200)}
+                    placeholder="Search questions by title..."
+                    disabled={isFormDisabled}
+                    className={styles.searchInput}
+                  />
+                  {searchLoading && <Loader size="sm" className={styles.spinner} />}
                 </div>
-                <div className={styles.detailsScroll}>
-                    <div className={styles.selectedList}>
-                      {selectedQuestions.length === 0 && <div className={styles.emptySelected}>No questions selected.</div>}
-                      {selectedQuestions.map((sq, idx) => (
-                        <div key={sq.id} className={styles.selectedItem}>
-                          <span className={styles.selectedIndex}>{idx + 1}.</span>
-                          <span className={styles.selectedTitle}>{sq.title}</span>
-                          <button type="button" className={styles.removeBtn} onClick={() => removeQuestion(sq.id)}>Remove</button>
-                        </div>
-                      ))}
+                {searchDropdown}
+              </div>
+              <div className={styles.detailsScroll}>
+                <div className={styles.selectedList}>
+                  {selectedQuestions.length === 0 && <div className={styles.emptySelected}>No questions selected.</div>}
+                  {selectedQuestions.map((sq, idx) => (
+                    <div key={sq.id} className={styles.selectedItem}>
+                      <span className={styles.selectedIndex}>{idx + 1}.</span>
+                      <span className={styles.selectedTitle}>{sq.title}</span>
+                      <button type="button" className={styles.removeBtn} onClick={() => removeQuestion(sq.id)}>Remove</button>
                     </div>
+                  ))}
+                </div>
                 {selectedQuestions.length === 0 && <p className={styles.error}>At least one question is required</p>}
-                </div>
-              </section>
+              </div>
+            </section>
           </div>
         </div>
       </form>

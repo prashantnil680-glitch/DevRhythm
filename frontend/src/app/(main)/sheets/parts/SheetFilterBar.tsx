@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import React, { useCallback } from 'react';
 import SearchBar from '@/shared/components/SearchBar';
 import Select from '@/shared/components/Select';
 import SortDropdown from '@/shared/components/SortDropdown';
@@ -42,7 +42,7 @@ const VIEW_OPTIONS = [
   { value: 'bookmarked', label: 'Bookmarked' },
 ];
 
-export default function SheetFilterBar({
+function SheetFilterBar({
   search,
   onSearchChange,
   viewFilter,
@@ -102,3 +102,5 @@ export default function SheetFilterBar({
     </div>
   );
 }
+
+export default React.memo(SheetFilterBar);

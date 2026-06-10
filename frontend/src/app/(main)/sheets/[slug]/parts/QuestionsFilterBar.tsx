@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import SearchBar from '@/shared/components/SearchBar';
 import Select from '@/shared/components/Select';
 import Button from '@/shared/components/Button';
@@ -37,7 +37,7 @@ const DIFFICULTY_LEVEL_OPTIONS = [
   { value: 'hard', label: 'Hard' },
 ];
 
-export default function QuestionsFilterBar({
+function QuestionsFilterBar({
   search,
   onSearchChange,
   solveStatus,
@@ -110,3 +110,5 @@ export default function QuestionsFilterBar({
     </div>
   );
 }
+
+export default React.memo(QuestionsFilterBar);

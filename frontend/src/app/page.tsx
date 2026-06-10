@@ -1,8 +1,10 @@
 import { Metadata } from 'next';
+import Script from 'next/script'; 
 import HomePageClient from './HomePageClient';
 
 const SITE_URL = 'https://www.devrhythm.space';
-const OG_IMAGE = `${SITE_URL}/images/og-homepage.png`;
+const OG_IMAGE = `${SITE_URL}/images/dr-logo.png`;
+const LOGO_URL = `${SITE_URL}/images/logos/dr-icon-dark-logo.png`;
 
 export const metadata: Metadata = {
   title: 'DevRhythm – Build Your Coding Rhythm | DSA Practice Platform',
@@ -67,5 +69,28 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
-  return <HomePageClient />;
+  return (
+    <>
+      {/* Organization Schema for Google Logo */}
+      <Script
+        id="schema-organization"
+        type="application/ld+json"
+        strategy="beforeInteractive"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'Organization',
+            name: 'DevRhythm',
+            url: SITE_URL,
+            logo: LOGO_URL,
+            sameAs: [
+              'https://github.com/anupam6335/DevRhythm',
+              'https://twitter.com/devrhythm',
+            ],
+          }),
+        }}
+      />
+      <HomePageClient />
+    </>
+  );
 }

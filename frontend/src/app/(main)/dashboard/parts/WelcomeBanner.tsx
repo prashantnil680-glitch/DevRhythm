@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { FiX } from 'react-icons/fi';
 import { Avatar } from '@/shared/components/Avatar';
 import { useUser } from '@/features/user';
@@ -18,18 +18,15 @@ const BANNER_AUTO_CLOSE_MS = 16500;
 export default function WelcomeBanner({ type, totalUsers, onDismiss }: WelcomeBannerProps) {
   const { user } = useUser();
   const [isVisible, setIsVisible] = useState(true);
+  const isClosingRef = useRef(false); // prevents double execution
   const displayName = user?.displayName || user?.username || 'there';
 
-  useEffect(() => {
-    if (!isVisible) return;
-    const timer = setTimeout(() => {
-      handleClose(); 
-    }, BANNER_AUTO_CLOSE_MS);
-    return () => clearTimeout(timer);
-  }, [isVisible]);
-
   const handleClose = async () => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+
     setIsVisible(false);
+
     try {
       if (type === 'welcome') {
         await apiClient.post('/users/welcome-shown');
@@ -39,8 +36,17 @@ export default function WelcomeBanner({ type, totalUsers, onDismiss }: WelcomeBa
     } catch (err) {
       console.error('Failed to record welcome shown:', err);
     }
+
     onDismiss();
   };
+
+  useEffect(() => {
+    if (!isVisible) return;
+    const timer = setTimeout(() => {
+      handleClose();
+    }, BANNER_AUTO_CLOSE_MS);
+    return () => clearTimeout(timer);
+  }, [isVisible]); // only depends on isVisible, no handleClose dependency
 
   if (!isVisible) return null;
 

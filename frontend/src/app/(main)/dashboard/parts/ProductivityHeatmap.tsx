@@ -39,11 +39,14 @@ function HeatmapCell({ day, count, intensity, dateStr }: { day: number; count: n
     year: 'numeric',
   });
   const tooltipText = `${formattedDate}: ${count} submission${count !== 1 ? 's' : ''}`;
+  const ariaLabel = `${formattedDate}, ${count} problem${count !== 1 ? 's' : ''} solved, intensity level ${intensity} out of 4`;
 
   return (
     <div
       className={`${styles.cell} ${styles[levelClass]}`}
       data-tooltip={tooltipText}
+      aria-label={ariaLabel}
+      role="gridcell"
     >
       <span className={styles.cellNumber}>{day}</span>
     </div>
@@ -56,14 +59,12 @@ export default function ProductivityHeatmap({ data, isLoading }: ProductivityHea
 
   if (!isLoading && data) {
     if (Array.isArray(data)) {
-      // Array shape: each item has activityCount
       points = data.map(item => ({
         date: item.date,
         count: item.activityCount,
         intensity: item.intensityLevel,
       }));
     } else if (data.dailyData && Array.isArray(data.dailyData)) {
-      // Object shape: each item has totalActivities
       points = data.dailyData.map(item => ({
         date: item.date,
         count: item.totalActivities,
@@ -83,6 +84,10 @@ export default function ProductivityHeatmap({ data, isLoading }: ProductivityHea
     );
   }
 
+  // Determine month name from first data point
+  const firstDate = new Date(points[0].date);
+  const monthName = firstDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
   // Build map from day-of-month to activity data
   const activityMap = new Map<number, { count: number; intensity: number; date: string }>();
   points.forEach(point => {
@@ -91,14 +96,10 @@ export default function ProductivityHeatmap({ data, isLoading }: ProductivityHea
     activityMap.set(dayOfMonth, { count: point.count, intensity: point.intensity, date: point.date });
   });
 
-  // Determine month name from first data point
-  const firstDate = new Date(points[0].date);
-  const monthName = firstDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-
-  // Total days in this month (from points length)
+  // Use points.length to determine row layout (same as original logic)
   const totalDays = points.length;
-  let rows: number[][] = [];
 
+  let rows: number[][] = [];
   if (totalDays === 31) {
     rows = [
       [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],

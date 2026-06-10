@@ -98,14 +98,14 @@ export default function RecentActivity({ activities, isLoading }: RecentActivity
           const timeAgo = formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true });
           const message = formatActivityMessage(activity);
           const isClickable = isClickableActivity(activity);
-          const questionLink = `/questions/${activity.platformQuestionId}`;
+          const questionLink = activity.platformQuestionId ? `/questions/${activity.platformQuestionId}` : null;
 
           return (
             <div key={activity._id || `fallback-${index}`} className={styles.activityItem}>
               <div className={styles.activityIcon}>{getActivityIcon(activity.type)}</div>
               <div className={styles.activityContent}>
                 <div className={styles.activityMessage}>
-                  {isClickable ? (
+                  {isClickable && questionLink ? (
                     <Link href={questionLink} className={styles.messageLink}>
                       <span className={styles.messageText}>{message}</span>
                     </Link>

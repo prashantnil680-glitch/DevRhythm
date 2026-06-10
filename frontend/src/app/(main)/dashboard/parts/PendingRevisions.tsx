@@ -104,7 +104,7 @@ export default function PendingRevisions({
         </Link>
       </div>
       <div className={styles.revisionsList}>
-        {displayRevisions.map((revision) => {
+        {displayRevisions.map((revision, index) => {
           const scheduledDate = format(new Date(revision.scheduledDate), 'MMM d');
           const isOverdue = type === 'pending' ? revision.overdue : false;
           const difficulty = revision.difficulty?.toLowerCase() as 'easy' | 'medium' | 'hard' | undefined;
@@ -130,7 +130,7 @@ export default function PendingRevisions({
           }
 
           return (
-            <div key={revision._id} className={styles.revisionItem}>
+            <div key={revision._id || `revision-${index}`} className={styles.revisionItem}>
               <div className={styles.revisionContent}>
                 <div className={styles.revisionHeader}>
                   {type === 'pending' && <FiZap className={styles.lightningIcon} />}

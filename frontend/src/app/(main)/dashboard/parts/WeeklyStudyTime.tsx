@@ -18,6 +18,44 @@ interface WeeklyStudyTimeProps {
 }
 
 export default function WeeklyStudyTime({ data, isLoading }: WeeklyStudyTimeProps) {
+  // Handle missing data gracefully
+  if (!isLoading && !data) {
+    return (
+      <Card className={styles.container} noHover>
+        <div className={styles.header}>
+          <h3 className={styles.title}>Weekly Study Time</h3>
+        </div>
+        <div className={styles.emptyState}>No study time data available.</div>
+      </Card>
+    );
+  }
+
+  // Guard against incomplete data (missing required fields)
+  if (!isLoading && data && (typeof data.currentWeekMinutes !== 'number' || typeof data.previousWeekMinutes !== 'number')) {
+    return (
+      <Card className={styles.container} noHover>
+        <div className={styles.header}>
+          <h3 className={styles.title}>Weekly Study Time</h3>
+        </div>
+        <div className={styles.emptyState}>Unable to load study time data.</div>
+      </Card>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Card className={styles.container} noHover>
+        <div className={styles.header}>
+          <h3 className={styles.title}>Weekly Study Time</h3>
+        </div>
+        <div className={styles.skeletonContent}>
+          <div className={styles.skeletonTime} />
+          <div className={styles.skeletonStats} />
+        </div>
+      </Card>
+    );
+  }
+
   // Handle null values – default to 0
   const weekOverWeekChange = data.weekOverWeekChangePercent ?? 0;
   const monthlyChange = data.changeFromMonthlyAveragePercent ?? 0;
@@ -77,20 +115,6 @@ export default function WeeklyStudyTime({ data, isLoading }: WeeklyStudyTimeProp
       : styles.trendNeutral;
 
   const monthlyText = `${isMonthlyPositive ? '+' : ''}${monthlyChange.toFixed(0)}%`;
-
-  if (isLoading) {
-    return (
-      <Card className={styles.container} noHover>
-        <div className={styles.header}>
-          <h3 className={styles.title}>Weekly Study Time</h3>
-        </div>
-        <div className={styles.skeletonContent}>
-          <div className={styles.skeletonTime} />
-          <div className={styles.skeletonStats} />
-        </div>
-      </Card>
-    );
-  }
 
   return (
     <Card className={styles.container} noHover>

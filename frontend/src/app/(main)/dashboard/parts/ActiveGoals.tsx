@@ -34,6 +34,9 @@ const formatDateRange = (title: string): string => {
 };
 
 export default function ActiveGoals({ goals, isLoading }: ActiveGoalsProps) {
+  // Safely handle undefined or null goals array
+  const plannedGoals = goals ?? [];
+
   if (isLoading) {
     return (
       <Card className={styles.container} noHover>
@@ -52,7 +55,7 @@ export default function ActiveGoals({ goals, isLoading }: ActiveGoalsProps) {
     );
   }
 
-  if (!goals || goals.length === 0) {
+  if (!plannedGoals || plannedGoals.length === 0) {
     return (
       <Card className={styles.container} noHover>
         <div className={styles.header}>
@@ -67,7 +70,7 @@ export default function ActiveGoals({ goals, isLoading }: ActiveGoalsProps) {
   }
 
   // Filter only active goals (percentage < 100 and deadline not passed)
-  const activeGoals = goals.filter(goal => {
+  const activeGoals = plannedGoals.filter(goal => {
     const isCompleted = goal.progress.percentage >= 100;
     const deadlinePassed = new Date(goal.deadline) < new Date();
     return !isCompleted && !deadlinePassed;

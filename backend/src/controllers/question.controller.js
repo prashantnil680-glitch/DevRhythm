@@ -245,11 +245,30 @@ const getQuestions = async (req, res, next) => {
       solvedMap = new Map(solvedProgress.map(p => [p.questionId.toString(), p.status]));
     }
 
-    const enrichedQuestions = questions.map(q => ({
-      ...q,
-      isSolved: status === 'solved' ? true : solvedMap.has(q._id.toString()),
-      userStatus: status === 'solved' ? 'Solved' : (solvedMap.get(q._id.toString()) || null)
-    }));
+    // Enrich questions with solved status – respect authentication
+    const enrichedQuestions = questions.map(q => {
+      let isSolvedFlag = false;
+      let userStatusVal = null;
+
+      if (req.user) {
+        if (status === 'solved') {
+          // Already filtered to solved questions only
+          isSolvedFlag = true;
+          userStatusVal = 'Solved';
+        } else {
+          const solved = solvedMap.has(q._id.toString());
+          isSolvedFlag = solved;
+          userStatusVal = solved ? (solvedMap.get(q._id.toString()) || 'Solved') : null;
+        }
+      }
+      // else: unauthenticated – both remain false/null
+
+      return {
+        ...q,
+        isSolved: isSolvedFlag,
+        userStatus: userStatusVal,
+      };
+    });
 
     res.json(formatResponse('Questions retrieved successfully', { questions: enrichedQuestions }, {
       pagination: paginate(total, page, limit)

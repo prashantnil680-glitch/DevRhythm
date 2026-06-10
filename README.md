@@ -1,10 +1,9 @@
 
-
 # DevRhythm – Coding Practice with Spaced Repetition
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/eb8d9235-1329-487d-9233-51ae7f9a9ccd" alt="DevRhythm Logo" width="240" />
-</p>
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/91596b18-5c4b-401e-94da-fb1a957f5939" alt="DevRhythm Logo" style="width: 100%; max-width: 1200px; height: auto; display: block; margin: 0 auto;" />
+</div>
 
 <p align="center">
   <strong>Learn to code. Never forget.</strong><br/>
@@ -456,3 +455,6 @@ Live demo: [https://devrhythm.space](https://devrhythm.space) (requires login)
 **Happy coding – and never forget what you learn!** 🚀
 
 *DevRhythm – Turn practice into permanent knowledge.*
+
+
+The logo now spans the full width of the container (up to 1200px max to avoid being too large on ultra‑wide screens) while remaining responsive and properly visible.

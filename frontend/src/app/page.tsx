@@ -4,7 +4,7 @@ import HomePageClient from './HomePageClient';
 
 const SITE_URL = 'https://www.devrhythm.space';
 const OG_IMAGE = `${SITE_URL}/images/dr-logo.png`;
-const LOGO_URL = `${SITE_URL}/images/logos/dr-icon-dark-logo.png`;
+const LOGO_URL = `${SITE_URL}/images/logos/dr-icon-light-logo.png`;
 
 export const metadata: Metadata = {
   title: 'DevRhythm – Build Your Coding Rhythm | DSA Practice Platform',

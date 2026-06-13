@@ -38,6 +38,10 @@ export default function ActivityDayPage() {
     { label: date },
   ];
 
+  // Determine if the date is today (using UTC date string for consistency with backend)
+  const today = new Date().toISOString().split('T')[0];
+  const isToday = date === today;
+
   if (isLoading) {
     return (
       <div className={styles.container}>
@@ -102,14 +106,21 @@ export default function ActivityDayPage() {
                   <FiBookOpen className={styles.emptySolvedIcon} size={48} />
                   <h4 className={styles.emptySolvedTitle}>No problems solved</h4>
                   <p className={styles.emptySolvedDescription}>
-                    You didn’t solve any problems on {date}.<br />
-                    Ready to change that?
+                    You didn’t solve any problems on {date}.
+                    {isToday && (
+                      <>
+                        <br />
+                        Ready to change that?
+                      </>
+                    )}
                   </p>
-                  <Link href="/questions" passHref>
-                    <Button variant="primary" size="md">
-                      Browse Problems
-                    </Button>
-                  </Link>
+                  {isToday && (
+                    <Link href="/questions" passHref>
+                      <Button variant="primary" size="md">
+                        Browse Problems
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </div>
             )}

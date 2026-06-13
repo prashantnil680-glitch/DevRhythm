@@ -461,3 +461,20 @@
 .creatorCredit a:hover {
   text-decoration: underline;
 }
+
+
+/* Video section header */
+.videoSectionHeader {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.videoSectionHeader h2 {
+  margin-bottom: 0.5rem;
+}
+
+.videoSectionHeader p {
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}

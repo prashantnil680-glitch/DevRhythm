@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import {
   FiInfo,
   FiBookOpen,
@@ -14,6 +15,7 @@ import {
 import Breadcrumb from '@/shared/components/Breadcrumb';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import EmptyState from '@/shared/components/EmptyState';
+import Button from '@/shared/components/Button';
 import { useDayActivity } from '@/features/activity/hooks/useActivityData';
 import HeroSummary from '../parts/HeroSummary';
 import styles from '../ActivityDashboard.module.css';
@@ -35,6 +37,10 @@ export default function ActivityDayPage() {
     { label: 'Activity', href: '/activity' },
     { label: date },
   ];
+
+  // Determine if the date is today (using UTC date string for consistency with backend)
+  const today = new Date().toISOString().split('T')[0];
+  const isToday = date === today;
 
   if (isLoading) {
     return (
@@ -95,11 +101,28 @@ export default function ActivityDayPage() {
           <div className={styles.tabSection}>
             <h4 className={styles.tabSubtitle}>Solved Questions</h4>
             {solvedList.length === 0 && (
-              <EmptyState
-                title="No solved questions"
-                description="No problems were solved on this day."
-                icon={<FiBookOpen size={48} />}
-              />
+              <div className={styles.emptySolvedWrapper}>
+                <div className={styles.emptySolvedContent}>
+                  <FiBookOpen className={styles.emptySolvedIcon} size={48} />
+                  <h4 className={styles.emptySolvedTitle}>No problems solved</h4>
+                  <p className={styles.emptySolvedDescription}>
+                    You didn’t solve any problems on {date}.
+                    {isToday && (
+                      <>
+                        <br />
+                        Ready to change that?
+                      </>
+                    )}
+                  </p>
+                  {isToday && (
+                    <Link href="/questions" passHref>
+                      <Button variant="primary" size="md">
+                        Browse Problems
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
             )}
             {solvedList.map((group: any) => (
               <QuestionCard

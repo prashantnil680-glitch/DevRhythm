@@ -285,3 +285,16 @@
     width: 2px;
   }
 }
+
+.dateLink {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: color 0.2s ease, text-decoration 0.2s ease;
+}
+
+.dateLink:hover {
+  color: var(--accent-moss);
+  text-decoration: underline;
+}

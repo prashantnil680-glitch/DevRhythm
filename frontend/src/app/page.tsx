@@ -1,10 +1,18 @@
+// src/app/page.tsx
+
 import { Metadata } from 'next';
-import Script from 'next/script'; 
+import Script from 'next/script';
 import HomePageClient from './HomePageClient';
 
 const SITE_URL = 'https://www.devrhythm.space';
 const OG_IMAGE = `${SITE_URL}/images/dr-logo.png`;
 const LOGO_URL = `${SITE_URL}/images/logos/dr-icon-light-logo.png`;
+
+// Replace with actual demo video details
+const DEMO_VIDEO_ID = 'H46vC6Qp67U';
+const DEMO_THUMBNAIL_URL = `${SITE_URL}/images/demo-thumbnail.jpg`;
+const DEMO_VIDEO_URL = `https://www.youtube.com/watch?v=${DEMO_VIDEO_ID}`;
+const DEMO_EMBED_URL = `https://www.youtube.com/embed/${DEMO_VIDEO_ID}`;
 
 export const metadata: Metadata = {
   title: 'DevRhythm – Build Your Coding Rhythm | DSA Practice Platform',
@@ -90,6 +98,32 @@ export default function HomePage() {
           }),
         }}
       />
+
+      {/* VideoObject Schema for demo video */}
+      <Script
+        id="schema-video"
+        type="application/ld+json"
+        strategy="beforeInteractive"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'VideoObject',
+            name: 'DevRhythm Demo – Build your coding rhythm',
+            description: 'Watch how DevRhythm uses spaced repetition, heatmaps, and smart revision schedules to help you master DSA with consistent practice.',
+            thumbnailUrl: DEMO_THUMBNAIL_URL,
+            uploadDate: new Date().toISOString().split('T')[0],
+            duration: 'PT3M45S', // Replace with actual duration
+            contentUrl: DEMO_VIDEO_URL,
+            embedUrl: DEMO_EMBED_URL,
+            interactionStatistic: {
+              '@type': 'InteractionCounter',
+              interactionType: 'https://schema.org/WatchAction',
+              userInteractionCount: 0, // Will be updated by YouTube; placeholder
+            },
+          }),
+        }}
+      />
+
       <HomePageClient />
     </>
   );

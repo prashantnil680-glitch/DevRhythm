@@ -1,12 +1,4 @@
 /**
- * src/utils/autoImports.js
- *
- * Provides standard library imports and helpers to be prepended to user code,
- * mimicking LeetCode's pre‑injected environment.
- * Currently supports Python and C++.
- */
-
-/**
  * Returns a string of standard Python imports and utility definitions.
  * These imports are automatically available to the user without manual typing.
  * @returns {string}
@@ -65,6 +57,7 @@ function getCppIncludes() {
 #include <cstdlib>
 #include <ctime>
 #include <cassert>
+#include <sstream>
 using namespace std;
 `.trim();
 }

@@ -1,0 +1,390 @@
+.playerContainer {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  background: var(--bg-surface);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.videoWrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.videoInner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Force all iframes inside video wrapper to crop and fill */
+.videoWrapper,
+.videoInner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.videoWrapper iframe,
+.videoInner iframe,
+.videoWrapper > div > iframe {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 150% !important;
+  height: 150% !important;
+  transform: translate(-50%, -50%) !important;
+  border: none !important;
+}
+.thumbnailOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  cursor: pointer;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbnailPlaceholder {
+  font-size: 4rem;
+  color: white;
+  background: #333;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.playButton {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.7);
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  transition: all 0.2s;
+}
+
+.playButton svg {
+  width: 40px;
+  height: 40px;
+}
+
+.playButton:hover {
+  background: var(--accent-moss);
+  transform: translate(-50%, -50%) scale(1.05);
+}
+
+.spinnerSmall {
+  width: 24px;
+  height: 24px;
+  border: 2px solid white;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.errorOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+.errorMessage {
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.retryButton {
+  background: var(--accent-moss);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.controlsBar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--bg-surface);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+  transition: opacity 0.2s;
+}
+
+.controlsBar.visible {
+  opacity: 1;
+}
+
+.controlButton {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.controlButton:hover {
+  background: var(--bg-elevated);
+}
+
+.timeDisplay {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: monospace;
+  min-width: 90px;
+}
+/* Progress bar – thicker, with draggable thumb */
+.progressBar {
+  flex: 1;
+  position: relative;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: height 0.1s ease;
+}
+
+.progressBar:hover {
+  height: 10px;
+}
+
+.progressFill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--accent-moss);
+  border-radius: 4px;
+  pointer-events: none;
+  width: 0%;
+}
+
+.progressThumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  background: white;
+  border: 2px solid var(--accent-moss);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: transform 0.1s, box-shadow 0.1s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.progressBar:hover .progressThumb {
+  transform: translate(-50%, -50%) scale(1.2);
+  box-shadow: 0 0 0 4px rgba(61, 139, 82, 0.3);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .progressBar {
+    height: 10px;
+  }
+  .progressThumb {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* Ensure all control buttons are always visible */
+.controlsBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: flex-start;
+  background: var(--bg-surface);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  margin-top: 0.5rem;
+}
+
+.controlButton {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+/* Progress bar & thumb – already defined, ensure they are correct */
+.progressBar {
+  flex: 1;
+  position: relative;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: height 0.1s ease;
+}
+
+.progressBar:hover {
+  height: 10px;
+}
+
+.progressFill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--accent-moss);
+  border-radius: 4px;
+  pointer-events: none;
+  width: 0%;
+}
+
+.progressThumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  background: white;
+  border: 2px solid var(--accent-moss);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: transform 0.1s, box-shadow 0.1s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.progressBar:hover .progressThumb {
+  transform: translate(-50%, -50%) scale(1.2);
+  box-shadow: 0 0 0 4px rgba(61, 139, 82, 0.3);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .controlsBar {
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+  .progressBar {
+    height: 10px;
+  }
+  .progressThumb {
+    width: 18px;
+    height: 18px;
+  }
+  .controlButton {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+.volumeControl {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.volumeSlider {
+  width: 80px;
+  height: 4px;
+  -webkit-appearance: none;
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.volumeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-moss);
+  cursor: pointer;
+}
+
+.videoTitle {
+  margin-top: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .controlsBar {
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+  .timeDisplay {
+    font-size: 0.7rem;
+    min-width: 70px;
+  }
+  .volumeSlider {
+    width: 60px;
+  }
+  .playButton {
+    width: 60px;
+    height: 60px;
+  }
+  .playButton svg {
+    width: 30px;
+    height: 30px;
+  }
+}

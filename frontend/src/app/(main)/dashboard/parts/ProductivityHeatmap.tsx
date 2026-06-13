@@ -1,6 +1,9 @@
+// components/ProductivityHeatmap.tsx
+
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import styles from './ProductivityHeatmap.module.css';
 
 // Shape when API returns array (as in your response)
@@ -33,23 +36,35 @@ interface ProductivityHeatmapProps {
 
 function HeatmapCell({ day, count, intensity, dateStr }: { day: number; count: number; intensity: number; dateStr: string }) {
   const levelClass = `level${intensity}`;
-  const formattedDate = new Date(dateStr).toLocaleDateString('en-US', {
+  const formattedDate = dateStr ? new Date(dateStr).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
-  });
-  const tooltipText = `${formattedDate}: ${count} submission${count !== 1 ? 's' : ''}`;
-  const ariaLabel = `${formattedDate}, ${count} problem${count !== 1 ? 's' : ''} solved, intensity level ${intensity} out of 4`;
+  }) : '';
+  const tooltipText = dateStr ? `${formattedDate}: ${count} submission${count !== 1 ? 's' : ''}` : `Day ${day}: No activity`;
+  const ariaLabel = dateStr ? `${formattedDate}, ${count} problem${count !== 1 ? 's' : ''} solved, intensity level ${intensity} out of 4` : `Day ${day}, no activity recorded`;
 
-  return (
+  const cellContent = (
     <div
       className={`${styles.cell} ${styles[levelClass]}`}
       data-tooltip={tooltipText}
       aria-label={ariaLabel}
       role="gridcell"
+      style={{ cursor: dateStr ? 'pointer' : 'default' }}
     >
       <span className={styles.cellNumber}>{day}</span>
     </div>
+  );
+
+  // Only wrap with Link if we have a valid date string
+  if (!dateStr) {
+    return cellContent;
+  }
+
+  return (
+    <Link href={`/activity/${dateStr}`} style={{ textDecoration: 'none', display: 'block' }}>
+      {cellContent}
+    </Link>
   );
 }
 

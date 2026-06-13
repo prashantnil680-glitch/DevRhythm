@@ -11,17 +11,40 @@ const Joi = require('joi');
 const { cache } = require('../middleware/cache');
 
 // ----------------------------------------------------------------------
-//  HELPERS (same as in activity.controller)
+//  HELPERS
 // ----------------------------------------------------------------------
 
 const groupQuestionLogs = (logs) => {
   const grouped = {};
   for (const log of logs) {
-    if (!log.targetId || !log.targetId._id) continue;
-    const questionId = log.targetId._id.toString();
+    let questionId;
+    let questionObj;
+
+    if (!log.targetId || !log.targetId._id) {
+      questionId = `deleted_${log._id}`;
+      questionObj = {
+        _id: null,
+        title: 'Deleted problem',
+        platform: 'Unknown',
+        platformQuestionId: null,
+        difficulty: 'Unknown',
+        pattern: [],
+        patternSlugs: [],
+      };
+    } else {
+      questionId = log.targetId._id.toString();
+      questionObj = { ...log.targetId };
+      if (questionObj.pattern && Array.isArray(questionObj.pattern)) {
+        questionObj.patternSlugs = questionObj.pattern.map(p => slugify(p));
+      } else {
+        questionObj.pattern = [];
+        questionObj.patternSlugs = [];
+      }
+    }
+
     if (!grouped[questionId]) {
       grouped[questionId] = {
-        question: { ...log.targetId },
+        question: questionObj,
         solves_timeline: []
       };
     }
@@ -41,11 +64,34 @@ const groupQuestionLogs = (logs) => {
 const groupRevisionLogs = (logs) => {
   const grouped = {};
   for (const log of logs) {
-    if (!log.targetId || !log.targetId._id) continue;
-    const questionId = log.targetId._id.toString();
+    let questionId;
+    let questionObj;
+
+    if (!log.targetId || !log.targetId._id) {
+      questionId = `deleted_${log._id}`;
+      questionObj = {
+        _id: null,
+        title: 'Deleted problem',
+        platform: 'Unknown',
+        platformQuestionId: null,
+        difficulty: 'Unknown',
+        pattern: [],
+        patternSlugs: [],
+      };
+    } else {
+      questionId = log.targetId._id.toString();
+      questionObj = { ...log.targetId };
+      if (questionObj.pattern && Array.isArray(questionObj.pattern)) {
+        questionObj.patternSlugs = questionObj.pattern.map(p => slugify(p));
+      } else {
+        questionObj.pattern = [];
+        questionObj.patternSlugs = [];
+      }
+    }
+
     if (!grouped[questionId]) {
       grouped[questionId] = {
-        question: { ...log.targetId },
+        question: questionObj,
         revision_timeline: []
       };
     }
@@ -88,7 +134,6 @@ const processRevisionLogs = (logs) => {
   };
 };
 
-// FIXED: filter by completedAt AFTER unwinding, so only revisions on the exact day are returned
 const fetchRevisionLogsForDate = async (userId, startDate, endDate) => {
   const pipeline = [
     { $match: { userId } },
@@ -108,7 +153,7 @@ const fetchRevisionLogsForDate = async (userId, startDate, endDate) => {
         as: 'targetId'
       }
     },
-    { $unwind: '$targetId' },
+    { $unwind: { path: '$targetId', preserveNullAndEmptyArrays: true } },
     {
       $project: {
         _id: '$_id',
@@ -136,11 +181,10 @@ const fetchRevisionLogsForDate = async (userId, startDate, endDate) => {
     }
   ];
   let logs = await RevisionSchedule.aggregate(pipeline);
-  logs = logs.filter(log => log.targetId && log.targetId._id);
   logs = logs.map(log => {
-    if (log.targetId?.pattern && Array.isArray(log.targetId.pattern)) {
+    if (log.targetId && log.targetId.pattern && Array.isArray(log.targetId.pattern)) {
       log.targetId.patternSlugs = log.targetId.pattern.map(p => slugify(p));
-    } else {
+    } else if (log.targetId) {
       log.targetId.pattern = [];
       log.targetId.patternSlugs = [];
     }
@@ -176,6 +220,54 @@ const fetchGoalsForDate = async (userId, startDate, endDate) => {
   const completed = goals.filter(g => g.status === 'completed').map(formatGoal);
   const failed = goals.filter(g => g.status === 'failed').map(formatGoal);
   return { completed, failed };
+};
+
+// Helper to count unique questions from a grouped object
+const countUniqueQuestions = (grouped) => {
+  return Object.keys(grouped).length;
+};
+
+// Merge revision completions into solved questions
+const mergeRevisionsIntoSolved = (questionSolved, revisionOnTime, revisionOverdue) => {
+  const merged = { ...questionSolved };
+
+  const addRevisionAsSolve = (revisionGroup) => {
+    for (const [qid, group] of Object.entries(revisionGroup)) {
+      if (!merged[qid]) {
+        // Create a new solved entry based on the revision group
+        merged[qid] = {
+          question: group.question,
+          solves_timeline: group.revision_timeline.map(rev => ({
+            _id: rev._id,
+            timestamp: rev.timestamp,
+            timeSpent: rev.timeSpent,
+            isFirstSolve: false,
+          })),
+        };
+      } else {
+        // Optionally, add revision timeline entries to existing solves (avoid duplicates)
+        // We'll add only if the timestamp is not already present (simple check by timestamp)
+        const existingTimestamps = new Set(merged[qid].solves_timeline.map(t => t.timestamp.toISOString()));
+        for (const rev of group.revision_timeline) {
+          if (!existingTimestamps.has(rev.timestamp.toISOString())) {
+            merged[qid].solves_timeline.push({
+              _id: rev._id,
+              timestamp: rev.timestamp,
+              timeSpent: rev.timeSpent,
+              isFirstSolve: false,
+            });
+          }
+        }
+        // Re‑sort timeline
+        merged[qid].solves_timeline.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      }
+    }
+  };
+
+  addRevisionAsSolve(revisionOnTime);
+  addRevisionAsSolve(revisionOverdue);
+
+  return merged;
 };
 
 // ----------------------------------------------------------------------
@@ -225,11 +317,10 @@ const getTodayActivity = async (req, res, next) => {
     const { completed: completedGoals, failed: failedGoals } = await fetchGoalsForDate(userId, dayStart, dayEnd);
 
     const processQuestionLogs = (logs) => {
-      logs = logs.filter(log => log.targetId && log.targetId._id);
       logs = logs.map(log => {
-        if (log.targetId?.pattern && Array.isArray(log.targetId.pattern)) {
+        if (log.targetId && log.targetId.pattern && Array.isArray(log.targetId.pattern)) {
           log.targetId.patternSlugs = log.targetId.pattern.map(p => slugify(p));
-        } else {
+        } else if (log.targetId) {
           log.targetId.pattern = [];
           log.targetId.patternSlugs = [];
         }
@@ -252,13 +343,31 @@ const getTodayActivity = async (req, res, next) => {
       group_challenge_completed: groupChallengeCompleted
     };
 
+    // Merge revision completions into solved questions
+    const mergedSolved = mergeRevisionsIntoSolved(
+      grouped.question_solved,
+      grouped.revision_completed.on_time,
+      grouped.revision_completed.overdue
+    );
+
+    // Recalculate solved count from merged object
+    const uniqueSolved = countUniqueQuestions(mergedSolved);
+    const uniqueMastered = countUniqueQuestions(grouped.question_mastered);
+    const uniqueRevisedOnTime = countUniqueQuestions(grouped.revision_completed.on_time);
+    const uniqueRevisedOverdue = countUniqueQuestions(grouped.revision_completed.overdue);
+    const uniqueRevisedTotal = uniqueRevisedOnTime + uniqueRevisedOverdue;
+
     const { date: _, dayOfWeek: __, ...summaryWithoutDate } = summary;
     const response = {
       ...summaryWithoutDate,
+      problemsSolved: uniqueSolved,
+      problemsMastered: uniqueMastered,
+      revisionsCompleted: uniqueRevisedTotal,
       date: localDateStr,
       dayOfWeek: localDayOfWeek,
       todayStudyTimeInMinutes: summary.studyTimeMinutes,
-      ...grouped
+      ...grouped,
+      question_solved: mergedSolved,   // override with merged version
     };
 
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
@@ -319,11 +428,10 @@ const getDayActivityByDate = async (req, res, next) => {
     const { completed: completedGoals, failed: failedGoals } = await fetchGoalsForDate(userId, dayStart, dayEnd);
 
     const processQuestionLogs = (logs) => {
-      logs = logs.filter(log => log.targetId && log.targetId._id);
       logs = logs.map(log => {
-        if (log.targetId?.pattern && Array.isArray(log.targetId.pattern)) {
+        if (log.targetId && log.targetId.pattern && Array.isArray(log.targetId.pattern)) {
           log.targetId.patternSlugs = log.targetId.pattern.map(p => slugify(p));
-        } else {
+        } else if (log.targetId) {
           log.targetId.pattern = [];
           log.targetId.patternSlugs = [];
         }
@@ -346,16 +454,33 @@ const getDayActivityByDate = async (req, res, next) => {
       group_challenge_completed: groupChallengeCompleted
     };
 
+    // Merge revision completions into solved questions
+    const mergedSolved = mergeRevisionsIntoSolved(
+      grouped.question_solved,
+      grouped.revision_completed.on_time,
+      grouped.revision_completed.overdue
+    );
+
+    // Recalculate solved count from merged object
+    const uniqueSolved = countUniqueQuestions(mergedSolved);
+    const uniqueMastered = countUniqueQuestions(grouped.question_mastered);
+    const uniqueRevisedOnTime = countUniqueQuestions(grouped.revision_completed.on_time);
+    const uniqueRevisedOverdue = countUniqueQuestions(grouped.revision_completed.overdue);
+    const uniqueRevisedTotal = uniqueRevisedOnTime + uniqueRevisedOverdue;
+
     const { date: _, dayOfWeek: __, ...summaryWithoutDate } = summary;
     const response = {
       ...summaryWithoutDate,
+      problemsSolved: uniqueSolved,
+      problemsMastered: uniqueMastered,
+      revisionsCompleted: uniqueRevisedTotal,
       date: outputDate,
       dayOfWeek: outputDayOfWeek,
       todayStudyTimeInMinutes: summary.studyTimeMinutes,
-      ...grouped
+      ...grouped,
+      question_solved: mergedSolved,
     };
 
-    // Prevent caching
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
@@ -366,9 +491,9 @@ const getDayActivityByDate = async (req, res, next) => {
 };
 
 // Cache middlewares (only for today endpoint)
-const todayCache = cache(300, 'activity:today');        // 5 minutes
+const todayCache = cache(300, 'activity:today');
 
 module.exports = {
   getTodayActivity: [todayCache, getTodayActivity],
-  getDayActivityByDate: [getDayActivityByDate],         // No cache for specific day
+  getDayActivityByDate: [getDayActivityByDate],
 };

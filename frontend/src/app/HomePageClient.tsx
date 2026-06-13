@@ -1,3 +1,5 @@
+// src/app/HomePageClient.tsx
+
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
@@ -18,6 +20,7 @@ import { Line } from 'react-chartjs-2';
 import OAuthButton from '@/shared/components/OAuthButton';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { tokenStorage } from '@/features/auth/utils/tokenStorage';
+import CustomYouTubePlayer from '@/features/video/components/CustomYouTubePlayer';
 import styles from './page.module.css';
 
 ChartJS.register(
@@ -342,6 +345,19 @@ function HomePageContent() {
             </div>
             <p className={styles.heatmapCaption}>▲ 350+ problems mastered over the past year</p>
           </div>
+        </section>
+
+        {/* NEW: Video Demo Section */}
+        <section className={`${styles.sectionContainer} ${styles.reveal}`} style={{ marginTop: '2rem', marginBottom: '2rem' }}>
+          <div className={styles.videoSectionHeader}>
+            <h2 className={styles.journeyHeading}>See DevRhythm in action</h2>
+            <p className={styles.heroSubtitle}>Watch how rhythm‑based practice transforms your coding consistency.</p>
+          </div>
+          <CustomYouTubePlayer
+            videoId="H46vC6Qp67U"  // Replace with actual demo video ID
+            thumbnailSrc="images\logos\main-logo.png"
+            title="DevRhythm Demo – Build your coding rhythm"
+          />
         </section>
 
         <section className={`${styles.journeySection} ${styles.reveal}`} id="journeySection">

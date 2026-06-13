@@ -60,11 +60,34 @@ const processRevisionLogs = (logs) => {
 const groupRevisionLogs = (logs) => {
   const grouped = {};
   for (const log of logs) {
-    if (!log.targetId || !log.targetId._id) continue;
-    const questionId = log.targetId._id.toString();
+    let questionId;
+    let questionObj;
+
+    if (!log.targetId || !log.targetId._id) {
+      questionId = `deleted_${log._id}`;
+      questionObj = {
+        _id: null,
+        title: 'Deleted problem',
+        platform: 'Unknown',
+        platformQuestionId: null,
+        difficulty: 'Unknown',
+        pattern: [],
+        patternSlugs: [],
+      };
+    } else {
+      questionId = log.targetId._id.toString();
+      questionObj = { ...log.targetId };
+      if (questionObj.pattern && Array.isArray(questionObj.pattern)) {
+        questionObj.patternSlugs = questionObj.pattern.map(p => slugify(p));
+      } else {
+        questionObj.pattern = [];
+        questionObj.patternSlugs = [];
+      }
+    }
+
     if (!grouped[questionId]) {
       grouped[questionId] = {
-        question: { ...log.targetId },
+        question: questionObj,
         revision_timeline: []
       };
     }
@@ -110,7 +133,7 @@ const getRevisionLogsFromSchedules = async (userId, { startDate, endDate, page =
         as: 'targetId'
       }
     },
-    { $unwind: '$targetId' },
+    { $unwind: { path: '$targetId', preserveNullAndEmptyArrays: true } },
     {
       $project: {
         _id: '$_id',
@@ -142,14 +165,14 @@ const getRevisionLogsFromSchedules = async (userId, { startDate, endDate, page =
   ];
 
   let logs = await RevisionSchedule.aggregate(pipeline);
-  logs = logs.filter(log => log.targetId && log.targetId._id);
   logs = logs.map(log => {
-    if (log.targetId?.pattern && Array.isArray(log.targetId.pattern)) {
+    if (log.targetId && log.targetId.pattern && Array.isArray(log.targetId.pattern)) {
       log.targetId.patternSlugs = log.targetId.pattern.map(p => slugify(p));
-    } else {
+    } else if (log.targetId) {
       log.targetId.pattern = [];
       log.targetId.patternSlugs = [];
     }
+    // If log.targetId is null, we will handle in groupRevisionLogs.
     return log;
   });
 
@@ -172,11 +195,34 @@ const getRevisionLogsFromSchedules = async (userId, { startDate, endDate, page =
 const groupQuestionLogs = (logs) => {
   const grouped = {};
   for (const log of logs) {
-    if (!log.targetId || !log.targetId._id) continue;
-    const questionId = log.targetId._id.toString();
+    let questionId;
+    let questionObj;
+
+    if (!log.targetId || !log.targetId._id) {
+      questionId = `deleted_${log._id}`;
+      questionObj = {
+        _id: null,
+        title: 'Deleted problem',
+        platform: 'Unknown',
+        platformQuestionId: null,
+        difficulty: 'Unknown',
+        pattern: [],
+        patternSlugs: [],
+      };
+    } else {
+      questionId = log.targetId._id.toString();
+      questionObj = { ...log.targetId };
+      if (questionObj.pattern && Array.isArray(questionObj.pattern)) {
+        questionObj.patternSlugs = questionObj.pattern.map(p => slugify(p));
+      } else {
+        questionObj.pattern = [];
+        questionObj.patternSlugs = [];
+      }
+    }
+
     if (!grouped[questionId]) {
       grouped[questionId] = {
-        question: { ...log.targetId },
+        question: questionObj,
         solves_timeline: []
       };
     }
@@ -215,11 +261,10 @@ const getGroupedQuestionLogs = async (userId, action, startDate, endDate, page, 
     .lean();
 
   let logs = await query;
-  logs = logs.filter(log => log.targetId && log.targetId._id);
   logs = logs.map(log => {
-    if (log.targetId?.pattern && Array.isArray(log.targetId.pattern)) {
+    if (log.targetId && log.targetId.pattern && Array.isArray(log.targetId.pattern)) {
       log.targetId.patternSlugs = log.targetId.pattern.map(p => slugify(p));
-    } else {
+    } else if (log.targetId) {
       log.targetId.pattern = [];
       log.targetId.patternSlugs = [];
     }
@@ -310,9 +355,8 @@ const getActivityLogs = async (req, res, next) => {
 
     if (action === 'revision_completed') {
       const { page, limit } = getPaginationParams(req);
-      const { type } = req.query; // 'on_time' or 'overdue'
+      const { type } = req.query;
 
-      // If type is specified, fetch only that category and wrap it under that key
       if (type === 'on_time' || type === 'overdue') {
         const overdueFlag = (type === 'overdue');
         const matchStage = { userId: req.user._id };
@@ -336,7 +380,7 @@ const getActivityLogs = async (req, res, next) => {
               as: 'targetId'
             }
           },
-          { $unwind: '$targetId' },
+          { $unwind: { path: '$targetId', preserveNullAndEmptyArrays: true } },
           {
             $project: {
               _id: '$_id',
@@ -365,11 +409,10 @@ const getActivityLogs = async (req, res, next) => {
         ];
 
         let logs = await RevisionSchedule.aggregate(pipeline);
-        logs = logs.filter(log => log.targetId && log.targetId._id);
         logs = logs.map(log => {
-          if (log.targetId?.pattern && Array.isArray(log.targetId.pattern)) {
+          if (log.targetId && log.targetId.pattern && Array.isArray(log.targetId.pattern)) {
             log.targetId.patternSlugs = log.targetId.pattern.map(p => slugify(p));
-          } else {
+          } else if (log.targetId) {
             log.targetId.pattern = [];
             log.targetId.patternSlugs = [];
           }
@@ -386,13 +429,11 @@ const getActivityLogs = async (req, res, next) => {
         const total = totalResult.length ? totalResult[0].total : 0;
 
         const grouped = groupRevisionLogs(logs);
-        // Wrap the grouped object under the requested type key
         const responseData = { revision_completed: { [type]: grouped } };
         const paginationMeta = paginate(total, page, limit);
         return res.json(formatResponse('Activity logs retrieved successfully', responseData, { pagination: paginationMeta }));
       }
 
-      // Default (no type) – return both categories with ratio/message
       const { logs, total } = await getRevisionLogsFromSchedules(req.user._id, {
         startDate: dateFilter.start,
         endDate: dateFilter.end,
@@ -427,7 +468,6 @@ const getActivityLogs = async (req, res, next) => {
     // ----- COMBINED FEED (no action) – limited items per action, grouped consistently -----
     const limitPerAction = 5;
 
-    // 1. question_solved
     const qSolvedQuery = { userId: req.user._id, action: 'question_solved' };
     if (dateFilter.start) qSolvedQuery.timestamp = { $gte: dateFilter.start };
     if (dateFilter.end) qSolvedQuery.timestamp = { ...qSolvedQuery.timestamp, $lte: dateFilter.end };
@@ -436,11 +476,10 @@ const getActivityLogs = async (req, res, next) => {
       .limit(limitPerAction)
       .populate({ path: 'targetId', select: 'title platform platformQuestionId difficulty pattern' })
       .lean();
-    qSolvedLogs = qSolvedLogs.filter(log => log.targetId && log.targetId._id);
     qSolvedLogs = qSolvedLogs.map(log => {
-      if (log.targetId?.pattern && Array.isArray(log.targetId.pattern)) {
+      if (log.targetId && log.targetId.pattern && Array.isArray(log.targetId.pattern)) {
         log.targetId.patternSlugs = log.targetId.pattern.map(p => slugify(p));
-      } else {
+      } else if (log.targetId) {
         log.targetId.pattern = [];
         log.targetId.patternSlugs = [];
       }
@@ -448,7 +487,6 @@ const getActivityLogs = async (req, res, next) => {
     });
     const groupedSolved = groupQuestionLogs(qSolvedLogs);
 
-    // 2. question_mastered
     const qMasteredQuery = { userId: req.user._id, action: 'question_mastered' };
     if (dateFilter.start) qMasteredQuery.timestamp = { $gte: dateFilter.start };
     if (dateFilter.end) qMasteredQuery.timestamp = { ...qMasteredQuery.timestamp, $lte: dateFilter.end };
@@ -457,11 +495,10 @@ const getActivityLogs = async (req, res, next) => {
       .limit(limitPerAction)
       .populate({ path: 'targetId', select: 'title platform platformQuestionId difficulty pattern' })
       .lean();
-    qMasteredLogs = qMasteredLogs.filter(log => log.targetId && log.targetId._id);
     qMasteredLogs = qMasteredLogs.map(log => {
-      if (log.targetId?.pattern && Array.isArray(log.targetId.pattern)) {
+      if (log.targetId && log.targetId.pattern && Array.isArray(log.targetId.pattern)) {
         log.targetId.patternSlugs = log.targetId.pattern.map(p => slugify(p));
-      } else {
+      } else if (log.targetId) {
         log.targetId.pattern = [];
         log.targetId.patternSlugs = [];
       }
@@ -469,7 +506,6 @@ const getActivityLogs = async (req, res, next) => {
     });
     const groupedMastered = groupQuestionLogs(qMasteredLogs);
 
-    // 3. revision_completed
     const { logs: revisionLogs } = await getRevisionLogsFromSchedules(req.user._id, {
       startDate: dateFilter.start,
       endDate: dateFilter.end,
@@ -482,14 +518,12 @@ const getActivityLogs = async (req, res, next) => {
     const onTimeGrouped = groupRevisionLogs(onTimeRaw);
     const overdueGrouped = groupRevisionLogs(overdueRaw);
 
-    // 4. goal_achieved (latest 5 completed and 5 failed)
     const goalData = await getGoalStatusArrays(req.user._id, 1, limitPerAction);
     const goalAchieved = {
       completed: goalData.completed,
       failed: goalData.failed
     };
 
-    // 5. group_goal_progress (latest 5, filter >50% or 100%)
     const groupGoalProgressQuery = { userId: req.user._id, action: 'group_goal_progress' };
     if (dateFilter.start) groupGoalProgressQuery.timestamp = { $gte: dateFilter.start };
     if (dateFilter.end) groupGoalProgressQuery.timestamp = { ...groupGoalProgressQuery.timestamp, $lte: dateFilter.end };
@@ -505,7 +539,6 @@ const getActivityLogs = async (req, res, next) => {
       return percentage > 50 || percentage === 100;
     });
 
-    // 6. group_goal_completed (latest 5)
     const groupGoalCompletedQuery = { userId: req.user._id, action: 'group_goal_completed' };
     if (dateFilter.start) groupGoalCompletedQuery.timestamp = { $gte: dateFilter.start };
     if (dateFilter.end) groupGoalCompletedQuery.timestamp = { ...groupGoalCompletedQuery.timestamp, $lte: dateFilter.end };
@@ -514,7 +547,6 @@ const getActivityLogs = async (req, res, next) => {
       .limit(limitPerAction)
       .lean();
 
-    // 7. group_challenge_progress (latest 5, filter >50% or 100%)
     const groupChallengeProgressQuery = { userId: req.user._id, action: 'group_challenge_progress' };
     if (dateFilter.start) groupChallengeProgressQuery.timestamp = { $gte: dateFilter.start };
     if (dateFilter.end) groupChallengeProgressQuery.timestamp = { ...groupChallengeProgressQuery.timestamp, $lte: dateFilter.end };
@@ -528,7 +560,6 @@ const getActivityLogs = async (req, res, next) => {
       return newProgress > 50 || newProgress === 100;
     });
 
-    // 8. group_challenge_completed (latest 5)
     const groupChallengeCompletedQuery = { userId: req.user._id, action: 'group_challenge_completed' };
     if (dateFilter.start) groupChallengeCompletedQuery.timestamp = { $gte: dateFilter.start };
     if (dateFilter.end) groupChallengeCompletedQuery.timestamp = { ...groupChallengeCompletedQuery.timestamp, $lte: dateFilter.end };
@@ -657,7 +688,7 @@ const getTodayGroupedFeed = async (req, res, next) => {
         user.solvedToday = user.solvedToday.map(solve => {
           if (solve.question && solve.question.pattern && Array.isArray(solve.question.pattern)) {
             solve.question.patternSlugs = solve.question.pattern.map(p => slugify(p));
-          } else {
+          } else if (solve.question) {
             solve.question.pattern = [];
             solve.question.patternSlugs = [];
           }

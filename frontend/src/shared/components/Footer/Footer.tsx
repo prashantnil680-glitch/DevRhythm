@@ -180,7 +180,7 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
             links={[
               { label: 'Questions', href: ROUTES.QUESTIONS.ROOT },
               { label: 'Patterns', href: '/patterns' },
-              { label: 'Visualizer Algo', href: 'https://sortopia.vercel.app/' },
+              { label: 'Visualizer Algo', href: 'https://sortopia.devrhythm.space' },
             ]}
           />
 

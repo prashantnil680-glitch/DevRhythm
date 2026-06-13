@@ -10,18 +10,18 @@ const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://devrhythm.space';
 const OG_IMAGE = `${SITE_URL}/images/logos/og-questions.png`;
 
 export const metadata: Metadata = {
-  title: 'Coding Problems Database · DevRhythm – Practice DSA & Algorithms',
+  title: 'Spaced Repetition for Coding Problems · DevRhythm – Practice DSA & Algorithms',
   description:
-    'Browse thousands of coding problems from LeetCode, Codeforces, and more. Filter by difficulty, platform, pattern, and tags. Track your solves and mastery.',
+    'Master coding problems using spaced repetition. Browse questions from LeetCode, Codeforces, and more. Filter by difficulty, platform, pattern, and tags. Track solves, revisions, and mastery over time.',
   keywords: [
+    'spaced repetition coding',
     'coding problems',
-    'DSA practice',
-    'LeetCode problems',
-    'algorithm questions',
-    'data structures',
+    'DSA practice with spaced repetition',
+    'LeetCode spaced repetition',
+    'algorithm revision',
+    'data structures mastery',
     'coding interview prep',
-    'problem solving',
-    'DevRhythm questions',
+    'DevRhythm',
     'programming challenges',
   ].join(', '),
   robots: {
@@ -39,9 +39,9 @@ export const metadata: Metadata = {
     canonical: `${SITE_URL}/questions`,
   },
   openGraph: {
-    title: 'Coding Problems Database · DevRhythm',
+    title: 'Spaced Repetition for Coding Problems · DevRhythm',
     description:
-      'Browse thousands of coding problems from LeetCode, Codeforces, and more. Filter by difficulty, platform, pattern, and tags.',
+      'Master coding problems with spaced repetition. Browse thousands of problems, schedule revisions, and track your long‑term progress.',
     url: `${SITE_URL}/questions`,
     siteName: 'DevRhythm',
     images: [
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
         url: OG_IMAGE,
         width: 1200,
         height: 630,
-        alt: 'DevRhythm Questions – Practice coding problems',
+        alt: 'DevRhythm – Spaced repetition for coding problems',
       },
     ],
     locale: 'en_US',
@@ -57,9 +57,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Coding Problems Database · DevRhythm',
+    title: 'Spaced Repetition for Coding Problems · DevRhythm',
     description:
-      'Browse thousands of coding problems from LeetCode, Codeforces, and more. Filter by difficulty, platform, pattern, and tags.',
+      'Master coding problems with spaced repetition. Browse thousands of problems, schedule revisions, and track your long‑term progress.',
     images: [OG_IMAGE],
     site: '@devrhythm',
   },
@@ -100,10 +100,6 @@ const searchActionSchema = {
     'query-input': 'required name=search_term_string',
   },
 };
-
-// Note: ItemList schema is dynamically generated on client-side for the actual questions.
-// We provide a static placeholder but the client component will update it if needed.
-// For now, we include a generic ItemList to satisfy Google's expectations.
 
 export default function QuestionsPage() {
   return (

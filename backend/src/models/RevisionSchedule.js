@@ -32,7 +32,7 @@ const RevisionScheduleSchema = new mongoose.Schema({
     type: Number,
     default: 0,
     min: 0,
-    max: 4,
+    max: 5,
   },
   status: {
     type: String,
@@ -43,7 +43,7 @@ const RevisionScheduleSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  overdueActive: {          
+  overdueActive: {
     type: Boolean,
     default: false,
     index: true,
@@ -56,7 +56,7 @@ const RevisionScheduleSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Indexes (add for new field if needed)
+// Indexes
 RevisionScheduleSchema.index({ userId: 1, status: 1 });
 RevisionScheduleSchema.index({ userId: 1, schedule: 1 });
 RevisionScheduleSchema.index({ userId: 1, questionId: 1 }, { unique: true });
@@ -64,11 +64,8 @@ RevisionScheduleSchema.index({ schedule: 1, status: 1 });
 RevisionScheduleSchema.index({ userId: 1, currentRevisionIndex: 1 });
 RevisionScheduleSchema.index({ userId: 1, overdueActive: 1 });
 RevisionScheduleSchema.index({ schedule: 1, userId: 1, status: 1 });
-RevisionScheduleSchema.index({
-  createdAt: 1,
-}, {
-  expireAfterSeconds: 2592000,
-  partialFilterExpression: { status: 'completed' },
-});
+
+// TTL index removed to prevent automatic deletion of completed revision schedules.
+// Completed schedules will remain in the database indefinitely, preserving revision history.
 
 module.exports = mongoose.model('RevisionSchedule', RevisionScheduleSchema);

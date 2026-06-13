@@ -683,45 +683,63 @@ const recordTimeSpent = async (req, res, next) => {
 const rescheduleRevision = async (req, res, next) => {
   try {
     const timeZone = getUserTimeZone(req);
-    const { newDate, revisionIndex } = req.body;
-    
-    if (revisionIndex < 0 || revisionIndex > 4) {
-      throw new AppError('Invalid revision index', 400);
+    const { newDate } = req.body;
+    // revisionIndex is accepted but ignored when all revisions are completed.
+    // It is kept for backward compatibility with the frontend.
+
+    if (!newDate) {
+      throw new AppError('newDate is required', 400);
     }
-    
+
     const revision = await RevisionSchedule.findOne({
       _id: req.params.revisionId,
       userId: req.user._id,
     });
-    
+
     if (!revision) {
       throw new AppError('Revision schedule not found', 404);
     }
-    
-    if (revision.status === 'completed') {
-      throw new AppError('Cannot reschedule a completed revision schedule.', 400);
+
+    // Check if all scheduled revisions have been completed.
+    const allCompleted = revision.completedRevisions.length === revision.schedule.length;
+
+    if (!allCompleted) {
+      throw new AppError(
+        'Cannot reschedule until all revisions (including overdue) are completed. ' +
+        'Please complete all pending revisions first.',
+        400
+      );
     }
-    
-    const currentDueDate = revision.schedule[revision.currentRevisionIndex];
-    
-    if (!isToday(currentDueDate, timeZone)) {
-      throw new AppError('Revisions can only be rescheduled on their scheduled due date.', 400);
-    }
-    
-    revision.schedule[revisionIndex] = new Date(newDate);
+
+    // Generate new schedule based on the provided newDate (local date in user's timezone)
+    const baseLocal = DateTime.fromJSDate(new Date(newDate), { zone: timeZone }).startOf('day');
+    const scheduleUTC = constants.REVISION_SCHEDULE.map(days => {
+      return baseLocal.plus({ days }).toUTC().toJSDate();
+    });
+
+    // Reset the revision schedule document
+    revision.schedule = scheduleUTC;
+    revision.baseDate = baseLocal.toUTC().toJSDate();
+    revision.completedRevisions = [];
+    revision.currentRevisionIndex = 0;
+    revision.status = 'active';
+    revision.overdueCount = 0;
+    revision.overdueActive = false;
     revision.updatedAt = new Date();
-    
-    if (revisionIndex < revision.currentRevisionIndex) {
-      revision.currentRevisionIndex = revisionIndex;
-    }
-    
+
     await revision.save();
-    
+
+    // Invalidate caches for the user's revisions
     await invalidateCache(`revisions:*:user:${req.user._id}:*`);
-    
-    res.json(formatResponse('Revision rescheduled successfully', {
-      revision,
-    }));
+
+    res.json({
+      success: true,
+      statusCode: 200,
+      message: 'Revision schedule has been reset and a new schedule created.',
+      data: { revision },
+      meta: { timestamp: new Date().toISOString() },
+      error: null,
+    });
   } catch (error) {
     next(error);
   }

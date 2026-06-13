@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
+import Link from 'next/link';
 import { FiCheck, FiAlertCircle } from 'react-icons/fi';
 import { differenceInDays } from 'date-fns';
 import { useMarkRevision } from '@/features/revision/hooks/useMarkRevision';
@@ -12,6 +13,14 @@ import styles from './RevisionTimelinePanel.module.css';
 const formatLocalDate = (dateString: string): string => {
   const date = new Date(dateString);
   return date.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const getDatePath = (dateString: string): string => {
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `/activity/${year}-${month}-${day}`;
 };
 
 const getDaysRemainingLocal = (scheduledDate: string): number => {
@@ -73,7 +82,6 @@ export const RevisionTimelinePanel: React.FC<RevisionTimelinePanelProps> = ({
   }, [lastCompletedIndex]);
 
   useLayoutEffect(() => {
-    // Delay to ensure DOM is fully painted
     const timer = setTimeout(() => {
       updateLineHeightToLastCompleted();
     }, 50);
@@ -154,6 +162,7 @@ export const RevisionTimelinePanel: React.FC<RevisionTimelinePanelProps> = ({
         {scheduleStatuses.map((item, idx) => {
           const { status, date } = item;
           const formattedDate = formatLocalDate(date);
+          const datePath = getDatePath(date);
           const isCompleted = status === 'Completed';
           const isPending = status === 'Pending';
           const isOverdue = status === 'Overdue';
@@ -187,7 +196,9 @@ export const RevisionTimelinePanel: React.FC<RevisionTimelinePanelProps> = ({
                 {!isCompleted && !isOverdue && <div className={styles.innerDot} />}
               </div>
               <div className={styles.content}>
-                <div className={styles.date}>{formattedDate}</div>
+                <Link href={datePath} className={styles.dateLink}>
+                  {formattedDate}
+                </Link>
                 <div className={styles.statusRow}>
                   <span
                     className={`${styles.status} ${

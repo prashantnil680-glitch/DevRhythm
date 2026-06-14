@@ -10,6 +10,7 @@ const { cache } = require('../../middleware/cache');
 const rateLimiters = require('../../middleware/rateLimiter');
 const Joi = require('joi');
 
+// LeetCode endpoints (no caching – rate-limited instead)
 router.get('/search-leetcode',
   auth,
   rateLimiters.leetcodeSearchLimiter,
@@ -27,18 +28,63 @@ router.post('/fetch-leetcode',
   questionController.fetchLeetCodeQuestion
 );
 
+// Daily problem (no caching – refreshes daily)
 router.get('/daily',
   auth,
   rateLimiters.userLimiter,
   questionController.getDailyProblemAndGoal
 );
 
-router.get('/',optionalAuth, rateLimiters.userLimiter, cache(300, 'questions:list'), validate(questionValidator.getQuestions, 'query'), questionController.getQuestions);
-router.get('/patterns',optionalAuth, rateLimiters.userLimiter, cache(1800, 'questions:patterns'), questionController.getPatterns);
-router.get('/tags',optionalAuth, rateLimiters.userLimiter, cache(1800, 'questions:tags'), questionController.getTags);
-router.get('/statistics',optionalAuth, rateLimiters.userLimiter, cache(3600, 'questions:statistics'), questionController.getStatistics);
-router.get('/deleted', auth, rateLimiters.userLimiter, cache(300, 'questions:deleted'), validate(questionValidator.getQuestions, 'query'), questionController.getDeletedQuestions);
-router.get('/platform/:platform/:platformQuestionId',optionalAuth, rateLimiters.userLimiter, cache(3600, 'question:platform'), validate(questionValidator.getQuestionByPlatformId, 'params'), questionController.getQuestionByPlatformId);
+// Main list endpoint – cached 30 seconds
+router.get('/',
+  optionalAuth,
+  rateLimiters.userLimiter,
+  cache(30, 'questions:list'),
+  validate(questionValidator.getQuestions, 'query'),
+  questionController.getQuestions
+);
+
+// Static metadata endpoints – cached longer (30 minutes)
+router.get('/patterns',
+  optionalAuth,
+  rateLimiters.userLimiter,
+  cache(1800, 'questions:patterns'),
+  questionController.getPatterns
+);
+
+router.get('/tags',
+  optionalAuth,
+  rateLimiters.userLimiter,
+  cache(1800, 'questions:tags'),
+  questionController.getTags
+);
+
+router.get('/statistics',
+  optionalAuth,
+  rateLimiters.userLimiter,
+  cache(3600, 'questions:statistics'),
+  questionController.getStatistics
+);
+
+// Deleted questions (authenticated only, short cache)
+router.get('/deleted',
+  auth,
+  rateLimiters.userLimiter,
+  cache(300, 'questions:deleted'),
+  validate(questionValidator.getQuestions, 'query'),
+  questionController.getDeletedQuestions
+);
+
+// Single question by platform ID – cached 1 hour (rarely changes)
+router.get('/platform/:platform/:platformQuestionId',
+  optionalAuth,
+  rateLimiters.userLimiter,
+  cache(3600, 'question:platform'),
+  validate(questionValidator.getQuestionByPlatformId, 'params'),
+  questionController.getQuestionByPlatformId
+);
+
+// Question details by platform ID (with user progress) – cached 30 seconds
 router.get('/platform/:platform/:platformQuestionId/details',
   optionalAuth,
   attachUserTimeZone,  
@@ -50,7 +96,17 @@ router.get('/platform/:platform/:platformQuestionId/details',
   }), 'params'),
   questionController.getQuestionDetailsByPlatform
 );
-router.get('/:id', auth, rateLimiters.userLimiter, cache(3600, 'question'), validate(questionValidator.getQuestionById, 'params'), questionController.getQuestionById);
+
+// Single question by ID – cached 1 hour
+router.get('/:id',
+  auth,
+  rateLimiters.userLimiter,
+  cache(3600, 'question'),
+  validate(questionValidator.getQuestionById, 'params'),
+  questionController.getQuestionById
+);
+
+// Detailed question with user progress – cached 30 seconds
 router.get('/:id/details',
   auth,
   attachUserTimeZone,  
@@ -59,17 +115,58 @@ router.get('/:id/details',
   validate(Joi.object({ id: Joi.string().hex().length(24).required() }), 'params'),
   questionController.getQuestionDetails
 );
-router.get('/similar/:id', auth, rateLimiters.userLimiter, cache(3600, 'question:similar'), validate(questionValidator.getSimilarQuestions, 'params'), validate(Joi.object({ limit: Joi.number().integer().min(1).max(50).optional() }), 'query'), questionController.getSimilarQuestions);
-router.post('/', auth, rateLimiters.questionCreateLimiter, validate(questionValidator.createQuestion), questionController.createQuestion);
-router.put('/:id', auth, rateLimiters.questionUpdateLimiter, validate(questionValidator.updateQuestion), questionController.updateQuestion);
-router.delete('/:id', auth, rateLimiters.questionDeleteLimiter, validate(questionValidator.deleteQuestion, 'params'), questionController.deleteQuestion);
-router.post('/:id/restore', auth, rateLimiters.questionUpdateLimiter, validate(questionValidator.restoreQuestion, 'params'), questionController.restoreQuestion);
-router.delete('/:id/permanent', auth, rateLimiters.questionDeleteLimiter, validate(questionValidator.permanentDeleteQuestion, 'params'), questionController.permanentDeleteQuestion);
 
-// NEW ROUTE: Get questions by pattern/tag slug
-router.get('/pattern/:patternSlug',
-  auth,  // require authentication (user must be logged in)
+// Similar questions – cached 1 hour
+router.get('/similar/:id',
+  auth,
   rateLimiters.userLimiter,
+  cache(3600, 'question:similar'),
+  validate(questionValidator.getSimilarQuestions, 'params'),
+  validate(Joi.object({ limit: Joi.number().integer().min(1).max(50).optional() }), 'query'),
+  questionController.getSimilarQuestions
+);
+
+// Create, update, delete (no caching – immediate consistency required)
+router.post('/',
+  auth,
+  rateLimiters.questionCreateLimiter,
+  validate(questionValidator.createQuestion),
+  questionController.createQuestion
+);
+
+router.put('/:id',
+  auth,
+  rateLimiters.questionUpdateLimiter,
+  validate(questionValidator.updateQuestion),
+  questionController.updateQuestion
+);
+
+router.delete('/:id',
+  auth,
+  rateLimiters.questionDeleteLimiter,
+  validate(questionValidator.deleteQuestion, 'params'),
+  questionController.deleteQuestion
+);
+
+router.post('/:id/restore',
+  auth,
+  rateLimiters.questionUpdateLimiter,
+  validate(questionValidator.restoreQuestion, 'params'),
+  questionController.restoreQuestion
+);
+
+router.delete('/:id/permanent',
+  auth,
+  rateLimiters.questionDeleteLimiter,
+  validate(questionValidator.permanentDeleteQuestion, 'params'),
+  questionController.permanentDeleteQuestion
+);
+
+// Get questions by pattern/tag slug (requires authentication, short cache)
+router.get('/pattern/:patternSlug',
+  auth,
+  rateLimiters.userLimiter,
+  cache(30, 'questions:pattern'),
   validate(Joi.object({
     patternSlug: Joi.string().pattern(/^[a-z0-9-]+$/).required()
   }), 'params'),

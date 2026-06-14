@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { questionService } from '../services/questionService';
 import { questionsKeys } from '@/shared/lib/react-query';
 import { slugify } from '@/shared/lib/stringUtils';
@@ -10,47 +10,40 @@ interface UseQuestionsParams {
   limit?: number;
   platform?: string;
   difficulty?: string;
-  pattern?: string;        // human-readable pattern name, e.g., "Hash Table"
+  pattern?: string;
   tags?: string[];
-  search?: string;         // user input for exact problem, e.g., "two sum"
+  search?: string;
   sort?: SortOption;
-  status?: string;         // 'solved' or 'all'
+  status?: string;
 }
 
 export function useQuestions(params?: UseQuestionsParams) {
-  // Build the actual query parameters for the API
   const apiParams: Record<string, any> = {};
 
   if (params?.page) apiParams.page = params.page;
   if (params?.limit) apiParams.limit = params.limit;
   if (params?.platform) apiParams.platform = params.platform;
 
-  // Difficulty: omit if 'all' (backend default)
   if (params?.difficulty && params.difficulty !== 'all') {
     apiParams.difficulty = params.difficulty;
   }
 
-  // Pattern: slugify the human-readable name
   if (params?.pattern && params.pattern !== 'all') {
     apiParams.pattern = slugify(params.pattern);
   }
 
-  // Tags: already array
   if (params?.tags && params.tags.length > 0) {
     apiParams.tags = params.tags;
   }
 
-  // Search: treat as exact match on platformQuestionId -> qtitle, slugify
   if (params?.search && params.search.trim()) {
     apiParams.qtitle = slugify(params.search.trim());
   }
 
-  // Status: 'solved' or omit for 'all'
   if (params?.status === 'solved') {
     apiParams.status = 'solved';
   }
 
-  // Sort mapping
   if (params?.sort) {
     switch (params.sort) {
       case 'newest':
@@ -71,7 +64,6 @@ export function useQuestions(params?: UseQuestionsParams) {
         break;
     }
   } else {
-    // default sort
     apiParams.sortBy = 'createdAt';
     apiParams.sortOrder = 'desc';
   }
@@ -79,6 +71,8 @@ export function useQuestions(params?: UseQuestionsParams) {
   return useQuery({
     queryKey: questionsKeys.list(apiParams),
     queryFn: () => questionService.getQuestions(apiParams),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes – data rarely changes
+    refetchOnWindowFocus: false, // avoid refetching when tab becomes active
+    placeholderData: keepPreviousData,
   });
 }

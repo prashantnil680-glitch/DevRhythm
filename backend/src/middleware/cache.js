@@ -38,7 +38,8 @@ const cache = (duration = DEFAULT_TTL, keyPrefix = '') => {
 
       const originalJson = res.json;
       res.json = function(data) {
-        redisClient.setEx(cacheKey, duration, JSON.stringify(data));
+        redisClient.setEx(cacheKey, duration, JSON.stringify(data))
+          .catch(err => console.warn('Redis set error:', err.message));
         originalJson.call(this, data);
       };
       next();

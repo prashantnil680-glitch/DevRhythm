@@ -77,7 +77,7 @@ const UserQuestionProgressSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Indexes (unchanged)
+// ========== EXISTING INDEXES (preserved) ==========
 UserQuestionProgressSchema.index({ userId: 1, questionId: 1 }, { unique: true });
 UserQuestionProgressSchema.index({ userId: 1, status: 1 });
 UserQuestionProgressSchema.index({ userId: 1, updatedAt: -1 });
@@ -89,10 +89,11 @@ UserQuestionProgressSchema.index({ userId: 1, "attempts.count": 1 });
 UserQuestionProgressSchema.index({ userId: 1, personalDifficulty: 1 });
 UserQuestionProgressSchema.index({ userId: 1, lastActivityDate: 1 });
 
+// ========== NEW PERFORMANCE INDEX ==========
+// For faster solved status filtering (status=solved) – used by question list endpoint
+UserQuestionProgressSchema.index({ userId: 1, status: 1, questionId: 1 });
+
 // ========== AUTO STATUS PROGRESSION HOOKS ==========
-// These hooks update status (Not Started → Attempted → Solved → Mastered)
-// but do NOT modify confidenceLevel. Confidence is managed separately
-// via background jobs (confidence.increment).
 UserQuestionProgressSchema.post('save', async function(doc) {
   if (doc.__statusUpdating) return;
   doc.__statusUpdating = true;

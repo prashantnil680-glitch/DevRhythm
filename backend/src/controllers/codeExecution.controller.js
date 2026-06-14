@@ -2,7 +2,7 @@
  * src/controllers/codeExecution.controller.js
  *
  * Handles code execution requests SYNCHRONOUSLY (no Bull queue).
- * Executes code immediately and returns result in the HTTP response.
+ * Executes code directly and returns result in the HTTP response.
  * Syntax validation is performed synchronously for fast rejection.
  */
 
@@ -10,8 +10,32 @@ const { executeCodeCore, SUPPORTED_LANGUAGES, normalizeLanguage } = require('../
 const { formatResponse } = require('../utils/helpers/response');
 const AppError = require('../utils/errors/AppError');
 const Question = require('../models/Question');
+const CodeExecutionHistory = require('../models/CodeExecutionHistory');
 const { validatePythonSyntax } = require('../utils/pythonSyntaxValidator');
 const { validateCppSyntax } = require('../utils/cppSyntaxValidator');
+const { normalizeTestCaseInput } = require('../utils/testCaseNormalizer');
+const { normalizeCode } = require('../utils/codeNormalizer');
+const crypto = require('crypto');
+
+/**
+ * Helper to get normalized code hash for matching.
+ */
+function getNormalizedCodeHash(code) {
+  const normalized = normalizeCode(code);
+  return crypto.createHash('sha256').update(normalized).digest('hex');
+}
+
+/**
+ * Helper to normalize test cases for matching.
+ * Returns a string key (e.g., normalized stdin strings joined).
+ */
+function normalizeTestCasesForMatch(testCases) {
+  if (!testCases || !Array.isArray(testCases)) return '';
+  return testCases.map(tc => {
+    const normalizedStdin = normalizeTestCaseInput(tc.stdin || '');
+    return `${normalizedStdin}|${tc.expected || ''}`;
+  }).join('||');
+}
 
 /**
  * SYNC ENDPOINT – executes code and returns result directly.
@@ -47,26 +71,101 @@ const runCode = async (req, res, next) => {
       }));
     }
 
+    // Prepare test cases array for comparison
     let finalTestCases = testCases;
     if (stdin !== undefined && !testCases) {
       finalTestCases = [{ stdin: stdin || '', expected: expected || '' }];
     }
+    if (!finalTestCases || finalTestCases.length === 0) {
+      throw new AppError('No test cases provided', 400);
+    }
+
+    // ========== EXECUTION HISTORY REUSE LOGIC ==========
+    const userId = req.user._id;
+    const normalizedCodeHash = getNormalizedCodeHash(code);
+    const testCasesKey = normalizeTestCasesForMatch(finalTestCases);
+
+    const existingHistory = await CodeExecutionHistory.findOne({
+      userId,
+      questionId,
+      language: normalizedLang,
+      normalizedCodeHash,
+    })
+      .sort({ executedAt: -1 })
+      .lean();
+
+    let historyMatched = false;
+    let matchedResult = null;
+
+    if (existingHistory) {
+      const storedTestCasesKey = normalizeTestCasesForMatch(
+        existingHistory.testCases.map(tc => ({ stdin: tc.stdin, expected: tc.expected }))
+      );
+      if (storedTestCasesKey === testCasesKey) {
+        historyMatched = true;
+        matchedResult = existingHistory;
+      }
+    }
+
+    if (historyMatched && matchedResult) {
+      const UserQuestionProgress = require('../models/UserQuestionProgress');
+      const User = require('../models/User');
+
+      // Increment totalTimeSpent in progress
+      await UserQuestionProgress.updateOne(
+        { userId, questionId },
+        { $inc: { totalTimeSpent: timeSpent }, $set: { lastActivityDate: new Date() } },
+        { upsert: true }
+      );
+
+      // Increment totalTimeSpent in user stats
+      await User.updateOne(
+        { _id: userId },
+        { $inc: { 'stats.totalTimeSpent': timeSpent } }
+      );
+
+      // Update lastActivityDate for heatmap (async, don't await)
+      const { updateUserActivity } = require('../services/user.service');
+      updateUserActivity(userId, new Date(), req.userTimeZone || 'UTC').catch(err => {
+        console.warn('Failed to update user activity on history match:', err.message);
+      });
+
+      const resultData = {
+        questionId: matchedResult.questionId,
+        results: matchedResult.testCases.map(tc => ({
+          input: tc.stdin,
+          output: tc.output,
+          expected: tc.expected,
+          error: tc.error,
+          exitCode: tc.exitCode,
+          passed: tc.passed,
+        })),
+        passedCount: matchedResult.summary.passedCount,
+        totalCount: matchedResult.summary.totalCount,
+        allPassed: matchedResult.summary.allPassed,
+        defaultTestCasesCount: matchedResult.summary.defaultTestCasesCount,
+        userCustomTestCasesCount: matchedResult.summary.userCustomTestCasesCount,
+        customTestCasesCount: matchedResult.summary.customTestCasesCount,
+      };
+
+      return res.json(formatResponse('Code execution completed (cached result)', resultData));
+    }
+    // ========== END REUSE LOGIC ==========
 
     // Build execution body
     const executionBody = {
       language: normalizedLang,
       code,
       questionId,
-      testCases: finalTestCases || [],
+      testCases: finalTestCases,
       stdin,
       expected,
       timeSpent,
     };
 
-    // Execute code directly (synchronous call, but internally async because of external API)
+    // Execute code directly (synchronous call)
     const result = await executeCodeCore(req.user._id, executionBody, req.userTimeZone || 'UTC');
 
-    // Return the result directly
     res.json(formatResponse('Code execution completed', result));
   } catch (error) {
     next(error);

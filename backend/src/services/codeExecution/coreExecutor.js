@@ -14,6 +14,7 @@ const JavaGenerator = require('./wrappers/javaGenerator');
 const CppGenerator = require('./wrappers/cppGenerator');
 const JsGenerator = require('./wrappers/jsGenerator');
 const { normalizeTestCaseInput } = require('../../utils/testCaseNormalizer');
+const { normalizeCode } = require('../../utils/codeNormalizer');
 const OutputComparator = require('../../utils/helpers/outputComparator');
 const AppError = require('../../utils/errors/AppError');
 const Question = require('../../models/Question');
@@ -52,10 +53,11 @@ const GENERATORS = {
 };
 
 /**
- * Compute SHA256 hash of code for caching.
+ * Compute SHA256 hash of normalized code.
  */
-function getCodeHash(code) {
-  return crypto.createHash('sha256').update(code).digest('hex');
+function getNormalizedCodeHash(code) {
+  const normalized = normalizeCode(code);
+  return crypto.createHash('sha256').update(normalized).digest('hex');
 }
 
 /**
@@ -107,21 +109,27 @@ const normalizeForCompare = (str) => (str || '').replace(/\s+/g, ' ').trim();
  */
 const buildTestCases = (question, userProgress, requestTestCases, stdin, expected) => {
   const defaultTestCases = (question.testCases || []).map(tc => ({
+    originalStdin: tc.stdin || tc.input,
     stdin: normalizeTestCaseInput(tc.stdin || tc.input),
     expected: tc.expected || tc.expectedOutput,
   }));
 
   const userCustomTestCases = (userProgress?.customTestCases || []).map(tc => ({
+    originalStdin: tc.stdin,
     stdin: normalizeTestCaseInput(tc.stdin),
     expected: tc.expected,
   }));
 
-  const requestTests = (requestTestCases && Array.isArray(requestTestCases)) ? requestTestCases.map(tc => ({
-    stdin: normalizeTestCaseInput(tc.stdin),
-    expected: tc.expected,
-  })) : [];
+  const requestTests = (requestTestCases && Array.isArray(requestTestCases)) 
+    ? requestTestCases.map(tc => ({
+        originalStdin: tc.stdin,
+        stdin: normalizeTestCaseInput(tc.stdin),
+        expected: tc.expected,
+      }))
+    : [];
 
   const singleTest = (stdin !== undefined && !requestTestCases) ? [{
+    originalStdin: stdin,
     stdin: normalizeTestCaseInput(stdin),
     expected: expected || '',
   }] : [];
@@ -159,7 +167,7 @@ const saveCustomTestCases = async (userId, questionId, testCases, defaultTestCas
 
   await UserQuestionProgress.findOneAndUpdate(
     { userId, questionId },
-    { $set: { customTestCases: uniqueCustom.map(tc => ({ stdin: tc.stdin, expected: tc.expected, updatedAt: new Date() })) } },
+    { $set: { customTestCases: uniqueCustom.map(tc => ({ stdin: tc.originalStdin, expected: tc.expected, updatedAt: new Date() })) } },
     { upsert: true }
   );
 };
@@ -214,7 +222,6 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
 
   // ========== AUTO-INJECT INCLUDES FOR C++ ==========
   if (language === 'cpp') {
-    // Use shared function that prepends includes only if missing
     code = prependCppAutoIncludes(code);
   }
 
@@ -246,7 +253,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
   timing.end('test_cases.preparation');
   timing.record('test_cases.count', finalTestCases.length, { count: finalTestCases.length });
 
-  const codeHash = getCodeHash(code);
+  const codeHash = crypto.createHash('sha256').update(originalUserCode).digest('hex');
   let syntaxError = null;
 
   // ========== SYNTAX VALIDATION WITH CACHING (Python & C++) ==========
@@ -262,7 +269,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
     timing.end('validation.syntax_validation');
     if (syntaxError) {
       const failedResults = finalTestCases.map(tc => ({
-        input: tc.stdin,
+        input: tc.originalStdin,
         output: '',
         expected: tc.expected,
         error: syntaxError,
@@ -288,14 +295,13 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
     if (cached) {
       syntaxError = cachedError;
     } else {
-      // Note: validateCppSyntax internally uses prependCppAutoIncludes, so it's safe to pass the raw code
       syntaxError = validateCppSyntax(code);
       await setCachedSyntaxValidation('cpp', codeHash, syntaxError);
     }
     timing.end('validation.syntax_validation');
     if (syntaxError) {
       const failedResults = finalTestCases.map(tc => ({
-        input: tc.stdin,
+        input: tc.originalStdin,
         output: '',
         expected: tc.expected,
         error: syntaxError,
@@ -316,7 +322,6 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
   }
 
   timing.start('validation.normalization');
-  // Normalization is a no‑op in current implementation; just mark as 0ms
   timing.end('validation.normalization');
 
   const generator = GENERATORS[language];
@@ -341,7 +346,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
     batchResults = await executeBatch({
       language,
       code: fullCode,
-      testCases: finalTestCases,
+      testCases: finalTestCases.map(tc => ({ stdin: tc.stdin })),
     });
     const compilerDuration = Date.now() - compilerStart;
     timing.end('compiler.provider_request');
@@ -350,7 +355,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
     timing.end('compiler.provider_request');
     console.error('Execution provider error:', execError);
     const failedResults = finalTestCases.map(tc => ({
-      input: tc.stdin,
+      input: tc.originalStdin,
       output: '',
       expected: tc.expected,
       error: `Code execution service error: ${execError.message}`,
@@ -389,7 +394,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
         expectedParsed = JSON.parse(expectedOutput);
       }
     } catch (e) {
-      // If JSON parsing fails, fall back to string comparison
+      // fallback to string comparison
     }
 
     if (actualParsed !== null && expectedParsed !== null) {
@@ -404,7 +409,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
     }
 
     return {
-      input: testCase.stdin,
+      input: testCase.originalStdin,
       output: actualOutput,
       expected: expectedOutput,
       error: errorMessage || (res.exitCode !== 0 ? `Execution failed with exit code ${res.exitCode}` : ''),
@@ -444,14 +449,17 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
   else if (stdin !== undefined) customToSave = [{ stdin: stdin || '', expected: expected || '' }];
   await saveCustomTestCases(userId, questionId, customToSave, defaultTestCases);
 
+  // ========== SAVE EXECUTION HISTORY WITH NORMALIZED CODE HASH ==========
   timing.start('persistence.result_storage');
+  const normalizedCodeHash = getNormalizedCodeHash(originalUserCode);
   await CodeExecutionHistory.create({
     userId,
     questionId,
     language,
     code: originalUserCode,
+    normalizedCodeHash,
     testCases: results.map(r => ({
-      stdin: r.input,
+      stdin: r.input, // original input string
       expected: r.expected,
       output: r.output,
       error: r.error,

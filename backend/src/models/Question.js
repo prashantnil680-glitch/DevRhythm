@@ -101,7 +101,7 @@ const QuestionSchema = new mongoose.Schema(
             },
           ],
           dataStructures: [{ type: String }],
-          interactive: { type: Boolean, default: false },   // NEW: true for multi-method problems
+          interactive: { type: Boolean, default: false },
           methods: [
             {
               name: { type: String, required: true },
@@ -121,7 +121,7 @@ const QuestionSchema = new mongoose.Schema(
   }
 );
 
-// Existing indexes
+// ========== EXISTING INDEXES (preserved) ==========
 QuestionSchema.index({ platform: 1, platformQuestionId: 1 }, { unique: true });
 QuestionSchema.index({ difficulty: 1 });
 QuestionSchema.index({ pattern: 1 });
@@ -132,6 +132,22 @@ QuestionSchema.index({ createdBy: 1 });
 QuestionSchema.index({ "executionMetadata.methodName": 1 });
 QuestionSchema.index({ title: 1 });
 QuestionSchema.index({ platformQuestionId: 1 });
+
+// ========== NEW PERFORMANCE INDEXES ==========
+// For main list query with platform + difficulty + createdAt sorting
+QuestionSchema.index({ isActive: 1, platform: 1, difficulty: 1, createdAt: -1 });
+
+// For tag filtering with createdAt sorting
+QuestionSchema.index({ isActive: 1, tags: 1, createdAt: -1 });
+
+// For pattern filtering with createdAt sorting
+QuestionSchema.index({ isActive: 1, pattern: 1, createdAt: -1 });
+
+// For exact match by platformQuestionId (used in getQuestionByPlatformId and SSR)
+QuestionSchema.index({ platformQuestionId: 1, isActive: 1 });
+
+// For fast counting of active questions (used in statistics)
+QuestionSchema.index({ isActive: 1 });
 
 QuestionSchema.pre("save", function (next) {
   if (this.pattern && !Array.isArray(this.pattern)) {

@@ -8,5 +8,6 @@ export function useQuestionDetails(questionId: string, options?: { enabled?: boo
     queryFn: () => questionService.getQuestionDetails(questionId),
     enabled: options?.enabled ?? true,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
   });
 }

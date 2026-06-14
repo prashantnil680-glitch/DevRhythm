@@ -173,4 +173,10 @@ function parseValue(valueStr) {
   return valueStr;
 }
 
-module.exports = { normalizeTestCaseInput, isInteractiveFormat };
+function normalizeTestCaseInputWithOriginal(stdin) {
+  const original = stdin || '';
+  const normalized = normalizeTestCaseInput(stdin);
+  return { original, normalized };
+}
+
+module.exports = { normalizeTestCaseInput, normalizeTestCaseInputWithOriginal, isInteractiveFormat };

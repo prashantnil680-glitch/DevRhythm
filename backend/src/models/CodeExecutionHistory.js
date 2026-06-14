@@ -23,6 +23,11 @@ const CodeExecutionHistorySchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    normalizedCodeHash: {
+      type: String,
+      index: true,
+      trim: true,
+    },
     testCases: [
       {
         stdin: String,
@@ -49,6 +54,12 @@ const CodeExecutionHistorySchema = new mongoose.Schema(
   {
     timestamps: true,
   }
+);
+
+// Compound index for fast execution matching (used by history reuse feature)
+CodeExecutionHistorySchema.index(
+  { userId: 1, questionId: 1, language: 1, normalizedCodeHash: 1 },
+  { name: 'idx_execution_match' }
 );
 
 module.exports = mongoose.model('CodeExecutionHistory', CodeExecutionHistorySchema);

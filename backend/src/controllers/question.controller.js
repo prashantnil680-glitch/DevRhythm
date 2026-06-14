@@ -5,6 +5,7 @@ const UserQuestionProgress = require('../models/UserQuestionProgress');
 const RevisionSchedule = require('../models/RevisionSchedule');
 const CodeExecutionHistory = require('../models/CodeExecutionHistory');
 const ActivityLog = require('../models/ActivityLog');
+const { client: redisClient } = require('../config/redis');
 const { formatResponse } = require('../utils/helpers/response');
 const { getPaginationParams, paginate } = require('../utils/helpers/pagination');
 const { applySorting } = require('../utils/helpers/sort');
@@ -18,6 +19,8 @@ const revisionService = require('../services/revision.service');
 const dashboardService = require('../services/dashboard.service');
 const leetcodeService = require('../services/leetcode.service');
 const patternQuestionService = require('../services/patternQuestion.service');
+
+const LIST_PROJECTION = '_id title platform platformQuestionId difficulty tags pattern createdAt updatedAt';
 
 const toLocalISOString = (utcDate, timeZone) => {
   if (!utcDate) return null;
@@ -91,25 +94,20 @@ const getQuestions = async (req, res, next) => {
     limit = Math.min(parseInt(limit) || 20, 100);
     const skip = (page - 1) * limit;
 
-    // ========== FIX: Normalize tags to array ==========
     if (tags && !Array.isArray(tags)) {
       tags = [tags];
     }
-    // =================================================
 
     let query = { isActive: true };
 
-    // Platform filter
     if (platform && platform !== 'all') {
       query.platform = platform;
     }
 
-    // Difficulty filter
     if (difficulty && difficulty !== 'all') {
       query.difficulty = difficulty;
     }
 
-    // Pattern filter: resolve slug to pattern name
     if (pattern && pattern !== 'all') {
       const patternName = await patternQuestionService.getPatternNameBySlug(pattern);
       if (!patternName) {
@@ -120,12 +118,10 @@ const getQuestions = async (req, res, next) => {
       query.pattern = patternName;
     }
 
-    // Tags filter (now normalized)
     if (tags && Array.isArray(tags) && tags.length) {
       query.tags = { $in: tags };
     }
 
-    // Status filter (solved only)
     let solvedIds = [];
     if (status === 'solved' && req.user) {
       const solvedProgress = await UserQuestionProgress.find({
@@ -144,17 +140,13 @@ const getQuestions = async (req, res, next) => {
     let questions = [];
     let total = 0;
 
-    // ---- UNIFIED qtitle HANDLING ----
     if (qtitle && qtitle.trim()) {
       const exactSlug = qtitle.trim().toLowerCase().replace(/[^\w\s-]/g, '').replace(/[\s_]+/g, '-').replace(/^-+|-+$/g, '');
-      
-      // Try exact match first
       const exactQuery = { ...query, platformQuestionId: exactSlug };
       const exactCount = await Question.countDocuments(exactQuery);
       
       if (exactCount > 0) {
-        // Exact match found – return those questions (normally one)
-        let dbQuery = Question.find(exactQuery).skip(skip).limit(limit);
+        let dbQuery = Question.find(exactQuery).select(LIST_PROJECTION).skip(skip).limit(limit);
         dbQuery = applySorting(dbQuery, { sortBy, sortOrder }, { createdAt: -1 });
         const [fetchedQuestions, totalCount] = await Promise.all([
           dbQuery.lean(),
@@ -163,7 +155,6 @@ const getQuestions = async (req, res, next) => {
         questions = fetchedQuestions;
         total = totalCount;
       } else {
-        // No exact match – fallback to partial text search using the original qtitle string
         const searchTerm = qtitle.trim();
         const andConditions = [
           { $text: { $search: searchTerm } }
@@ -178,7 +169,8 @@ const getQuestions = async (req, res, next) => {
           { $addFields: { textScore: { $meta: 'textScore' } } },
           { $sort: { textScore: -1 } },
           { $skip: skip },
-          { $limit: limit }
+          { $limit: limit },
+          { $project: this._parseProjection(LIST_PROJECTION) }
         ];
         const countPipeline = [
           { $match: { $and: andConditions } },
@@ -191,9 +183,7 @@ const getQuestions = async (req, res, next) => {
         questions = results;
         total = countResult[0]?.total || 0;
       }
-    }
-    // ---- EXISTING search PARAMETER (unchanged, for backward compatibility) ----
-    else if (search && search.trim()) {
+    } else if (search && search.trim()) {
       const searchTerm = search.trim();
       const andConditions = [
         { $text: { $search: searchTerm } }
@@ -208,7 +198,8 @@ const getQuestions = async (req, res, next) => {
         { $addFields: { textScore: { $meta: 'textScore' } } },
         { $sort: { textScore: -1 } },
         { $skip: skip },
-        { $limit: limit }
+        { $limit: limit },
+        { $project: this._parseProjection(LIST_PROJECTION) }
       ];
       const countPipeline = [
         { $match: { $and: andConditions } },
@@ -220,10 +211,8 @@ const getQuestions = async (req, res, next) => {
       ]);
       questions = results;
       total = countResult[0]?.total || 0;
-    }
-    else {
-      // No search – simple find()
-      let dbQuery = Question.find(query).skip(skip).limit(limit);
+    } else {
+      let dbQuery = Question.find(query).select(LIST_PROJECTION).skip(skip).limit(limit);
       dbQuery = applySorting(dbQuery, { sortBy, sortOrder }, { createdAt: -1 });
       const [fetchedQuestions, totalCount] = await Promise.all([
         dbQuery.lean(),
@@ -233,7 +222,6 @@ const getQuestions = async (req, res, next) => {
       total = totalCount;
     }
 
-    // Add user solved status (if logged in)
     let solvedMap = new Map();
     if (req.user && questions.length > 0 && status !== 'solved') {
       const questionIds = questions.map(q => q._id);
@@ -245,14 +233,12 @@ const getQuestions = async (req, res, next) => {
       solvedMap = new Map(solvedProgress.map(p => [p.questionId.toString(), p.status]));
     }
 
-    // Enrich questions with solved status – respect authentication
     const enrichedQuestions = questions.map(q => {
       let isSolvedFlag = false;
       let userStatusVal = null;
 
       if (req.user) {
         if (status === 'solved') {
-          // Already filtered to solved questions only
           isSolvedFlag = true;
           userStatusVal = 'Solved';
         } else {
@@ -261,7 +247,6 @@ const getQuestions = async (req, res, next) => {
           userStatusVal = solved ? (solvedMap.get(q._id.toString()) || 'Solved') : null;
         }
       }
-      // else: unauthenticated – both remain false/null
 
       return {
         ...q,
@@ -280,7 +265,7 @@ const getQuestions = async (req, res, next) => {
 
 const getQuestionById = async (req, res, next) => {
   try {
-    const question = await Question.findById(req.params.id).populate('similarQuestions', '_id title platform difficulty pattern').select('-__v');
+    const question = await Question.findById(req.params.id).select(LIST_PROJECTION).populate('similarQuestions', '_id title platform difficulty pattern').lean();
     if (!question) throw new AppError('Question not found', 404);
     res.json(formatResponse('Question retrieved successfully', { question }));
   } catch (error) { next(error); }
@@ -295,41 +280,29 @@ const fetchQuestionDetails = async (userId, questionId, timeZone) => {
     activityLogs
   ] = await Promise.all([
     Question.findById(questionId)
-      .select('title problemLink platform platformQuestionId difficulty tags pattern solutionLinks similarQuestions contentRef testCases starterCode source createdBy isActive')
+      .select('title problemLink platform platformQuestionId difficulty tags pattern solutionLinks contentRef testCases starterCode source createdBy isActive')
       .lean(),
-    UserQuestionProgress.findOne({ userId, questionId })
-      .select('-__v')
-      .lean(),
-    RevisionSchedule.findOne({ userId, questionId })
-      .select('-__v')
-      .lean(),
+    UserQuestionProgress.findOne({ userId, questionId }).lean(),
+    RevisionSchedule.findOne({ userId, questionId }).lean(),
     CodeExecutionHistory.find({ userId, questionId })
       .sort({ executedAt: -1 })
       .limit(10)
-      .select('-__v')
       .lean(),
     ActivityLog.find({ userId, targetId: questionId, targetModel: 'Question' })
       .sort({ timestamp: -1 })
       .limit(5)
-      .select('-__v')
       .lean()
   ]);
 
   if (!question) return null;
 
-  // Compute revision count from the revision schedule (source of truth)
   const computedRevisionCount = revision ? revision.completedRevisions.length : 0;
 
-  // If progress exists, override its revisionCount with the computed value
   let updatedProgress = progress ? { ...progress } : null;
   if (updatedProgress) {
     updatedProgress.revisionCount = computedRevisionCount;
   } else if (computedRevisionCount > 0) {
-    // If no progress document exists but the user has revisions, create a minimal progress object
-    updatedProgress = {
-      revisionCount: computedRevisionCount,
-      // other fields will be undefined, but the frontend can handle them
-    };
+    updatedProgress = { revisionCount: computedRevisionCount };
   }
 
   let revisionWithLocalDates = null;
@@ -375,9 +348,7 @@ const getQuestionDetailsByPlatform = async (req, res, next) => {
     const userId = req.user._id;
     const timeZone = req.userTimeZone || 'UTC';
 
-    const question = await Question.findOne({ platform, platformQuestionId, isActive: true })
-      .select('_id')
-      .lean();
+    const question = await Question.findOne({ platform, platformQuestionId, isActive: true }).select('_id').lean();
     if (!question) throw new AppError('Question not found', 404);
 
     const details = await fetchQuestionDetails(userId, question._id, timeZone);
@@ -387,11 +358,20 @@ const getQuestionDetailsByPlatform = async (req, res, next) => {
   }
 };
 
+const invalidateSimilarCache = async (questionId) => {
+  if (!redisClient) return;
+  const cacheKey = `similar:${questionId}`;
+  try {
+    await redisClient.del(cacheKey);
+  } catch (err) {
+    console.warn(`Failed to invalidate similar cache for ${questionId}:`, err.message);
+  }
+};
+
 const createQuestion = async (req, res, next) => {
   try {
     const { isManual = false, contentRef, testCases, starterCode, isPaidOnly } = req.body;
 
-    // Block VIP questions
     if (isPaidOnly === true) {
       throw new AppError('VIP questions are not allowed', 403);
     }
@@ -435,12 +415,10 @@ const createQuestion = async (req, res, next) => {
       req.body.createdBy = null;
     }
 
-    // Create the question without starterCode (to avoid validation errors)
     const questionData = { ...req.body };
     delete questionData.starterCode;
     const question = await Question.create(questionData);
 
-    // For LeetCode questions, fetch the latest starter code snippets
     if (!isManual) {
       try {
         const problemUrl = req.body.problemLink;
@@ -569,9 +547,10 @@ const updateQuestion = async (req, res, next) => {
       id,
       allowedUpdates,
       { new: true, runValidators: true }
-    ).select('-__v');
+    ).select('-__v').lean();
 
     await invalidateQuestionCache(updatedQuestion._id, updatedQuestion.platform, updatedQuestion.platformQuestionId);
+    await invalidateSimilarCache(id);
 
     res.json(formatResponse('Question updated successfully', { question: updatedQuestion }));
   } catch (error) {
@@ -597,7 +576,12 @@ const getDeletedQuestions = async (req, res, next) => {
 
 const getQuestionByPlatformId = async (req, res, next) => {
   try {
-    const question = await Question.findOne({ platform: req.params.platform, platformQuestionId: req.params.platformQuestionId, isActive: true }).populate('similarQuestions', '_id title platform difficulty pattern').select('-__v');
+    const { platform, platformQuestionId } = req.params;
+    const platforms = ['LeetCode', 'Codeforces', 'HackerRank', 'AtCoder', 'CodeChef', 'GeeksForGeeks', 'Other'];
+    const question = await Question.findOne({
+      isActive: true,
+      $or: platforms.map(p => ({ platform: p, platformQuestionId }))
+    }).select('-__v').populate('similarQuestions', '_id title platform difficulty pattern').lean();
     if (!question) throw new AppError('Question not found', 404);
     res.json(formatResponse('Question retrieved successfully', { question }));
   } catch (error) { next(error); }
@@ -608,21 +592,33 @@ const getSimilarQuestions = async (req, res, next) => {
     const targetId = req.params.id;
     const limit = parseInt(req.query.limit) || 10;
 
-    const target = await Question.findById(targetId).select('pattern tags title');
+    let cached = null;
+    const cacheKey = `similar:${targetId}`;
+    if (redisClient) {
+      try {
+        const cachedRaw = await redisClient.get(cacheKey);
+        if (cachedRaw) cached = JSON.parse(cachedRaw);
+      } catch (err) {
+        console.warn('Redis get error in getSimilarQuestions:', err.message);
+      }
+    }
+
+    if (cached) {
+      return res.json(formatResponse('Similar questions retrieved successfully', { similarQuestions: cached }));
+    }
+
+    const target = await Question.findById(targetId).select('pattern tags title').lean();
     if (!target) throw new AppError('Question not found', 404);
 
     let targetPatterns = target.pattern || [];
     if (!Array.isArray(targetPatterns)) targetPatterns = [targetPatterns];
 
-    // Build aggregation pipeline:
-    // 1. First $match with $text search (cannot be inside $or)
-    // 2. Then $match with $or on pattern and tags (applied to text search results)
     const pipeline = [
       {
         $match: {
           _id: { $ne: target._id },
           isActive: true,
-          $text: { $search: target.title }   // text search first, outside $or
+          $text: { $search: target.title }
         }
       },
       {
@@ -695,6 +691,15 @@ const getSimilarQuestions = async (req, res, next) => {
     ];
 
     const similar = await Question.aggregate(pipeline);
+
+    if (redisClient && similar.length > 0) {
+      try {
+        await redisClient.setEx(cacheKey, 3600, JSON.stringify(similar));
+      } catch (err) {
+        console.warn('Redis set error in getSimilarQuestions:', err.message);
+      }
+    }
+
     res.json(formatResponse('Similar questions retrieved successfully', { similarQuestions: similar }));
   } catch (error) {
     next(error);
@@ -921,6 +926,16 @@ const getQuestionsByPattern = async (req, res, next) => {
     next(error);
   }
 };
+
+// Helper to convert projection string to object for aggregation
+function _parseProjection(projectionStr) {
+  const fields = projectionStr.split(' ');
+  const proj = {};
+  for (const field of fields) {
+    if (field.trim()) proj[field.trim()] = 1;
+  }
+  return proj;
+}
 
 module.exports = {
   getQuestions,

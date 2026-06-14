@@ -10,7 +10,6 @@ import { useRunCodeWithPolling } from '@/features/codeExecution/hooks/useRunCode
 import { useDeleteQuestion } from '@/features/question/hooks/useDeleteQuestion';
 import { useQuestionDetails } from '@/features/question/hooks/useQuestionDetails';
 import { useUpdateStatus } from '@/features/progress/hooks/useUpdateStatus';
-import { useSimilarQuestions } from '@/features/question/hooks/useSimilarQuestions';
 import { useTimeTracker } from '@/features/revision/hooks/useTimeTracker';
 import { questionsKeys, slugify } from '@/shared/lib';
 import Button from '@/shared/components/Button';
@@ -109,13 +108,12 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
   const [executionError, setExecutionError] = useState<string | null>(null);
   const [isWarningVisible, setIsWarningVisible] = useState(true);
 
-  // Client-side fallback for similar questions
-  const [similarQuestions, setSimilarQuestions] = useState(initialSimilarQuestions);
-  const [shouldFetchSimilar, setShouldFetchSimilar] = useState(initialSimilarQuestions.length === 0);
+  // Use server-provided similar questions directly – no client fetch needed
+  const similarQuestions = initialSimilarQuestions;
 
   // Warning banner dismissal (global, daily reset)
   useEffect(() => {
-    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
+    const today = new Date().toLocaleDateString('en-CA');
     const dismissedDate = localStorage.getItem('codeRunnerWarningDismissedDate');
     if (dismissedDate === today) {
       setIsWarningVisible(false);
@@ -129,21 +127,6 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
     localStorage.setItem('codeRunnerWarningDismissedDate', today);
     setIsWarningVisible(false);
   };
-
-  const {
-    data: clientSimilarQuestions,
-    isLoading: clientSimilarLoading,
-    error: clientSimilarError,
-  } = useSimilarQuestions(initialQuestion._id, shouldFetchSimilar);
-
-  useEffect(() => {
-    if (clientSimilarQuestions && clientSimilarQuestions.length > 0) {
-      setSimilarQuestions(clientSimilarQuestions);
-      setShouldFetchSimilar(false);
-    } else if (clientSimilarError && !clientSimilarLoading) {
-      setShouldFetchSimilar(false);
-    }
-  }, [clientSimilarQuestions, clientSimilarLoading, clientSimilarError]);
 
   const updateStatusMutation = useUpdateStatus(initialQuestion._id);
 
@@ -182,7 +165,7 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
   const markRevisionMutation = useMarkRevision(initialQuestion._id);
   const saveNotesMutation = useSaveNotes(initialQuestion._id);
   const runCodeMutation = useRunCodeWithPolling();
-  const { status: executionStatus, resetStatus } = runCodeMutation; // NEW: destructure status
+  const { status: executionStatus, resetStatus } = runCodeMutation;
   const deleteQuestionMutation = useDeleteQuestion();
 
   useEffect(() => {
@@ -233,11 +216,9 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
       });
       setExecutionError(null);
       
-      // Invalidate and refetch question details
       await queryClient.invalidateQueries({ queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'] });
       await queryClient.refetchQueries({ queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'] });
 
-      // If tests failed, extract the first meaningful error message from the results
       if (!result.allPassed && result.results && result.results.length > 0) {
         const failedResult = result.results.find(r => !r.passed);
         if (failedResult?.error) {
@@ -251,7 +232,6 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
       }
     } catch (error: any) {
       console.error('Run code error:', error);
-      // Extract error message from the response
       const apiMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message;
       if (apiMessage && typeof apiMessage === 'string') {
         setExecutionError(apiMessage);
@@ -482,7 +462,7 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
             initialHistory={codeHistory}
             activeTab={rightActiveTab}
             onTabChange={setRightActiveTab}
-            executionStatus={executionStatus}   // NEW: pass execution status
+            executionStatus={executionStatus}
           />
         </div>
       </div>
@@ -494,12 +474,6 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
             questions={similarQuestions}
             viewAllHref={viewAllQuestionsUrl}
           />
-        ) : clientSimilarLoading ? (
-          <div className={styles.similarLoadingGrid}>
-            {Array.from({ length: 3 }).map((_, i) => (
-              <SkeletonLoader key={i} variant="custom" className={styles.skeletonSimilarCard} />
-            ))}
-          </div>
         ) : (
           <div className={styles.noSimilarMessage}>
             <p>No similar questions found.</p>

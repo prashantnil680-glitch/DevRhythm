@@ -27,11 +27,27 @@ const toLocalISOString = (utcDate, timeZone) => {
 const getUserStats = async (user) => {
   const userId = user._id;
   const timeZone = user.preferences?.timezone || 'UTC';
-  const computedStats = await computeUserStats(userId, timeZone);
+
+  // ========== LIVE COUNT OF UNIQUE SOLVED QUESTIONS ==========
+  const solvedCount = await UserQuestionProgress.distinct('questionId', {
+    userId,
+    status: { $in: ['Solved', 'Mastered'] }
+  }).countDocuments();
+
+  // Recalculate mastery rate based on total active questions
+  const totalActiveQuestions = await Question.countDocuments({ isActive: true });
+  let masteryRate = 0;
+  if (totalActiveQuestions > 0) {
+    masteryRate = (solvedCount / totalActiveQuestions) * 100;
+    masteryRate = Math.min(100, Math.round(masteryRate * 100) / 100);
+  }
+  // =============================================================
+
   const computedStreak = await computeUserStreak(userId, timeZone);
+
   return {
-    totalSolved: computedStats.totalSolved,
-    masteryRate: computedStats.masteryRate,
+    totalSolved: solvedCount,
+    masteryRate: masteryRate,
     currentStreak: computedStreak.currentStreak,
     longestStreak: computedStreak.longestStreak,
   };

@@ -236,16 +236,26 @@ const getPatternMastery = async (req, res, next) => {
 
 const getPatternStats = async (req, res, next) => {
   try {
-    let patterns = await PatternMastery.find({ userId: req.user._id }).lean();
-    
-    // Recompute confidence for all patterns
+    const userId = req.user._id;
+
+    // Get all pattern mastery documents for the user
+    let patterns = await PatternMastery.find({ userId }).lean();
+
+    // Recompute confidence for all patterns based on solvedCount
     patterns = patterns.map(p => ({
       ...p,
       confidenceLevel: computeConfidence(p.solvedCount)
     }));
-    
+
     const totalPatterns = patterns.length;
-    const totalSolved = patterns.reduce((sum, p) => sum + p.solvedCount, 0);
+    
+    // ✅ CORRECT: Count distinct solved questions (unique question IDs)
+    const uniqueSolvedQuestions = await UserQuestionProgress.distinct('questionId', {
+      userId,
+      status: { $in: ['Solved', 'Mastered'] }
+    });
+    const totalSolved = uniqueSolvedQuestions.length;
+
     const totalMastered = patterns.reduce((sum, p) => sum + p.masteredCount, 0);
     const averageConfidence = totalPatterns
       ? patterns.reduce((sum, p) => sum + p.confidenceLevel, 0) / totalPatterns
@@ -253,7 +263,7 @@ const getPatternStats = async (req, res, next) => {
     const averageMasteryRate = totalPatterns
       ? patterns.reduce((sum, p) => sum + p.masteryRate, 0) / totalPatterns
       : 0;
-    
+
     // Determine strongest pattern: highest masteryRate, then solvedCount
     let strongestPattern = null;
     if (patterns.length) {
@@ -271,7 +281,7 @@ const getPatternStats = async (req, res, next) => {
         confidenceLevel: strongestPattern.confidenceLevel
       };
     }
-    
+
     // Determine weakest pattern: lowest masteryRate, then solvedCount
     let weakestPattern = null;
     if (patterns.length) {
@@ -289,7 +299,7 @@ const getPatternStats = async (req, res, next) => {
         confidenceLevel: weakestPattern.confidenceLevel
       };
     }
-    
+
     const patternsByConfidence = {
       1: patterns.filter(p => p.confidenceLevel === 1).length,
       2: patterns.filter(p => p.confidenceLevel === 2).length,
@@ -297,10 +307,10 @@ const getPatternStats = async (req, res, next) => {
       4: patterns.filter(p => p.confidenceLevel === 4).length,
       5: patterns.filter(p => p.confidenceLevel === 5).length
     };
-    
+
     const stats = {
       totalPatterns,
-      totalSolved,
+      totalSolved,          // ✅ now equals unique solved questions
       totalMastered,
       averageConfidence: parseFloat(averageConfidence.toFixed(2)),
       averageMasteryRate: parseFloat(averageMasteryRate.toFixed(2)),
@@ -308,9 +318,11 @@ const getPatternStats = async (req, res, next) => {
       weakestPattern,
       patternsByConfidence
     };
-    
+
     res.json(formatResponse('Pattern mastery stats retrieved', { stats }));
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
 const getRecommendations = async (req, res, next) => {

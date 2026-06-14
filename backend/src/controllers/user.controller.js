@@ -17,23 +17,34 @@ const getCurrentUser = async (req, res, next) => {
     delete user.__v;
     user.isOnline = (Date.now() - new Date(user.lastOnline).getTime()) < 1 * 60 * 1000;
 
+    // ========== PERMANENT FIX: Recalculate totalSolved from source of truth ==========
+    const solvedCount = await UserQuestionProgress.distinct('questionId', {
+      userId: user._id,
+      status: { $in: ['Solved', 'Mastered'] }
+    }).countDocuments();
+
+    // Recalculate mastery rate based on total active questions
+    const totalActiveQuestions = await Question.countDocuments({ isActive: true });
+    let masteryRate = 0;
+    if (totalActiveQuestions > 0) {
+      masteryRate = (solvedCount / totalActiveQuestions) * 100;
+      masteryRate = Math.min(100, Math.round(masteryRate * 100) / 100);
+    }
+
+    // Override the stats with correct values
+    user.stats.totalSolved = solvedCount;
+    user.stats.masteryRate = masteryRate;
+
+    // Optionally, you can also recalc totalTimeSpent, totalRevisions, activeDays from aggregation
+    // but that would add overhead. For now, keep existing values from user document.
+    // ================================================================================
+
     const timeZone = user.preferences?.timezone || 'UTC';
-    const computedStats = await computeUserStats(user._id, timeZone);
     const computedStreak = await computeUserStreak(user._id, timeZone);
+    user.streak.current = computedStreak.currentStreak;
+    user.streak.longest = computedStreak.longestStreak;
 
-    user.stats = {
-      totalSolved: computedStats.totalSolved,
-      masteryRate: computedStats.masteryRate,
-      totalRevisions: computedStats.totalRevisions,
-      totalTimeSpent: computedStats.totalTimeSpent,
-      activeDays: computedStats.activeDays,
-    };
-    user.streak = {
-      current: computedStreak.currentStreak,
-      longest: computedStreak.longestStreak,
-      lastActiveDate: user.streak.lastActiveDate, // keep original or compute from heatmap? Keep as is.
-    };
-
+    // Round masteryRate for display
     if (user.stats.masteryRate) {
       user.stats.masteryRate = Math.round(user.stats.masteryRate * 100) / 100;
     }

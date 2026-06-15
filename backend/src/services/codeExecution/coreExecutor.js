@@ -569,6 +569,15 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
       responseData.revisionOutOfOrder = revisionResult.outOfOrder || false;
       responseData.revisionOverdueCompleted = revisionResult.overdueCompleted || false;
     }
+
+    // ========== NEW: Complete any past revision sessions (from /complete-past) ==========
+    const pastResult = await revisionActivityService.completeAllPastSessionsForQuestion(userId, questionId);
+    if (pastResult.completed > 0) {
+      responseData.pastRevisionsCompleted = pastResult.completed;
+      console.log(`[CodeExecution] Completed ${pastResult.completed} past revision session(s) for question ${questionId}`);
+    }
+    // ====================================================================================
+
     timing.end('processing.confidence_update');
   }
 

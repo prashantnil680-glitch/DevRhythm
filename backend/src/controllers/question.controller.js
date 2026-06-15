@@ -156,6 +156,8 @@ const getQuestions = async (req, res, next) => {
         // Exact match found – return those questions (normally one)
         let dbQuery = Question.find(exactQuery).skip(skip).limit(limit);
         dbQuery = applySorting(dbQuery, { sortBy, sortOrder }, { createdAt: -1 });
+        // Project only needed fields
+        dbQuery = dbQuery.select('_id title platformQuestionId platform difficulty tags');
         const [fetchedQuestions, totalCount] = await Promise.all([
           dbQuery.lean(),
           Promise.resolve(exactCount)
@@ -176,6 +178,16 @@ const getQuestions = async (req, res, next) => {
         const pipeline = [
           { $match: { $and: andConditions } },
           { $addFields: { textScore: { $meta: 'textScore' } } },
+          { $project: {
+              _id: 1,
+              title: 1,
+              platformQuestionId: 1,
+              platform: 1,
+              difficulty: 1,
+              tags: 1,
+              textScore: 1
+            }
+          },
           { $sort: { textScore: -1 } },
           { $skip: skip },
           { $limit: limit }
@@ -206,6 +218,16 @@ const getQuestions = async (req, res, next) => {
       const pipeline = [
         { $match: { $and: andConditions } },
         { $addFields: { textScore: { $meta: 'textScore' } } },
+        { $project: {
+            _id: 1,
+            title: 1,
+            platformQuestionId: 1,
+            platform: 1,
+            difficulty: 1,
+            tags: 1,
+            textScore: 1
+          }
+        },
         { $sort: { textScore: -1 } },
         { $skip: skip },
         { $limit: limit }
@@ -225,6 +247,8 @@ const getQuestions = async (req, res, next) => {
       // No search – simple find()
       let dbQuery = Question.find(query).skip(skip).limit(limit);
       dbQuery = applySorting(dbQuery, { sortBy, sortOrder }, { createdAt: -1 });
+      // Project only needed fields
+      dbQuery = dbQuery.select('_id title platformQuestionId platform difficulty tags');
       const [fetchedQuestions, totalCount] = await Promise.all([
         dbQuery.lean(),
         Question.countDocuments(query)

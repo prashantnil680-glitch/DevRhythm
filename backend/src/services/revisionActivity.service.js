@@ -246,7 +246,7 @@ const startRevisionSession = async (userId, questionId, targetDate) => {
 
   const key = getRevisionSessionKey(userId, questionId, targetDate);
   const session = { activeSeconds: 0, testPassed: false };
-  await redisClient.setEx(key, 7200, JSON.stringify(session));
+  await redisClient.setEx(key, 1200, JSON.stringify(session));
   console.log(`[revision.session] Session created for user ${userId}, question ${questionId}, date ${targetDate}`);
   return session;
 };
@@ -268,7 +268,7 @@ const addActiveSecondsToSession = async (userId, questionId, targetDate, seconds
   if (!session) return false;
 
   session.activeSeconds += seconds;
-  await redisClient.setEx(key, 7200, JSON.stringify(session));
+  await redisClient.setEx(key, 1200, JSON.stringify(session));
 
   if (session.activeSeconds >= 1200 || session.testPassed === true) {
     const result = await completePastRevision(userId, questionId, targetDate);
@@ -293,7 +293,7 @@ const markTestPassedForQuestion = async (userId, questionId) => {
       const session = JSON.parse(data);
       if (!session.testPassed) {
         session.testPassed = true;
-        await redisClient.setEx(key, 7200, JSON.stringify(session));
+        await redisClient.setEx(key, 1200, JSON.stringify(session));
       }
       if (session.activeSeconds >= 1200 || session.testPassed) {
         const parts = key.split(':');
@@ -521,6 +521,107 @@ const getDayRevisions = async (userId, date, timeZone) => {
   return schedules;
 };
 
+// ========== NEW FUNCTION: Complete all past revision sessions for a question ==========
+/**
+ * Find all active revision sessions for a specific question (created by /complete-past),
+ * mark them as `testPassed = true`, and attempt to complete each one.
+ * This is typically called after a user successfully runs code that passes all test cases.
+ *
+ * @param {string} userId - User ObjectId
+ * @param {string} questionId - Question ObjectId
+ * @returns {Promise<{ completed: number, failed: number }>}
+ */
+async function completeAllPastSessionsForQuestion(userId, questionId) {
+  const pattern = `revision:session:${userId}:${questionId}:*`;
+  let cursor = 0;
+  let keys = [];
+  do {
+    const reply = await redisClient.scan(cursor, { MATCH: pattern, COUNT: 100 });
+    cursor = reply.cursor;
+    keys.push(...reply.keys);
+  } while (cursor !== 0);
+
+  let completedCount = 0;
+  let failedCount = 0;
+
+  for (const key of keys) {
+    const parts = key.split(':');
+    const targetDateStr = parts[parts.length - 1];
+    if (!targetDateStr) continue;
+
+    const targetDate = new Date(targetDateStr);
+    if (isNaN(targetDate.getTime())) continue;
+
+    // Ensure the session has testPassed = true
+    let session = await getRevisionSession(userId, questionId, targetDate);
+    if (session && !session.testPassed) {
+      session.testPassed = true;
+      await redisClient.setEx(key, 1200, JSON.stringify(session));
+    }
+
+    // Attempt to complete the revision for this date
+    try {
+      const result = await completePastRevision(userId, questionId, targetDate, null, true);
+      if (result.completed) {
+        completedCount++;
+      } else {
+        failedCount++;
+      }
+    } catch (err) {
+      console.error(`[RevisionActivity] Failed to complete past session for ${targetDateStr}:`, err.message);
+      failedCount++;
+    }
+  }
+
+  return { completed: completedCount, failed: failedCount };
+}
+
+// ========== NEW FUNCTION: Add time to all active past sessions ==========
+/**
+ * Add active seconds to ALL active revision sessions for a user+question
+ * (including past dates). For any session that reaches or exceeds 1200 seconds,
+ * automatically complete the revision for that date.
+ *
+ * @param {string} userId - User ObjectId
+ * @param {string} questionId - Question ObjectId
+ * @param {number} seconds - Seconds to add (usually 60 per heartbeat)
+ * @returns {Promise<{ updated: number, completed: number }>}
+ */
+async function addActiveSecondsToAllSessions(userId, questionId, seconds) {
+  const pattern = `revision:session:${userId}:${questionId}:*`;
+  let cursor = 0;
+  let keys = [];
+  do {
+    const reply = await redisClient.scan(cursor, { MATCH: pattern, COUNT: 100 });
+    cursor = reply.cursor;
+    keys.push(...reply.keys);
+  } while (cursor !== 0);
+
+  let updatedCount = 0;
+  let completedCount = 0;
+
+  for (const key of keys) {
+    const parts = key.split(':');
+    const targetDateStr = parts[parts.length - 1];
+    if (!targetDateStr) continue;
+
+    const targetDate = new Date(targetDateStr);
+    if (isNaN(targetDate.getTime())) continue;
+
+    // Add seconds to this session
+    const completed = await addActiveSecondsToSession(userId, questionId, targetDate, seconds);
+    updatedCount++;
+
+    // If addActiveSecondsToSession returned true, it means the revision was completed
+    if (completed) {
+      completedCount++;
+    }
+  }
+
+  return { updated: updatedCount, completed: completedCount };
+}
+
+// ========== UPDATE module.exports ==========
 module.exports = {
   recordTimeSpent,
   recordCodeSubmission,
@@ -533,4 +634,6 @@ module.exports = {
   addActiveSecondsToSession,
   deleteRevisionSession,
   getDayRevisions,
+  completeAllPastSessionsForQuestion,
+  addActiveSecondsToAllSessions,   // <-- NEW EXPORT
 };

@@ -572,7 +572,7 @@ const recordTimeSpent = async (req, res, next) => {
     const today = new Date();
     const timeZone = req.userTimeZone || 'UTC';
 
-    // Update revision activity (Redis)
+    // Update revision activity (Redis) – now updates ALL active sessions
     await revisionActivityService.recordTimeSpent(req.user._id, questionId, today, minutes);
 
     // Update heatmap directly (time spent)
@@ -610,7 +610,7 @@ const recordTimeSpent = async (req, res, next) => {
 
     await progress.save();
 
-    // ========== NEW SYNC UPDATES ==========
+    // ========== SYNC UPDATES ==========
     // 1. Update User.stats.totalTimeSpent
     await User.updateOne(
       { _id: req.user._id },
@@ -619,66 +619,41 @@ const recordTimeSpent = async (req, res, next) => {
 
     // 2. Update streak and active days
     await updateUserActivity(req.user._id, today, timeZone);
+    // ========== END SYNC UPDATES ==========
 
-    // ========== END NEW SYNC UPDATES ==========
+    // ========== REPLACED: Update ALL active sessions (past dates) ==========
+    // Previously: only today's session via addActiveSecondsToSession
+    // Now: update all past sessions and auto‑complete any reaching 20 minutes
+    const result = await revisionActivityService.addActiveSecondsToAllSessions(
+      req.user._id,
+      questionId,
+      minutes * 60
+    );
 
-    // Check any pending revision sessions (existing logic)
-    const pattern = `revision:session:${req.user._id}:${questionId}:*`;
-    let cursor = 0;
-    let keys = [];
-    do {
-      const reply = await redisClient.scan(cursor, { MATCH: pattern, COUNT: 100 });
-      cursor = reply.cursor;
-      keys.push(...reply.keys);
-    } while (cursor !== 0);
-
-    let anyCompleted = false;
-    for (const key of keys) {
-      const parts = key.split(':');
-      const targetDateStr = parts[parts.length - 1];
-      if (targetDateStr) {
-        const targetDate = new Date(targetDateStr);
-        const completed = await revisionActivityService.addActiveSecondsToSession(
-          req.user._id,
-          questionId,
-          targetDate,
-          minutes * 60
-        );
-        if (completed) anyCompleted = true;
-      }
-    }
-
-    if (anyCompleted && jobQueue) {
-      await jobQueue.add('confidence.increment', {
-        userId: req.user._id,
-        questionId,
-        action: 'active_time_reached',
-      });
-    }
-
+    // Still handle today's standard revision (if any) separately
     const revisionResult = await revisionActivityService.checkAndCompleteRevision(
       req.user._id,
       questionId,
       today,
-      'auto'
+      'auto',
+      { targetDate: today }
     );
 
     if (revisionResult.completed) {
-      if (jobQueue) {
-        await jobQueue.add('confidence.increment', {
-          userId: req.user._id,
-          questionId,
-          action: 'revision_completed_standard',
-        });
-      }
-      return res.json(formatResponse(revisionResult.message, { revisionCompleted: true }));
+      // Optionally log or track
+      console.log(`[recordTimeSpent] Completed today's revision for question ${questionId}`);
     }
 
-    res.json(formatResponse('Time recorded successfully', { minutes }));
+    if (result.completed > 0) {
+      console.log(`[recordTimeSpent] Completed ${result.completed} past revision session(s) for question ${questionId}`);
+    }
+
+    res.json(formatResponse('Time recorded successfully', { minutes, pastRevisionsCompleted: result.completed }));
   } catch (error) {
     next(error);
-  }
+  };
 };
+
 
 const rescheduleRevision = async (req, res, next) => {
   try {

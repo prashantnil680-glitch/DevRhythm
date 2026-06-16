@@ -1,6 +1,7 @@
 const dashboardService = require('../services/dashboard.service');
 const { formatResponse } = require('../utils/helpers/response');
 const { cache } = require('../middleware/cache');
+const User = require('../models/User');
 
 /**
  * GET /api/v1/dashboard
@@ -14,6 +15,7 @@ const { cache } = require('../middleware/cache');
  * - dailyChallenge: LeetCode problem of the day with user progress
  * - notifications: unread count and recent notifications
  * - insights: weakest pattern for actionable improvement
+ * - totalUsers: total number of active users (for community context)
  *
  * All lists limited to 4–5 items; no personal details.
  * Response cached 30 seconds.
@@ -40,7 +42,8 @@ const getDashboard = async (req, res, next) => {
       upcomingRevisionsList,
       activePlannedGoals,
       weakestPattern,
-      currentMonthHeatmap
+      currentMonthHeatmap,
+      totalUsers
     ] = await Promise.all([
       dashboardService.getUserStats(req.user),
       dashboardService.getCurrentGoals(userId, timeZone),
@@ -58,12 +61,13 @@ const getDashboard = async (req, res, next) => {
       dashboardService.getUpcomingRevisionsList(userId, timeZone, 5),
       dashboardService.getActivePlannedGoals(userId, 2),
       dashboardService.getTopWeakestPattern(userId),
-      dashboardService.getCurrentMonthHeatmap(userId, timeZone)
+      dashboardService.getCurrentMonthHeatmap(userId, timeZone),
+      User.countDocuments({ isActive: true })
     ]);
 
     const responseData = {
       summary: userStats,
-       productivity: {
+      productivity: {
         heatmap: heatmapSummary,
         weeklyStudyTime: weeklyStudyTime,
         currentMonthHeatmap
@@ -92,7 +96,8 @@ const getDashboard = async (req, res, next) => {
       },
       insights: {
         weakestPattern
-      }
+      },
+      totalUsers
     };
 
     res.json(formatResponse('Dashboard data retrieved', responseData));
@@ -101,8 +106,8 @@ const getDashboard = async (req, res, next) => {
   }
 };
 
-// Apply cache middleware (15 seconds) with user-specific key pattern
-const dashboardCache = cache(15, 'dashboard:user');
+// Apply cache middleware (30 seconds) with user-specific key pattern
+const dashboardCache = cache(30, 'dashboard:user');
 
 module.exports = {
   getDashboard,

@@ -1,13 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, memo, lazy, Suspense } from 'react';
 import { useDashboard } from '@/features/dashboard';
-import { useUser, useTotalUsers } from '@/features/user';
-import QuestionsList from '@/features/user/components/QuestionsList';
+import { useSession } from '@/features/auth/hooks/useSession';
 import HeroSummary from './parts/HeroSummary';
-import ProductivityHeatmap from './parts/ProductivityHeatmap';
 import WeeklyStudyTime from './parts/WeeklyStudyTime';
-import GoalsProgressGraph from './parts/GoalsProgressGraph';
 import ActiveGoals from './parts/ActiveGoals';
 import DailyChallengeCard from './parts/DailyChallengeCard';
 import PendingRevisions from './parts/PendingRevisions';
@@ -17,17 +14,29 @@ import WelcomeBanner from './parts/WelcomeBanner';
 import DashboardSkeleton from './parts/DashboardSkeleton';
 import styles from './page.module.css';
 
-export default function DashboardPage() {
-  const { data: dashboard, isLoading: dashboardLoading, refetch: refetchDashboard } = useDashboard();
-  const { user } = useUser();
-  const { data: totalUsersData, isLoading: totalUsersLoading } = useTotalUsers();
+// Lazy load heavy components that are below the fold
+const ProductivityHeatmap = lazy(() => import('./parts/ProductivityHeatmap'));
+const GoalsProgressGraph = lazy(() => import('./parts/GoalsProgressGraph'));
+const QuestionsList = lazy(() => import('@/features/user/components/QuestionsList'));
+
+// Simple skeleton placeholders for lazy components
+const SectionSkeleton = ({ height = 200 }: { height?: number }) => (
+  <div className={styles.skeletonPlaceholder} style={{ height, background: 'var(--bg-elevated)', borderRadius: 'var(--radius)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+);
+
+interface DashboardPageClientProps {
+  initialData?: any;
+}
+
+function DashboardPageClient({ initialData }: DashboardPageClientProps) {
+  const { data: dashboard, isLoading: dashboardLoading, refetch: refetchDashboard } = useDashboard(initialData);
+  const { user } = useSession();
 
   const [showBanner, setShowBanner] = useState(false);
   const [bannerType, setBannerType] = useState<'welcome' | 'welcomeBack' | null>(null);
 
-  // Read sessionStorage flags after user is loaded
   useEffect(() => {
-    if (user && !dashboardLoading && !totalUsersLoading) {
+    if (user && dashboard && !dashboardLoading) {
       const showWelcome = sessionStorage.getItem('showWelcome') === 'true';
       const showWelcomeBack = sessionStorage.getItem('showWelcomeBack') === 'true';
       if (showWelcome) {
@@ -38,30 +47,27 @@ export default function DashboardPage() {
         setShowBanner(true);
       }
     }
-  }, [user, dashboardLoading, totalUsersLoading]);
+  }, [user, dashboard, dashboardLoading]);
 
-  const handleBannerDismiss = () => {
-    // Clear sessionStorage flags
+  const handleBannerDismiss = useCallback(() => {
     sessionStorage.removeItem('showWelcome');
     sessionStorage.removeItem('showWelcomeBack');
     setShowBanner(false);
     setBannerType(null);
-  };
+  }, []);
 
-  if (dashboardLoading || !dashboard || !user || totalUsersLoading) {
+  if (dashboardLoading || !dashboard || !user) {
     return <DashboardSkeleton />;
   }
 
-  const { summary, productivity, goals, revisions, activity, dailyChallenge, insights } = dashboard;
-  const totalUsers = totalUsersData?.total ?? 0;
+  const { summary, productivity, goals, revisions, activity, dailyChallenge, insights, totalUsers } = dashboard;
 
   return (
     <div className={styles.container}>
-      {/* Welcome Banner – shown only once per session */}
       {showBanner && bannerType && (
         <WelcomeBanner
           type={bannerType}
-          totalUsers={totalUsers}
+          totalUsers={totalUsers ?? 0}
           onDismiss={handleBannerDismiss}
         />
       )}
@@ -70,10 +76,11 @@ export default function DashboardPage() {
         <HeroSummary summary={summary} goals={goals.current} />
       </div>
 
-      {/* Rest of the dashboard unchanged */}
       <div className={styles.twoColumn}>
         <div className={styles.heatmapColumn}>
-          <ProductivityHeatmap data={productivity.currentMonthHeatmap} isLoading={dashboardLoading} />
+          <Suspense fallback={<SectionSkeleton height={280} />}>
+            <ProductivityHeatmap data={productivity.currentMonthHeatmap} isLoading={dashboardLoading} />
+          </Suspense>
         </div>
         <div className={styles.weeklyColumn}>
           <WeeklyStudyTime data={productivity.weeklyStudyTime} isLoading={dashboardLoading} />
@@ -91,7 +98,9 @@ export default function DashboardPage() {
           />
         </div>
         <div className={styles.goalsGraphColumn}>
-          <GoalsProgressGraph />
+          <Suspense fallback={<SectionSkeleton height={300} />}>
+            <GoalsProgressGraph />
+          </Suspense>
         </div>
       </div>
 
@@ -114,7 +123,9 @@ export default function DashboardPage() {
       </div>
 
       <div className={styles.fullWidth}>
-        <QuestionsList isOwnProfile limit={3} />
+        <Suspense fallback={<SectionSkeleton height={200} />}>
+          <QuestionsList isOwnProfile limit={3} />
+        </Suspense>
       </div>
 
       <div className={styles.fullWidth}>
@@ -123,3 +134,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+export default memo(DashboardPageClient);

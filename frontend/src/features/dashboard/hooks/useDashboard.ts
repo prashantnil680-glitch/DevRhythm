@@ -7,6 +7,10 @@ export const dashboardKeys = {
   detail: () => [...dashboardKeys.all, 'data'] as const,
 };
 
+interface UseDashboardOptions {
+  initialData?: DashboardResponse;
+}
+
 export function useDashboard(initialData?: DashboardResponse) {
   return useQuery({
     queryKey: dashboardKeys.detail(),

@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { FaGithub, FaLinkedin, FaArrowUp } from 'react-icons/fa';
-import { FiAward, FiCheckCircle, FiClock } from 'react-icons/fi';
 import clsx from 'clsx';
 import { ROUTES } from '@/shared/config';
 import Logo from '@/shared/components/Logo';
 import Button from '@/shared/components/Button';
 import OAuthButton from '@/shared/components/OAuthButton';
 import { useSession } from '@/features/auth/hooks/useSession';
-import { useTodayProgress } from '@/features/user/hooks/useTodayProgress';
-import { usePendingRevisions } from '@/features/revision/hooks/usePendingRevisions';
 import styles from './Footer.module.css';
 
 export interface FooterProps {
@@ -46,7 +43,6 @@ const StatDisplay: React.FC<{
   return content;
 };
 
-// Helper to check if URL is external
 const isExternalUrl = (href: string): boolean => {
   return href.startsWith('http://') || href.startsWith('https://');
 };
@@ -108,36 +104,8 @@ const BackToTop: React.FC = () => {
 
 export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) => {
   const { user } = useSession();
-  const { solvedToday } = useTodayProgress();
-  const { pendingCount } = usePendingRevisions();
   const isLoggedIn = !!user;
-  const streak = user?.streak?.current ?? 0;
 
-  const statDisplays = isLoggedIn ? (
-    <div className={styles.statRow}>
-      <StatDisplay
-        icon={<FiAward />}
-        value={streak}
-        label="day streak"
-        href={ROUTES.USER_PROFILE.OWN(user.username)}
-      />
-      <StatDisplay
-        icon={<FiCheckCircle />}
-        value={solvedToday}
-        label="solved today"
-        href={ROUTES.PROGRESS}
-      />
-      <StatDisplay
-        icon={<FiClock />}
-        value={pendingCount}
-        label="revisions"
-        href={ROUTES.REVISIONS.OVERDUE}
-        badge={pendingCount}
-      />
-    </div>
-  ) : null;
-
-  // Build Community links conditionally
   const communityLinks: Array<{ label: string; href: string }> = [
     { label: 'All Sheets', href: ROUTES.SHEETS.ROOT },
   ];
@@ -149,6 +117,15 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
     communityLinks.push({ label: 'Create Group', href: ROUTES.GROUPS.CREATE });
   }
 
+  const accountLinks: Array<{ label: string; href: string }> = [];
+  if (isLoggedIn) {
+    accountLinks.push({
+      label: 'My Profile',
+      href: ROUTES.USER_PROFILE.OWN(user.username),
+    });
+  }
+  accountLinks.push({ label: 'View Community', href: '/users' });
+
   return (
     <footer className={clsx(styles.footer, className)}>
       <div className={styles.container}>
@@ -156,12 +133,11 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
           <div className={styles.brand}>
             <Logo size="md" layout="horizontal" />
             <p className={styles.tagline}>
-              Master coding patterns through deliberate practice.
+              Build your rhythm, one problem at a time –<br />
+              spaced repetition for lasting mastery.
             </p>
           </div>
-          {statDisplays ? (
-            statDisplays
-          ) : (
+          {!isLoggedIn && (
             <OAuthButton
               provider="google"
               variant="outline"
@@ -181,6 +157,7 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
               { label: 'Questions', href: ROUTES.QUESTIONS.ROOT },
               { label: 'Patterns', href: '/patterns' },
               { label: 'Visualizer Algo', href: 'https://sortopia.devrhythm.space' },
+              { label: 'Apna Samay (Todo App)', href: 'https://donow.devrhythm.space/' },
             ]}
           />
 
@@ -195,16 +172,7 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
 
           <LinkGroup title="Community" links={communityLinks} />
 
-          <LinkGroup
-            title="Account"
-            links={[
-              {
-                label: 'Profile',
-                href: user ? ROUTES.USER_PROFILE.OWN(user.username) : ROUTES.LOGIN,
-              },
-              { label: 'Other User', href: '/users'},
-            ]}
-          />
+          <LinkGroup title="Account" links={accountLinks} />
 
           <LinkGroup
             title="Company & Legal"
@@ -212,6 +180,7 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
               { label: 'About', href: '/about/me' },
               { label: 'Privacy', href: '/privacy' },
               { label: 'Terms', href: '/terms' },
+              { label: 'Sitemap', href: '/sitemap.xml' },
             ]}
           />
         </div>
@@ -220,25 +189,28 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
           <div className={styles.copyright}>
             © {new Date().getFullYear()} DevRhythm
           </div>
-          <div className={styles.social}>
-            <a
-              href="https://github.com/anupam6335/DevRhythm"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="GitHub"
-              className={styles.socialLink}
-            >
-              <FaGithub />
-            </a>
-            <a
-              href="https://www.linkedin.com/in/anupamdebnath6335/"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="LinkedIn"
-              className={styles.socialLink}
-            >
-              <FaLinkedin />
-            </a>
+          <div className={styles.socialWrapper}>
+            <span className={styles.connectText}>Connect with me</span>
+            <div className={styles.social}>
+              <a
+                href="https://github.com/anupam6335/DevRhythm"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="GitHub"
+                className={styles.socialLink}
+              >
+                <FaGithub />
+              </a>
+              <a
+                href="https://www.linkedin.com/in/anupamdebnath6335/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="LinkedIn"
+                className={styles.socialLink}
+              >
+                <FaLinkedin />
+              </a>
+            </div>
           </div>
           <div className={styles.version}>v{version}</div>
         </div>

@@ -218,4 +218,5 @@ export interface DashboardResponse {
   dailyChallenge: DailyChallenge;
   notifications: NotificationsData;
   insights: InsightsData;
+  totalUsers: number;
 }

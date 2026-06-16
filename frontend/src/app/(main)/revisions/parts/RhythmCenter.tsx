@@ -11,7 +11,6 @@ import {
   eachWeekOfInterval,
   eachMonthOfInterval,
   subMonths,
-  getDate,
 } from 'date-fns';
 import {
   Chart as ChartJS,
@@ -26,6 +25,7 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { useTheme } from 'next-themes';
+import Link from 'next/link'; // <-- added for navigation
 import Card from '@/shared/components/Card';
 import Tabs from '@/shared/components/Tabs';
 import TooltipComponent from '@/shared/components/Tooltip';
@@ -96,7 +96,7 @@ function LineChart({ title, data, labels, borderColor, backgroundColor, yAxisLab
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: false, // we show title separately
+        display: false,
       },
       tooltip: {
         backgroundColor: isDark ? '#2C2D28' : '#FBFAF6',
@@ -339,8 +339,8 @@ export default function RhythmCenter({ trends }: RhythmCenterProps) {
   }, [period, heatmapItems]);
 
   // Theme colors for graphs
-  const completedColor = '#3d8b52';     // moss
-  const confidenceColor = '#C4A265';    // sand
+  const completedColor = '#3d8b52';
+  const confidenceColor = '#C4A265';
   const timeColor = '#6C5CE7';
 
   const completedBg = `${completedColor}20`;
@@ -387,7 +387,7 @@ export default function RhythmCenter({ trends }: RhythmCenterProps) {
         />
       </div>
 
-      {/* HEATMAP SECTION – unchanged */}
+      {/* HEATMAP SECTION */}
       <div className={styles.heatmapContainer}>
         <div className={styles.heatmapHeader}>
           <span>{period === 'daily' ? format(new Date(), 'MMMM yyyy') : period === 'weekly' ? 'Weekly Activity' : 'Monthly Activity'}</span>
@@ -405,20 +405,32 @@ export default function RhythmCenter({ trends }: RhythmCenterProps) {
                     const completed = dayItem?.value ?? 0;
                     const confidence = dayItem?.confidence ?? 0;
                     const tooltipText = `${dayNumber}: ${completed} revision${completed !== 1 ? 's' : ''}`;
+                    const dateStr = dayItem?.id; // YYYY-MM-DD
+
+                    const cellContent = (
+                      <div
+                        className={styles.cell}
+                        style={{ backgroundColor: getIntensityColor(completed) }}
+                      >
+                        <span className={styles.cellNumber}>{dayNumber}</span>
+                        <span
+                          className={styles.confidenceDot}
+                          style={{
+                            backgroundColor: confidence >= 4 ? '#2e7d32' : confidence >= 3 ? '#ed6c02' : '#d32f2f',
+                          }}
+                        />
+                      </div>
+                    );
+
                     return (
                       <TooltipComponent key={dayNumber} content={tooltipText}>
-                        <div
-                          className={styles.cell}
-                          style={{ backgroundColor: getIntensityColor(completed) }}
-                        >
-                          <span className={styles.cellNumber}>{dayNumber}</span>
-                          <span
-                            className={styles.confidenceDot}
-                            style={{
-                              backgroundColor: confidence >= 4 ? '#2e7d32' : confidence >= 3 ? '#ed6c02' : '#d32f2f',
-                            }}
-                          />
-                        </div>
+                        {dateStr ? (
+                          <Link href={`/activity/${dateStr}`} className={styles.cellLink}>
+                            {cellContent}
+                          </Link>
+                        ) : (
+                          cellContent
+                        )}
                       </TooltipComponent>
                     );
                   })}
@@ -427,7 +439,8 @@ export default function RhythmCenter({ trends }: RhythmCenterProps) {
             })}
           </div>
         ) : (
-          <div className={styles.heatmapGrid}>
+          // Weekly / Monthly – fixed 6‑column grid (no links)
+          <div className={`${styles.heatmapGrid} ${styles.heatmapGridFixed}`}>
             {heatmapItems.map(item => {
               const tooltipText = `${item.label}: ${item.value} revision${item.value !== 1 ? 's' : ''}, avg confidence ${item.confidence.toFixed(1)}`;
               return (

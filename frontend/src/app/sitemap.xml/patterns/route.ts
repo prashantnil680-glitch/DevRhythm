@@ -3,8 +3,7 @@ import { SITE_URL } from '@/shared/config/seo';
 import { slugify } from '@/shared/lib/stringUtils';
 
 const FULL_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ||
-                      process.env.API_BASE_URL ||
-                      'https://api.devrhythm.space';
+                      'https://api.devrhythm.space/api/v1';
 const API_ORIGIN = FULL_API_BASE.replace(/\/api\/v1\/?$/, '');
 
 // Prevent static generation – always fetch fresh data

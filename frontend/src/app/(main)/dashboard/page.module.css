@@ -1,3 +1,42 @@
+.skeletonPlaceholder {
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  animation: pulse 1.5s ease-in-out infinite;
+  width: 100%;
+  min-height: 100px;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Optional: ensure placeholder respects grid layout */
+.skeletonPlaceholder {
+  grid-column: 1 / -1; /* if used inside grid, this ensures full width */
+}
+
+/* Adjust for specific columns if needed */
+.heatmapColumn .skeletonPlaceholder {
+  grid-column: 1 / span 1;
+}
+
+.weeklyColumn .skeletonPlaceholder {
+  grid-column: 2 / span 1;
+}
+
+.goalsGraphColumn .skeletonPlaceholder {
+  grid-column: 2 / span 1;
+}
+
+.fullWidth .skeletonPlaceholder {
+  grid-column: 1 / -1;
+}
+
 .container {
   max-width: 940px;
   margin: 0 auto;

@@ -126,9 +126,13 @@
 /* Wrap‑grid layout for weekly/monthly periods */
 .heatmapGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
   gap: 0.5rem;
   justify-items: stretch;
+}
+
+/* Fixed 6‑column grid for weekly/monthly – fills the container evenly */
+.heatmapGridFixed {
+  grid-template-columns: repeat(6, 1fr);
 }
 
 /* Individual cell */
@@ -167,6 +171,15 @@
   right: 2px;
 }
 
+/* Link wrapper for daily cells – fills the cell and removes default anchor styles */
+.cellLink {
+  display: block;
+  width: 100%;
+  height: 100%;
+  text-decoration: none;
+  color: inherit;
+}
+
 /* ===== Responsive Breakpoints ===== */
 @media (max-width: 939px) {
   .graphsRow {
@@ -181,10 +194,16 @@
   .row {
     gap: 0.25rem;
   }
+
+  /* For weekly/monthly – switch to 3 columns on tablet */
+  .heatmapGridFixed {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
   .heatmapGrid {
     gap: 0.25rem;
-    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
   }
+
   .cell {
     font-size: 0.7rem;
   }
@@ -200,9 +219,11 @@
 }
 
 @media (max-width: 480px) {
-  .heatmapGrid {
-    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  /* For weekly/monthly – switch to 2 columns on mobile */
+  .heatmapGridFixed {
+    grid-template-columns: repeat(2, 1fr);
   }
+
   .cell {
     font-size: 0.55rem;
   }

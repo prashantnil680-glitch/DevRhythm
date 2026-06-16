@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import Link from 'next/link';
 import { differenceInDays, format } from 'date-fns';
 import Card from '@/shared/components/Card';
@@ -33,7 +34,7 @@ const formatDateRange = (title: string): string => {
   return title;
 };
 
-export default function ActiveGoals({ goals, isLoading }: ActiveGoalsProps) {
+function ActiveGoals({ goals, isLoading }: ActiveGoalsProps) {
   // Safely handle undefined or null goals array
   const plannedGoals = goals ?? [];
 
@@ -162,3 +163,5 @@ export default function ActiveGoals({ goals, isLoading }: ActiveGoalsProps) {
     </Card>
   );
 }
+
+export default memo(ActiveGoals);

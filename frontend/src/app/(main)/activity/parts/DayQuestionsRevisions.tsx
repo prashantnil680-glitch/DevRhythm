@@ -24,7 +24,7 @@ export default function DayQuestionsRevisions({ date }: DayQuestionsRevisionsPro
     return (
       <Card className={styles.container}>
         <div className={styles.header}>
-          <h3 className={styles.title}>Day&apos;s Questions &amp; Revisions</h3>
+          <h3 className={styles.title}>Today&apos;s Questions Solved &amp; Revisions</h3>
           <div className={styles.skeletonViewAll} />
         </div>
         <div className={styles.section}>
@@ -51,7 +51,7 @@ export default function DayQuestionsRevisions({ date }: DayQuestionsRevisionsPro
     return (
       <Card className={styles.container}>
         <div className={styles.header}>
-          <h3 className={styles.title}>Day&apos;s Questions &amp; Revisions</h3>
+          <h3 className={styles.title}>Today&apos;s Questions Solved &amp; Revisions</h3>
           <Link href={`/activity/${viewAllDate}`} className={styles.viewAllLink}>
             View All →
           </Link>
@@ -137,7 +137,7 @@ export default function DayQuestionsRevisions({ date }: DayQuestionsRevisionsPro
   return (
     <Card className={styles.container}>
       <div className={styles.header}>
-        <h3 className={styles.title}>Day&apos;s Questions &amp; Revisions</h3>
+        <h3 className={styles.title}>Today&apos;s Questions Solved &amp; Revisions</h3>
         <Link href={`/activity/${viewAllDate}`} className={styles.viewAllLink}>
           View All →
         </Link>

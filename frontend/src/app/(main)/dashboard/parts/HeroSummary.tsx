@@ -1,8 +1,12 @@
+// frontend/src/app/(main)/dashboard/parts/HeroSummary.tsx
+
 'use client';
+
+import { memo } from 'react';
 import Link from 'next/link';
-import Card from '@/shared/components/Card';
-import ProgressBar from '@/shared/components/ProgressBar';
+import { FiTarget, FiCalendar } from 'react-icons/fi';
 import { ROUTES } from '@/shared/config';
+import Tooltip from '@/shared/components/Tooltip';
 import type { DashboardSummary, GoalsData } from '@/features/dashboard';
 import styles from './HeroSummary.module.css';
 
@@ -11,79 +15,83 @@ interface HeroSummaryProps {
   goals: GoalsData['current'];
 }
 
-export default function HeroSummary({ summary, goals }: HeroSummaryProps) {
+function HeroSummary({ summary, goals }: HeroSummaryProps) {
   const dailyGoal = goals.daily;
   const weeklyGoal = goals.weekly;
 
-  // Helper to check if a goal is active (exists and has target > 0)
-  const hasActiveGoal = (goal: GoalsData['current']['daily']): boolean => {
-    return !!goal && goal.targetCount > 0;
-  };
+  const hasDaily = dailyGoal && dailyGoal.targetCount > 0;
+  const hasWeekly = weeklyGoal && weeklyGoal.targetCount > 0;
 
-  const dailyActive = hasActiveGoal(dailyGoal);
-  const weeklyActive = hasActiveGoal(weeklyGoal);
-
-  // Compute percentages only if goal exists (safe to access)
-  const dailyPercentage = dailyActive ? dailyGoal!.completionPercentage : 0;
-  const weeklyPercentage = weeklyActive ? weeklyGoal!.completionPercentage : 0;
+  const dailyPercentage = hasDaily ? Math.round(dailyGoal.completionPercentage) : 0;
+  const weeklyPercentage = hasWeekly ? Math.round(weeklyGoal.completionPercentage) : 0;
 
   return (
-    <Card className={styles.container}>
-      <div className={styles.header}>
-        <h2 className={styles.visuallyHidden}>Summary</h2>
+    <div className={styles.container}>
+      {/* Metrics row – clearer labels with tooltips */}
+      <div className={styles.metricsRow}>
+        <span className={styles.stat}>
+          <strong>{summary.totalSolved.toLocaleString()}</strong>
+          <Tooltip content="Total number of problems you've solved across all platforms">
+            <span className={styles.statLabel}>questions solved</span>
+          </Tooltip>
+        </span>
+        <span className={styles.separator}>•</span>
+
+        <span className={styles.stat}>
+          <strong>{summary.currentStreak}</strong>
+          <Tooltip content="Consecutive days with at least one solved problem">
+            <span className={styles.statLabel}>day streak</span>
+          </Tooltip>
+        </span>
+        <span className={styles.separator}>•</span>
+
+        <span className={styles.stat}>
+          <strong>{Math.round(summary.masteryRate)}%</strong>
+          <Tooltip content="Percentage of questions you've mastered (solved + revised) out of all available questions">
+            <span className={styles.statLabel}>mastery</span>
+          </Tooltip>
+        </span>
+        <span className={styles.separator}>•</span>
+
+        <span className={styles.stat}>
+          <strong>{summary.longestStreak}</strong>
+          <Tooltip content="Your longest consecutive days streak ever achieved">
+            <span className={styles.statLabel}>longest streak</span>
+          </Tooltip>
+        </span>
+
         <Link href={ROUTES.QUESTIONS.ROOT} className={styles.viewAllLink}>
-          View All →
+          View All questions →
         </Link>
       </div>
 
-      <div className={styles.statsGrid}>
-        <div className={styles.statItem}>
-          <span className={styles.statValue}>{summary.totalSolved.toLocaleString()}</span>
-          <span className={styles.statLabel}>Total Solved</span>
-        </div>
-        <div className={styles.statItem}>
-          <span className={styles.statValue}>{summary.currentStreak}</span>
-          <span className={styles.statLabel}>Current Streak</span>
-        </div>
-        <div className={styles.statItem}>
-          <span className={styles.statValue}>{Math.round(summary.masteryRate)}%</span>
-          <span className={styles.statLabel}>Mastery Rate</span>
-        </div>
-        <div className={styles.statItem}>
-          <span className={styles.statValue}>{summary.longestStreak}</span>
-          <span className={styles.statLabel}>Longest Streak</span>
-        </div>
-      </div>
-
-      <div className={styles.goalsSection}>
-        {/* Only render Daily Goal if active */}
-        {dailyActive && (
-          <div className={styles.goalItem}>
-            <div className={styles.goalHeader}>
-              <span className={styles.goalTitle}>Daily Goal</span>
-              <span className={styles.goalCount}>
-                {dailyGoal!.completedCount} / {dailyGoal!.targetCount}
+      {/* Goals row – only if at least one goal exists */}
+      {(hasDaily || hasWeekly) && (
+        <div className={styles.goalsRow}>
+          {hasDaily && (
+            <div className={styles.goalChip}>
+              <FiTarget size={14} className={styles.goalIcon} />
+              <span className={styles.goalLabel}>Daily</span>
+              <span className={styles.goalProgress}>
+                {dailyGoal?.completedCount}/{dailyGoal?.targetCount}
               </span>
+              <span className={styles.goalPercentage}>{dailyPercentage}%</span>
             </div>
-            <ProgressBar value={dailyPercentage} max={100} size="md" showValue={false} rounded />
-            <span className={styles.goalPercentage}>{dailyPercentage}%</span>
-          </div>
-        )}
-
-        {/* Only render Weekly Goal if active */}
-        {weeklyActive && (
-          <div className={styles.goalItem}>
-            <div className={styles.goalHeader}>
-              <span className={styles.goalTitle}>Weekly Goal</span>
-              <span className={styles.goalCount}>
-                {weeklyGoal!.completedCount} / {weeklyGoal!.targetCount}
+          )}
+          {hasWeekly && (
+            <div className={styles.goalChip}>
+              <FiCalendar size={14} className={styles.goalIcon} />
+              <span className={styles.goalLabel}>Weekly</span>
+              <span className={styles.goalProgress}>
+                {weeklyGoal?.completedCount}/{weeklyGoal?.targetCount}
               </span>
+              <span className={styles.goalPercentage}>{weeklyPercentage}%</span>
             </div>
-            <ProgressBar value={weeklyPercentage} max={100} size="md" showValue={false} rounded />
-            <span className={styles.goalPercentage}>{weeklyPercentage}%</span>
-          </div>
-        )}
-      </div>
-    </Card>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
+
+export default memo(HeroSummary);

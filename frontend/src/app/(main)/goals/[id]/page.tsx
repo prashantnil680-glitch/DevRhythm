@@ -33,10 +33,6 @@ import { formatDateForDisplay } from '@/shared/lib/dateUtils';
 import { ROUTES } from '@/shared/config';
 import styles from './GoalDetail.module.css';
 
-// ------------------------------------------------------------------- //
-//  Types – align with your actual API responses. Adjust as needed.    //
-// ------------------------------------------------------------------- //
-
 interface QuestionMeta {
   _id: string;
   title: string;
@@ -79,13 +75,14 @@ interface Goal {
   completedQuestions?: CompletedQuestionEntry[];
 }
 
-// ------------------------------------------------------------------- //
-//  Pure helpers                                                       //
-// ------------------------------------------------------------------- //
-
 const formatDate = (dateString?: string): string => {
   if (!dateString) return '—';
   return format(new Date(dateString), 'MMM d, yyyy');
+};
+
+const formatDateShort = (dateString?: string): string => {
+  if (!dateString) return '—';
+  return format(new Date(dateString), 'MMM d');
 };
 
 const pluralize = (count: number, singular: string, plural: string) =>
@@ -121,50 +118,6 @@ const confidenceGlow = (level: number): React.CSSProperties => ({
   '--glow-opacity': 0.2 + level * 0.08,
 } as React.CSSProperties);
 
-interface HeroMessage {
-  icon: React.ReactNode;
-  text: string;
-}
-
-function getHeroMessage(
-  goal: Goal,
-  daysLeft: number,
-  completedPercentage: number
-): HeroMessage {
-  const isCompleted = goal.status === 'completed';
-  const isFailed = goal.status === 'failed';
-
-  if (isCompleted) {
-    const early = differenceInDays(goal.endDate!, new Date()) > 0;
-    return early
-      ? { icon: <FiAward />, text: `Completed ${Math.abs(daysLeft)} days early!` }
-      : { icon: <FiCheckCircle />, text: 'Goal completed!' };
-  }
-  if (isFailed) {
-    return { icon: <FiAlertCircle />, text: 'Missed the deadline. Next time!' };
-  }
-  if (daysLeft === 0) {
-    return { icon: <FiAlertCircle />, text: 'Ends today! Solve remaining problems.' };
-  }
-  if (daysLeft < 0) {
-    return { icon: <FiAlertCircle />, text: `Overdue by ${Math.abs(daysLeft)} days` };
-  }
-  if (completedPercentage >= 75 && daysLeft === 1) {
-    return { icon: <FiTrendingUp />, text: 'Almost there! 1 day left.' };
-  }
-  if (completedPercentage === 0 && daysLeft === 1) {
-    return { icon: <FiZap />, text: 'Start now – there’s still time!' };
-  }
-  if (goal.goalType === 'daily') {
-    return { icon: <FiTarget />, text: `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left` };
-  }
-  return { icon: <FiTrendingUp />, text: `Keep going! ${daysLeft} days left` };
-}
-
-// ------------------------------------------------------------------- //
-//  RiverQuestionItem                                                  //
-// ------------------------------------------------------------------- //
-
 interface RiverQuestionItemProps {
   questionId: string;
   questionMetadata: QuestionMeta;
@@ -194,95 +147,74 @@ function RiverQuestionItem({
     : 'N/A';
 
   const timeDisplay = timeSpent < 60 ? `${timeSpent}m` : `${Math.round(timeSpent / 60)}h`;
-  const difficultyClass = styles[`riverDifficulty${questionMetadata.difficulty}`];
+  const difficultyClass = styles[`timelineDifficulty${questionMetadata.difficulty}`];
   const pattern = questionMetadata.pattern?.[0] || null;
   const tags = questionMetadata.tags?.slice(0, 2) || [];
   const remainingTags = (questionMetadata.tags?.length || 0) - tags.length;
 
-  const href = `/questions/${questionMetadata.platformQuestionId || questionMetadata._id}`;
+  const href = `/questions/${questionMetadata.platformQuestionId}`;
 
   if (isLoading) {
-    return (
-      <div className={styles.riverItem}>
-        <div className={styles.riverNode} />
-        <div className={styles.riverDate}>Loading progress...</div>
-        <div className={styles.riverTitleLine}>
-          <span className={styles.riverConnector}>╰─</span>
-          <span className={styles.riverTitleLink}>{questionMetadata.title}</span>
-        </div>
-      </div>
-    );
+    return <div className={styles.timelineItemSkeleton}>Loading...</div>;
   }
 
   return (
-    <div className={styles.riverItem}>
+    <div className={styles.timelineItem}>
       <div
-        className={clsx(styles.riverNode, styles.riverNodeGlow)}
+        className={clsx(styles.timelineNode, completed && styles.timelineNodeCompleted)}
         style={confidenceGlow(confidenceLevel)}
       />
-      <div className={styles.riverDate}>
-        {completed ? (solvedDisplay ? `Completed ${solvedDisplay}` : 'Completed') : 'Pending'}
-      </div>
-      <div className={styles.riverTitleLine}>
-        <span className={styles.riverConnector}>╰─</span>
-        <Link href={href} className={styles.riverTitleLink}>
-          {questionMetadata.title}
-        </Link>
-        <span className={styles.riverStatus}>{completed ? 'Completed' : 'Target'}</span>
-      </div>
-      <div className={styles.riverMeta}>
-        <span className={clsx(styles.riverDifficulty, difficultyClass)}>
-          {questionMetadata.difficulty}
-        </span>
-        <PlatformIcon platform={questionMetadata.platform} size="sm" />
-        <span>{questionMetadata.platform}</span>
-        {pattern && <span className={styles.riverPattern}>· {pattern}</span>}
-      </div>
-      {tags.length > 0 && (
-        <div className={styles.riverTagsRow}>
-          {tags.map((tag) => (
-            <span key={tag} className={styles.riverTag}>
-              #{tag}
-            </span>
-          ))}
-          {remainingTags > 0 && (
-            <Tooltip content={questionMetadata.tags?.slice(2).join(', ')}>
-              <span className={styles.riverTag}>+{remainingTags}</span>
-            </Tooltip>
-          )}
+      <div className={styles.timelineContent}>
+        <div className={styles.timelineTop}>
+          <Link href={href} className={styles.timelineTitle}>
+            {questionMetadata.title}
+          </Link>
+          <span className={clsx(styles.timelineDifficulty, difficultyClass)}>
+            {questionMetadata.difficulty}
+          </span>
+          <div className={styles.timelineTags}>
+            {tags.map(tag => (
+              <span key={tag} className={styles.timelineTag}>#{tag}</span>
+            ))}
+            {remainingTags > 0 && (
+              <Tooltip content={questionMetadata.tags?.slice(2).join(', ')}>
+                <span className={styles.timelineTag}>+{remainingTags}</span>
+              </Tooltip>
+            )}
+          </div>
+          <div className={styles.timelineStatus}>
+            {completed ? (
+              <span className={styles.statusCompleted}>✓ Completed {solvedDisplay || ''}</span>
+            ) : (
+              <span className={styles.statusPending}>○ Pending</span>
+            )}
+          </div>
         </div>
-      )}
-      <div className={styles.riverMetricsRow}>
-        <Tooltip content={`Total time spent: ${timeSpent} minutes`}>
-          <span className={styles.riverMetric}>
-            <FiClock className={styles.riverMetricIcon} /> {timeDisplay}
+        <div className={styles.timelineMetrics}>
+          <span className={styles.metric}>
+            <FiClock className={styles.metricIcon} /> {timeDisplay}
           </span>
-        </Tooltip>
-        <Tooltip content={`Attempts: ${attemptsCount}`}>
-          <span className={styles.riverMetric}>
-            <span className={styles.riverMetricIcon}>👣</span> {attemptsCount} att
+          <span className={styles.metric}>
+            <span className={styles.metricIcon}>👣</span> {attemptsCount} att
           </span>
-        </Tooltip>
-        <Tooltip content={`Revisions: ${revisionCount}`}>
-          <span className={styles.riverMetric}>
-            <FiRefreshCw className={styles.riverMetricIcon} /> {revisionCount} rev
+          <span className={styles.metric}>
+            <FiRefreshCw className={styles.metricIcon} /> {revisionCount} rev
           </span>
-        </Tooltip>
-        {completedAt && (
-          <Tooltip content={`Last activity: ${revisionFull}`}>
-            <span className={styles.riverMetric}>
-              <FiRefreshCw className={styles.riverMetricIcon} /> {revisionShort}
+          {completedAt && (
+            <span className={styles.metric}>
+              <FiRefreshCw className={styles.metricIcon} /> {revisionShort}
             </span>
-          </Tooltip>
-        )}
+          )}
+          <span className={styles.metricPlatform}>
+            <PlatformIcon platform={questionMetadata.platform} size="sm" />
+            {questionMetadata.platform}
+          </span>
+          {pattern && <span className={styles.metricPattern}>· {pattern}</span>}
+        </div>
       </div>
     </div>
   );
 }
-
-// ------------------------------------------------------------------- //
-//  Main page component                                                //
-// ------------------------------------------------------------------- //
 
 export default function GoalDetailPage() {
   const router = useRouter();
@@ -302,7 +234,6 @@ export default function GoalDetailPage() {
     setIsDeleteModalOpen(false);
   };
 
-  // Derived data
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -317,12 +248,6 @@ export default function GoalDetailPage() {
   const isFailed = goal?.status === 'failed';
   const isPlanned = goal?.goalType === 'planned';
 
-  const heroMessage = useMemo(
-    () => (goal ? getHeroMessage(goal, daysLeft, completedPercentage) : null),
-    [goal, daysLeft, completedPercentage]
-  );
-
-  // ----- Robust separation of pending vs completed questions -----
   const pendingQuestions = useMemo(() => {
     if (!isPlanned || !goal?.targetQuestions) return [];
 
@@ -343,7 +268,6 @@ export default function GoalDetailPage() {
   const completedQuestionData = useMemo(() => {
     if (!isPlanned || !goal?.completedQuestions) return [];
 
-    // First build a map of target questions for fallback resolution
     const targetMap = new Map<string, TargetQuestion>();
     for (const q of goal.targetQuestions || []) {
       targetMap.set(q._id, q);
@@ -352,7 +276,6 @@ export default function GoalDetailPage() {
     const result: { meta: QuestionMeta; completedAt?: string }[] = [];
     for (const cq of goal.completedQuestions) {
       let meta: QuestionMeta | undefined;
-      // Try to extract question ID
       let qid: string | undefined;
       if (typeof cq.questionId === 'string') {
         qid = cq.questionId;
@@ -361,11 +284,9 @@ export default function GoalDetailPage() {
       }
       if (!qid) continue;
 
-      // If we have a full object already, use it
       if (typeof cq.questionId === 'object' && cq.questionId.title) {
         meta = cq.questionId as unknown as QuestionMeta;
       } else {
-        // Otherwise fallback to the targetQuestions list
         const fallback = targetMap.get(qid);
         if (fallback) {
           meta = {
@@ -386,7 +307,20 @@ export default function GoalDetailPage() {
     return result;
   }, [isPlanned, goal?.completedQuestions, goal?.targetQuestions]);
 
-  // ---------- early returns ----------
+  const allQuestions = useMemo(() => {
+    const pending = pendingQuestions.map(q => ({
+      ...q,
+      completed: false,
+      completedAt: undefined,
+    }));
+    const completed = completedQuestionData.map(({ meta, completedAt }) => ({
+      ...meta,
+      completed: true,
+      completedAt,
+    }));
+    return [...pending, ...completed];
+  }, [pendingQuestions, completedQuestionData]);
+
   if (isLoading) return <GoalDetailSkeleton />;
   if (error || !goal) {
     return (
@@ -401,17 +335,48 @@ export default function GoalDetailPage() {
     const start = formatDate(goal.startDate);
     const end = formatDate(goal.endDate);
     if (goal.goalType === 'daily') {
-      return start; // e.g., "Apr 27, 2026"
+      return start;
     }
-    return `${start} – ${end}`; // e.g., "Apr 27 – May 3, 2026"
+    return `${start} – ${end}`;
   }
 
-  // ---------- rendering ----------
+  const getHeroMessage = (goal: Goal): { icon: React.ReactNode; text: string } | null => {
+    const isCompleted = goal.status === 'completed';
+    const isFailed = goal.status === 'failed';
+    if (isCompleted) {
+      const early = differenceInDays(goal.endDate!, new Date()) > 0;
+      return early
+        ? { icon: <FiAward />, text: `Completed ${Math.abs(daysLeft)} days early!` }
+        : { icon: <FiCheckCircle />, text: 'Goal completed!' };
+    }
+    if (isFailed) {
+      return { icon: <FiAlertCircle />, text: 'Missed the deadline. Next time!' };
+    }
+    if (daysLeft === 0) {
+      return { icon: <FiAlertCircle />, text: 'Ends today! Solve remaining problems.' };
+    }
+    if (daysLeft < 0) {
+      return { icon: <FiAlertCircle />, text: `Overdue by ${Math.abs(daysLeft)} days` };
+    }
+    if (completedPercentage >= 75 && daysLeft === 1) {
+      return { icon: <FiTrendingUp />, text: 'Almost there! 1 day left.' };
+    }
+    if (completedPercentage === 0 && daysLeft === 1) {
+      return { icon: <FiZap />, text: 'Start now – there’s still time!' };
+    }
+    if (goal.goalType === 'daily') {
+      return { icon: <FiTarget />, text: `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left` };
+    }
+    return { icon: <FiTrendingUp />, text: `Keep going! ${daysLeft} days left` };
+  };
+
+  const heroMessage = getHeroMessage(goal);
+  const totalQuestions = allQuestions.length;
+
   return (
     <div className={styles.container}>
       <Breadcrumb
         items={[
-          // { label: 'Dashboard', href: ROUTES.DASHBOARD },
           { label: 'Home', href: ROUTES.HOME },
           { label: 'Goals', href: ROUTES.GOALS.ROOT },
           { label: 'Goal Details' },
@@ -431,175 +396,117 @@ export default function GoalDetailPage() {
           onClick={() => setIsDeleteModalOpen(true)}
           className={styles.deleteButton}
         >
-          <FiTrash2 /> Delete Goal
+          <FiTrash2 /> Delete
         </Button>
       </div>
 
-      {/* Hero area */}
-      <div className={styles.heroTwoColumns}>
-        <div onMouseEnter={() => setAnimationKey((k) => k + 1)} className={styles.heroLeft}>
+      <div className={styles.heroRow} onMouseEnter={() => setAnimationKey(k => k + 1)}>
+        <div className={styles.heroRing}>
           <CircularProgress
             key={animationKey}
             progress={completedPercentage}
-            size={120}
-            strokeWidth={8}
+            size={80}
+            strokeWidth={7}
             animate
           >
             <div className={styles.ringText}>
-              <span className={styles.percentage}>{completedPercentage}%</span>
+              <span className={styles.ringPercentage}>{completedPercentage}%</span>
             </div>
           </CircularProgress>
-          <div className={styles.heroFraction}>
-            {goal.completedCount} / {goal.targetCount}{' '}
-            {pluralize(goal.targetCount, 'problem', 'problems')}
-          </div>
-          <div className={styles.heroPercentText}>{completedPercentage}% completed</div>
         </div>
-        <div className={styles.heroRight}>
-          {heroMessage && (
-            <div className={styles.heroMessage}>
-              {heroMessage.icon}
-              <span>{heroMessage.text}</span>
-            </div>
-          )}
-          {!isCompleted && !isFailed && (
-            <div className={styles.deadlineLarge}>
-              {daysLeft > 0
-                ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`
-                : daysLeft === 0
-                ? 'Ends today'
-                : `Overdue by ${Math.abs(daysLeft)} days`}
-            </div>
-          )}
-          {isCompleted && (
-            <div className={styles.completedMessage}>
-              Completed on {formatDate(goal.achievedAt || goal.endDate)}
-            </div>
-          )}
-          <div className={styles.heroStatsGroup}>
-            <div className={styles.heroStat}>
-              <FiTarget />
-              <span>{goal.targetCount} target · {goal.completedCount} completed</span>
-            </div>
-            {!isCompleted && !isFailed && remainingCount > 0 && (
-              <div className={styles.heroAction}>
-                <FiZap /> Solve {remainingCount} more{' '}
-                {pluralize(remainingCount, 'question', 'questions')}!
-              </div>
+        <div className={styles.heroStats}>
+          <div className={styles.heroMainStats}>
+            <span className={styles.heroCount}>
+              {goal.completedCount} / {goal.targetCount}
+            </span>
+            <span className={styles.heroLabel}>completed</span>
+            <span className={styles.heroDivider}>•</span>
+            <Badge variant={isCompleted ? 'success' : isFailed ? 'error' : 'moss'} size="sm">
+              {goal.status}
+            </Badge>
+            <span className={styles.heroDivider}>•</span>
+            {heroMessage && (
+              <span className={styles.heroMessage}>
+                {heroMessage.icon} {heroMessage.text}
+              </span>
             )}
+          </div>
+          <div className={styles.heroMeta}>
+            <span className={styles.heroMetaItem}>
+              <FiType className={styles.heroMetaIcon} />
+              <span className={styles.heroMetaLabel}>Type:</span>
+              {goal.goalType.charAt(0).toUpperCase() + goal.goalType.slice(1)}
+            </span>
+            <span className={styles.heroMetaDivider}>|</span>
+            <span className={styles.heroMetaItem}>
+              <FiCalendar className={styles.heroMetaIcon} />
+              <span className={styles.heroMetaLabel}>Start:</span>
+              {formatDateShort(goal.startDate)}
+            </span>
+            <span className={styles.heroMetaDivider}>|</span>
+            <span className={styles.heroMetaItem}>
+              <FiTarget className={styles.heroMetaIcon} />
+              <span className={styles.heroMetaLabel}>End:</span>
+              {formatDateShort(goal.endDate)}
+            </span>
+            <span className={styles.heroMetaDivider}>|</span>
+            <span className={styles.heroMetaItem}>
+              <FiClock className={styles.heroMetaIcon} />
+              <span className={styles.heroMetaLabel}>Created:</span>
+              {formatDateShort(goal.createdAt)}
+            </span>
             {goal.totalTimeSpent != null && (
-              <div className={styles.heroStat}>
-                <FiClock />
-                <span>
-                  Total time spent:{' '}
+              <>
+                <span className={styles.heroMetaDivider}>|</span>
+                <span className={styles.heroMetaItem}>
+                  <FiClock className={styles.heroMetaIcon} />
+                  <span className={styles.heroMetaLabel}>Total:</span>
                   {goal.totalTimeSpent < 60
                     ? `${goal.totalTimeSpent}m`
                     : `${Math.round(goal.totalTimeSpent / 60)}h`}
                 </span>
-              </div>
+              </>
             )}
           </div>
         </div>
       </div>
 
-      {/* Dashboard + question timeline */}
-      <div className={styles.twoColumns}>
-        <div className={styles.leftColumn}>
-          <Card className={styles.detailsCard} noHover>
-            <h2 className={styles.detailsTitle}>Goal Dashboard</h2>
-            <div className={styles.detailsList}>
-              <div className={styles.detailsRow}>
-                <FiType className={styles.detailsIcon} />
-                <span className={styles.detailsLabel}>Type</span>
-                <span className={styles.detailsValue}>
-                  {goal.goalType.charAt(0).toUpperCase() + goal.goalType.slice(1)}
-                </span>
-              </div>
-              <div className={styles.detailsRow}>
-                <FiFlag className={styles.detailsIcon} />
-                <span className={styles.detailsLabel}>Status</span>
-                <Badge
-                  variant={isCompleted ? 'success' : isFailed ? 'error' : 'moss'}
-                  size="sm"
-                  className={styles.statusBadge}
-                >
-                  {goal.status}
-                </Badge>
-              </div>
-              <div className={styles.detailsRow}>
-                <FiCalendar className={styles.detailsIcon} />
-                <span className={styles.detailsLabel}>Start date</span>
-                <span className={styles.detailsValue}>{formatDate(goal.startDate)}</span>
-              </div>
-              <div className={styles.detailsRow}>
-                <FiTarget className={styles.detailsIcon} />
-                <span className={styles.detailsLabel}>Target date</span>
-                <span className={styles.detailsValue}>{formatDate(goal.endDate)}</span>
-              </div>
-              <div className={styles.detailsDivider} />
-              <div className={styles.detailsRow}>
-                <FiClock className={styles.detailsIcon} />
-                <span className={styles.detailsLabel}>Created</span>
-                <span className={styles.detailsValue}>{formatDate(goal.createdAt)}</span>
-              </div>
-              <div className={styles.detailsRow}>
-                <FiRefreshCw className={styles.detailsIcon} />
-                <span className={styles.detailsLabel}>Updated</span>
-                <span className={styles.detailsValue}>{formatDate(goal.updatedAt)}</span>
-              </div>
-            </div>
-          </Card>
+      <Card className={styles.timelineCard} noHover>
+        <div className={styles.timelineHeader}>
+          <h2 className={styles.timelineTitle}>
+            {isPlanned ? 'Question Timeline' : 'Progress Insights'}
+          </h2>
+          {isPlanned && totalQuestions > 0 && (
+            <span className={styles.timelineSummary}>
+              {totalQuestions} questions · {completedQuestionData.length} completed · {pendingQuestions.length} pending
+            </span>
+          )}
         </div>
-        <div className={styles.rightColumn}>
-          <Card className={styles.questionCard} noHover>
-            <h2 className={styles.sectionTitle}>
-              {isPlanned ? 'Question Timeline' : 'Progress Insights'}
-            </h2>
-            {!isPlanned && (
-              <div className={styles.defaultInsight}>
-                <p>
-                  This {goal.goalType} goal doesn’t track specific questions. Solve any problem on
-                  the platform to make progress.
-                </p>
-              </div>
+        {!isPlanned && (
+          <div className={styles.defaultInsight}>
+            <p>
+              This {goal.goalType} goal doesn’t track specific questions. Solve any problem on
+              the platform to make progress.
+            </p>
+          </div>
+        )}
+        {isPlanned && (
+          <div className={styles.timelineList}>
+            {allQuestions.length === 0 && (
+              <div className={styles.defaultInsight}>No questions associated with this planned goal.</div>
             )}
-            {isPlanned && (
-              <div className={styles.plannedWrapper}>
-                {pendingQuestions.length > 0 && (
-                  <div className={styles.timeline}>
-                    {pendingQuestions.map((q) => (
-                      <RiverQuestionItem
-                        key={q._id}
-                        questionId={q._id}
-                        questionMetadata={q}
-                        completed={false}
-                      />
-                    ))}
-                  </div>
-                )}
-                {completedQuestionData.length > 0 && (
-                  <div className={styles.timeline} style={{ marginTop: '1.5rem' }}>
-                    {completedQuestionData.map(({ meta, completedAt }) => (
-                      <RiverQuestionItem
-                        key={meta._id}
-                        questionId={meta._id}
-                        questionMetadata={meta}
-                        completed
-                        completedAt={completedAt}
-                      />
-                    ))}
-                  </div>
-                )}
-                {pendingQuestions.length === 0 && completedQuestionData.length === 0 && (
-                  <div className={styles.defaultInsight}>
-                    <p>No questions associated with this planned goal.</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </Card>
-        </div>
-      </div>
+            {allQuestions.map((q) => (
+              <RiverQuestionItem
+                key={q._id}
+                questionId={q._id}
+                questionMetadata={q}
+                completed={q.completed}
+                completedAt={q.completedAt}
+              />
+            ))}
+          </div>
+        )}
+      </Card>
 
       <Modal
         isOpen={isDeleteModalOpen}
@@ -628,26 +535,21 @@ function GoalDetailSkeleton() {
     <div className={styles.container}>
       <div className={styles.skeletonBreadcrumb} />
       <div className={styles.header}>
-        <SkeletonLoader variant="text" width={200} height={32} />
+        <SkeletonLoader variant="text" width={200} height={28} />
         <SkeletonLoader variant="custom" className={styles.skeletonButton} />
       </div>
-      <div className={styles.heroTwoColumns}>
-        <div className={styles.heroLeft}>
-          <SkeletonLoader variant="custom" className={styles.skeletonRing} />
-        </div>
-        <div className={styles.heroRight}>
-          <SkeletonLoader variant="text" width="80%" height={24} />
+      <div className={styles.skeletonHeroRow}>
+        <SkeletonLoader variant="custom" className={styles.skeletonRing} />
+        <div className={styles.skeletonHeroStats}>
           <SkeletonLoader variant="text" width="60%" height={20} />
-          <SkeletonLoader variant="text" width="70%" height={20} />
+          <SkeletonLoader variant="text" width="80%" height={16} />
         </div>
       </div>
-      <div className={styles.twoColumns}>
-        <div className={styles.leftColumn}>
-          <SkeletonLoader variant="custom" className={styles.skeletonMetadata} />
-        </div>
-        <div className={styles.rightColumn}>
-          <SkeletonLoader variant="custom" className={styles.skeletonQuestions} />
-        </div>
+      <div className={styles.skeletonTimelineCard}>
+        <SkeletonLoader variant="text" width="30%" height={24} />
+        <SkeletonLoader variant="text" width="100%" height={40} />
+        <SkeletonLoader variant="text" width="100%" height={40} />
+        <SkeletonLoader variant="text" width="100%" height={40} />
       </div>
     </div>
   );

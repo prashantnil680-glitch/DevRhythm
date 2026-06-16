@@ -36,7 +36,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://api.devrhythm.space/api/v1';
 
   return (
     <html
@@ -48,7 +48,24 @@ export default function RootLayout({
         <meta name="author" content="Anupam Debnath" />
         <link rel="author" href="/about/me" />
         <link rel="icon" href="/images/logos/dr-icon-dark-logo.png" type="image/png" />
-        {apiUrl && <link rel="preconnect" href={apiUrl} crossOrigin="anonymous" />}
+
+        {/* Preconnect to API domain for faster data fetching */}
+        {apiUrl && (
+          <>
+            <link rel="preconnect" href={apiUrl} crossOrigin="anonymous" />
+            <link rel="dns-prefetch" href={apiUrl} />
+          </>
+        )}
+
+        {/* Preconnect to avatar CDN domains to speed up image loading */}
+        <link rel="preconnect" href="https://lh3.googleusercontent.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://lh3.googleusercontent.com" />
+        <link rel="preconnect" href="https://avatars.githubusercontent.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://avatars.githubusercontent.com" />
+
+        {/* Preconnect to Cloudinary if used */}
+        <link rel="preconnect" href="https://res.cloudinary.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://res.cloudinary.com" />
       </head>
       <body>
         <RootLayoutClient>{children}</RootLayoutClient>

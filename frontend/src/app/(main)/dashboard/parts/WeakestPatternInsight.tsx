@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import Link from 'next/link';
 import Card from '@/shared/components/Card';
 import Button from '@/shared/components/Button';
@@ -12,7 +13,7 @@ interface WeakestPatternInsightProps {
   isLoading?: boolean;
 }
 
-export default function WeakestPatternInsight({ pattern, isLoading }: WeakestPatternInsightProps) {
+function WeakestPatternInsight({ pattern, isLoading }: WeakestPatternInsightProps) {
   // Determine the link URL based on pattern availability
   const viewAllLink = pattern ? `/patterns/${pattern.slug}` : '/patterns';
 
@@ -99,3 +100,5 @@ export default function WeakestPatternInsight({ pattern, isLoading }: WeakestPat
     </Card>
   );
 }
+
+export default memo(WeakestPatternInsight);

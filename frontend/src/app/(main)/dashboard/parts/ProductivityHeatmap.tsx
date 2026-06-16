@@ -1,8 +1,7 @@
-// components/ProductivityHeatmap.tsx
-
 'use client';
 
 import * as React from 'react';
+import { memo, useMemo } from 'react';
 import Link from 'next/link';
 import styles from './ProductivityHeatmap.module.css';
 
@@ -68,25 +67,74 @@ function HeatmapCell({ day, count, intensity, dateStr }: { day: number; count: n
   );
 }
 
-export default function ProductivityHeatmap({ data, isLoading }: ProductivityHeatmapProps) {
+function ProductivityHeatmap({ data, isLoading }: ProductivityHeatmapProps) {
   // Extract array of points from the two possible shapes
-  let points: Array<{ date: string; count: number; intensity: number }> = [];
-
-  if (!isLoading && data) {
+  const points = useMemo(() => {
+    if (!data) return [];
     if (Array.isArray(data)) {
-      points = data.map(item => ({
+      return data.map(item => ({
         date: item.date,
         count: item.activityCount,
         intensity: item.intensityLevel,
       }));
     } else if (data.dailyData && Array.isArray(data.dailyData)) {
-      points = data.dailyData.map(item => ({
+      return data.dailyData.map(item => ({
         date: item.date,
         count: item.totalActivities,
         intensity: item.intensityLevel,
       }));
     }
-  }
+    return [];
+  }, [data]);
+
+  // Build activity map for quick lookup
+  const activityMap = useMemo(() => {
+    const map = new Map<number, { count: number; intensity: number; date: string }>();
+    points.forEach(point => {
+      const dateObj = new Date(point.date);
+      const dayOfMonth = dateObj.getUTCDate();
+      map.set(dayOfMonth, { count: point.count, intensity: point.intensity, date: point.date });
+    });
+    return map;
+  }, [points]);
+
+  // Determine month name from first data point
+  const monthName = useMemo(() => {
+    if (points.length === 0) return '';
+    const firstDate = new Date(points[0].date);
+    return firstDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+  }, [points]);
+
+  // Build rows based on total days
+  const rows = useMemo(() => {
+    const totalDays = points.length;
+    if (totalDays === 31) {
+      return [
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        [12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
+        [22, 23, 24, 25, 26, 27, 28, 29, 30, 31],
+      ];
+    } else if (totalDays === 30) {
+      return [
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        [11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+        [21, 22, 23, 24, 25, 26, 27, 28, 29, 30],
+      ];
+    } else if (totalDays === 29) {
+      return [
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        [11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+        [21, 22, 23, 24, 25, 26, 27, 28, 29],
+      ];
+    } else {
+      // 28 days (February non-leap)
+      return [
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        [11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+        [21, 22, 23, 24, 25, 26, 27, 28],
+      ];
+    }
+  }, [points.length]);
 
   if (isLoading || points.length === 0) {
     return (
@@ -97,49 +145,6 @@ export default function ProductivityHeatmap({ data, isLoading }: ProductivityHea
         <div className={styles.skeletonHeatmap} />
       </div>
     );
-  }
-
-  // Determine month name from first data point
-  const firstDate = new Date(points[0].date);
-  const monthName = firstDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-
-  // Build map from day-of-month to activity data
-  const activityMap = new Map<number, { count: number; intensity: number; date: string }>();
-  points.forEach(point => {
-    const dateObj = new Date(point.date);
-    const dayOfMonth = dateObj.getUTCDate();
-    activityMap.set(dayOfMonth, { count: point.count, intensity: point.intensity, date: point.date });
-  });
-
-  // Use points.length to determine row layout (same as original logic)
-  const totalDays = points.length;
-
-  let rows: number[][] = [];
-  if (totalDays === 31) {
-    rows = [
-      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-      [12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
-      [22, 23, 24, 25, 26, 27, 28, 29, 30, 31],
-    ];
-  } else if (totalDays === 30) {
-    rows = [
-      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-      [11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
-      [21, 22, 23, 24, 25, 26, 27, 28, 29, 30],
-    ];
-  } else if (totalDays === 29) {
-    rows = [
-      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-      [11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
-      [21, 22, 23, 24, 25, 26, 27, 28, 29],
-    ];
-  } else {
-    // 28 days (February non-leap)
-    rows = [
-      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-      [11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
-      [21, 22, 23, 24, 25, 26, 27, 28],
-    ];
   }
 
   return (
@@ -170,3 +175,5 @@ export default function ProductivityHeatmap({ data, isLoading }: ProductivityHea
     </div>
   );
 }
+
+export default memo(ProductivityHeatmap);

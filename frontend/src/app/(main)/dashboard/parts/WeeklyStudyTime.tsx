@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import Link from 'next/link';
 import { FiTrendingUp, FiTrendingDown } from 'react-icons/fi';
 import { ROUTES } from '@/shared/config';
@@ -17,7 +18,7 @@ interface WeeklyStudyTimeProps {
   isLoading?: boolean;
 }
 
-export default function WeeklyStudyTime({ data, isLoading }: WeeklyStudyTimeProps) {
+function WeeklyStudyTime({ data, isLoading }: WeeklyStudyTimeProps) {
   // Handle missing data gracefully
   if (!isLoading && !data) {
     return (
@@ -153,3 +154,5 @@ export default function WeeklyStudyTime({ data, isLoading }: WeeklyStudyTimeProp
     </Card>
   );
 }
+
+export default memo(WeeklyStudyTime);

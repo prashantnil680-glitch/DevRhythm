@@ -10,6 +10,7 @@ import ProgressBar from '@/shared/components/ProgressBar';
 import Button from '@/shared/components/Button';
 import { useDailyProblem } from '@/features/goal';
 import type { DailyProblemResponse } from '@/features/goal/hooks/useDailyProblem';
+import { slugify } from '@/shared/lib/stringUtils';
 import styles from './DailyProblemCard.module.css';
 
 interface DailyProblemCardProps {
@@ -48,12 +49,8 @@ export default function DailyProblemCard({ initialData }: DailyProblemCardProps)
 
   return (
     <Card className={styles.container} noHover>
-      {/* Left column */}
       <div className={styles.leftColumn}>
         <div className={styles.problemHeader}>
-          <div className={styles.podBadge}>
-            <span>POD</span>
-          </div>
           <div className={styles.dateBadge}>
             <FiCalendar size={14} />
             <span>{formattedDate}</span>
@@ -64,6 +61,9 @@ export default function DailyProblemCard({ initialData }: DailyProblemCardProps)
           >
             {dailyProblem.difficulty}
           </Badge>
+          <div className={styles.podBadge}>
+            <span>POD</span>
+          </div>
         </div>
         <h3 className={styles.problemTitle}>
           <Link href={internalLink} className={styles.titleLink}>
@@ -72,9 +72,13 @@ export default function DailyProblemCard({ initialData }: DailyProblemCardProps)
         </h3>
         <div className={styles.tags}>
           {dailyProblem.tags.slice(0, 4).map((tag) => (
-            <span key={tag} className={styles.tag}>
+            <Link
+              key={tag}
+              href={`/patterns/${slugify(tag)}`}
+              className={styles.tagLink}
+            >
               #{tag}
-            </span>
+            </Link>
           ))}
           {dailyProblem.tags.length > 4 && (
             <Tooltip content={dailyProblem.tags.slice(4).join(', ')}>
@@ -94,7 +98,6 @@ export default function DailyProblemCard({ initialData }: DailyProblemCardProps)
         </div>
       </div>
 
-      {/* Right column – Today's Goal */}
       {todayGoal?.completedCount >= 0 && (
         <div className={styles.rightColumn}>
           <div className={styles.goalCard}>
@@ -103,7 +106,7 @@ export default function DailyProblemCard({ initialData }: DailyProblemCardProps)
               <span className={styles.goalLabel}>Today&apos;s goal</span>
             </div>
             <div className={styles.goalProgress}>
-              <ProgressBar value={goalPercentage} max={100} size="md" showValue rounded />
+              <ProgressBar value={goalPercentage} max={100} size="sm" showValue rounded />
               <span className={styles.goalCount}>
                 {todayGoal?.completedCount} / {todayGoal?.targetCount} completed
               </span>

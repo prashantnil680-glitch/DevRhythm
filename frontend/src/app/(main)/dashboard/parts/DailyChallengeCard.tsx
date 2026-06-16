@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import Link from 'next/link';
 import { format, endOfDay, differenceInHours } from 'date-fns';
 import { FiExternalLink } from 'react-icons/fi';
@@ -21,7 +22,7 @@ const getHoursLeftToday = (): number => {
   return Math.max(0, hoursLeft);
 };
 
-export default function DailyChallengeCard({ dailyChallenge, isLoading }: DailyChallengeCardProps) {
+function DailyChallengeCard({ dailyChallenge, isLoading }: DailyChallengeCardProps) {
   if (isLoading) {
     return (
       <Card className={styles.container} noHover>
@@ -124,3 +125,5 @@ export default function DailyChallengeCard({ dailyChallenge, isLoading }: DailyC
     </Card>
   );
 }
+
+export default memo(DailyChallengeCard);

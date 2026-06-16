@@ -54,9 +54,12 @@ export default function GoalDashboardClient() {
 
   return (
     <div className={styles.container}>
-      <DailyProblemCard initialData={initialDaily} />
-      <HeroStats totalGoals={totalGoals} completionRate={completionRate} />
-      <CurrentMomentum daily={dailyGoalData} weekly={weeklyGoalData} />
+      <div className={styles.heroRow}>
+        <DailyProblemCard initialData={initialDaily} />
+        <HeroStats totalGoals={totalGoals} completionRate={completionRate} />
+      </div>
+
+      {/* <CurrentMomentum daily={dailyGoalData} weekly={weeklyGoalData} /> */}
       <LazySection
         loader={() => import('./TrendsCharts')}
         fallback={<TrendsChartsSkeleton />}

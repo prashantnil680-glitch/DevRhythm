@@ -1,4 +1,5 @@
-'use client'
+'use client';
+
 import React, { useState, forwardRef } from "react";
 import Image from "next/image";
 import { FaUser } from "react-icons/fa";
@@ -18,6 +19,7 @@ export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   badge?: React.ReactNode;
   ring?: boolean;
   className?: string;
+  priority?: boolean; // NEW: whether to prioritise loading this image
 }
 
 const sizeMap = {
@@ -39,11 +41,13 @@ const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
       badge,
       ring = false,
       className,
+      priority = false,
       ...rest
     },
     ref
   ) => {
     const [imgError, setImgError] = useState(false);
+
     const shouldShowImage = src && !imgError;
 
     let fallbackContent: React.ReactNode;
@@ -87,7 +91,9 @@ const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
             className={styles.image}
             width={sizeMap[size]}
             height={sizeMap[size]}
-            loading="lazy"
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
+            priority={priority}
           />
         ) : (
           <div className={styles.fallback}>{fallbackContent}</div>

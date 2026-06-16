@@ -1,11 +1,22 @@
+.bannerWrapper {
+  min-height: 100px;
+  margin-bottom: 1.5rem;
+  transition: min-height 0.2s ease;
+  width: 100%;
+}
+
 .banner {
   position: relative;
   display: flex;
   align-items: center;
   gap: 1.5rem;
   padding: 1rem 2rem 1rem 1rem;
-  margin-bottom: 1.5rem;
   border-bottom: 1px solid var(--divider);
+}
+
+.bannerPlaceholder {
+  min-height: 100px;
+  width: 100%;
 }
 
 .closeButton {
@@ -69,10 +80,13 @@
     gap: 1rem;
     padding: 1rem;
   }
+
   .title {
     font-size: 1.2rem;
   }
-  .message, .submessage {
+
+  .message,
+  .submessage {
     font-size: 0.85rem;
   }
 }

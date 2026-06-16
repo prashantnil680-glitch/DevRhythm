@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { FiCheckCircle, FiRefreshCw, FiTarget } from 'react-icons/fi';
@@ -50,7 +51,7 @@ const isClickableActivity = (activity: ActivityItem): boolean => {
   return clickableTypes.includes(activity.type) && !!activity.platformQuestionId;
 };
 
-export default function RecentActivity({ activities, isLoading }: RecentActivityProps) {
+function RecentActivity({ activities, isLoading }: RecentActivityProps) {
   if (isLoading) {
     return (
       <Card className={styles.container} noHover>
@@ -131,3 +132,5 @@ export default function RecentActivity({ activities, isLoading }: RecentActivity
     </Card>
   );
 }
+
+export default memo(RecentActivity);

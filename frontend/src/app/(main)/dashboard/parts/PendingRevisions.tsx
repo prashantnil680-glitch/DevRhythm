@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, differenceInHours, differenceInDays, startOfDay, endOfDay } from 'date-fns';
@@ -19,7 +20,7 @@ interface PendingRevisionsProps {
   onRevisionComplete?: () => void;
 }
 
-export default function PendingRevisions({
+function PendingRevisions({
   revisions,
   type = 'pending',
   limit,
@@ -171,3 +172,5 @@ export default function PendingRevisions({
     </Card>
   );
 }
+
+export default memo(PendingRevisions);

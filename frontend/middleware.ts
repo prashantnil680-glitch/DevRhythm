@@ -1,33 +1,17 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-const PUBLIC_PATHS = [
-  '/',
-  '/login',
-  '/auth/callback', 
-  '/about/me',
-  '/privacy',
-  '/terms',
-  '/users',
-  '/sheets',
-  '/questions',
-  '/patterns',
-];
+import { isPublicPath } from '@/shared/lib/publicPaths';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get('auth_token')?.value;
 
-  const isPublic = PUBLIC_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`)
-  );
-
-  // console.log(`[Middleware] path=${pathname}, token=${!!token}, isPublic=${isPublic}`);
-
-  if (isPublic) {
+  // Check if the path is public using the shared utility
+  if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
+  // Redirect to login if no token
   if (!token) {
     const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);

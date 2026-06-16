@@ -4,11 +4,13 @@ export const PUBLIC_PATHS = [
   '/auth/callback',
   '/about/me',
   '/privacy',
+  '/groups/my',
   '/terms',
   '/users',
   '/sheets',
   '/questions',
   '/patterns',
+  '/sitemap.xml', // Allows all subpaths: /sitemap.xml/sheets, /sitemap.xml/questions, etc.
 ];
 
 export function isPublicPath(pathname: string): boolean {

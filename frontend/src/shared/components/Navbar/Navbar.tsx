@@ -21,6 +21,7 @@ import {
   FiGrid,
   FiChevronRight,
   FiBell,
+  FiLock,
 } from 'react-icons/fi';
 import { FaFire } from 'react-icons/fa';
 import clsx from 'clsx';
@@ -110,7 +111,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <Logo size="sm" layout="horizontal" />
 
           <div className={styles.navLinks}>
-            {/* Sheets dropdown (first) */}
+            {/* Sheets dropdown */}
             <div className={styles.dropdownWrapper} ref={sheetsRef}>
               <Button
                 variant="ghost"
@@ -162,7 +163,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
 
-            {/* Progress dropdown */}
+            {/* Progress dropdown – shows login prompt when logged out */}
             <div className={styles.dropdownWrapper} ref={progressRef}>
               <Button
                 variant="ghost"
@@ -185,15 +186,35 @@ export const Navbar: React.FC<NavbarProps> = ({
               </Button>
               {openDropdown === 'progress' && (
                 <div className={styles.dropdownMenu}>
-                  <Link href={ROUTES.GOALS.ROOT} className={styles.dropdownItem}>
-                    Goals
-                  </Link>
-                  <Link href={ROUTES.REVISIONS.ROOT} className={styles.dropdownItem}>
-                    Revisions
-                    {pendingRevisionsCount > 0 && user && (
-                      <span className={styles.badgeInline}>{pendingRevisionsCount}</span>
-                    )}
-                  </Link>
+                  {isAuthenticated ? (
+                    <>
+                      <Link href="/activity" className={styles.dropdownItem}>
+                        Activity
+                      </Link>
+                      <Link href={ROUTES.GOALS.ROOT} className={styles.dropdownItem}>
+                        Goals
+                      </Link>
+                      <Link href={ROUTES.REVISIONS.ROOT} className={styles.dropdownItem}>
+                        Revisions
+                        {pendingRevisionsCount > 0 && (
+                          <span className={styles.badgeInline}>{pendingRevisionsCount}</span>
+                        )}
+                      </Link>
+                    </>
+                  ) : (
+                    <div className={styles.loginPrompt}>
+                      <FiLock className={styles.loginPromptIcon} />
+                      <span className={styles.loginPromptText}>Login to track your progress</span>
+                      <Button
+                        asChild
+                        variant="primary"
+                        size="sm"
+                        className={styles.loginPromptButton}
+                      >
+                        <Link href={loginHref}>Sign In</Link>
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -275,9 +296,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                     >
                       <FiUser /> Profile
                     </Link>
-                    {/* <Link href={ROUTES.SHARES.ROOT} className={styles.dropdownItem}>
-                      <FiShare2 /> Shares
-                    </Link> */}
                     <div className={styles.dropdownDivider} />
                     <button onClick={logout} className={styles.dropdownItem}>
                       <FiLogOut /> Logout
@@ -365,16 +383,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
                 </Link>
               ) : (
-                <Link
-                  href={loginHref}
-                  className={styles.drawerLoginLink}
-                  onClick={() => setIsDrawerOpen(false)}
-                >
-                  Login
-                </Link>
+                <div className={styles.drawerLoginSection}>
+                  <Button
+                    asChild
+                    variant="primary"
+                    size="md"
+                    fullWidth
+                    className={styles.drawerLoginButton}
+                  >
+                    <Link href={loginHref} onClick={() => setIsDrawerOpen(false)}>
+                      Sign In
+                    </Link>
+                  </Button>
+                </div>
               )}
 
-              {/* Sheets section (first) */}
+              {/* Sheets section */}
               <div className={styles.drawerSection}>
                 <h3>Sheets</h3>
                 <Link href={ROUTES.SHEETS.ROOT} onClick={() => setIsDrawerOpen(false)}>
@@ -398,18 +422,43 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </Link>
               </div>
 
-              {/* Progress section */}
+              {/* Progress section – shows login prompt when logged out */}
               <div className={styles.drawerSection}>
                 <h3>Progress</h3>
-                <Link href={ROUTES.GOALS.ROOT} onClick={() => setIsDrawerOpen(false)}>
-                  Goals
-                </Link>
-                <Link href={ROUTES.REVISIONS.ROOT} onClick={() => setIsDrawerOpen(false)}>
-                  Revisions
-                  {pendingRevisionsCount > 0 && user && (
-                    <span className={styles.drawerBadge}>{pendingRevisionsCount}</span>
-                  )}
-                </Link>
+                {isAuthenticated ? (
+                  <>
+                    <Link href="/activity" onClick={() => setIsDrawerOpen(false)}>
+                      Activity
+                    </Link>
+                    <Link href={ROUTES.GOALS.ROOT} onClick={() => setIsDrawerOpen(false)}>
+                      Goals
+                    </Link>
+                    <Link href={ROUTES.REVISIONS.ROOT} onClick={() => setIsDrawerOpen(false)}>
+                      Revisions
+                      {pendingRevisionsCount > 0 && (
+                        <span className={styles.drawerBadge}>{pendingRevisionsCount}</span>
+                      )}
+                    </Link>
+                  </>
+                ) : (
+                  <div className={styles.drawerLoginPrompt}>
+                    <FiLock className={styles.drawerLoginPromptIcon} />
+                    <span className={styles.drawerLoginPromptText}>
+                      Login to track your progress
+                    </span>
+                    <Button
+                      asChild
+                      variant="primary"
+                      size="sm"
+                      fullWidth
+                      className={styles.drawerLoginPromptButton}
+                    >
+                      <Link href={loginHref} onClick={() => setIsDrawerOpen(false)}>
+                        Sign In
+                      </Link>
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* Groups section */}
@@ -435,9 +484,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   >
                     Profile
                   </Link>
-                  {/* <Link href="/settings" onClick={() => setIsDrawerOpen(false)}>
-                    Settings
-                  </Link> */}
                   <Button
                     variant="ghost"
                     className={styles.drawerLogout}
@@ -481,7 +527,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </Link>
 
-          {/* Quick add (plus) – unchanged */}
+          {/* Quick add (plus) */}
           <Link
             href={ROUTES.QUESTIONS.CREATE}
             className={styles.quickAddButton}
@@ -490,7 +536,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <FiPlus />
           </Link>
 
-          {/* All Sheets – replaces "Groups" */}
+          {/* All Sheets */}
           <Link
             href={ROUTES.SHEETS.ROOT}
             className={clsx(styles.mobileNavItem, isActive(ROUTES.SHEETS.ROOT) && styles.active)}
@@ -500,7 +546,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className={styles.mobileLabel}>Sheets</span>
           </Link>
 
-          {/* All Questions – new button */}
+          {/* All Questions */}
           <Link
             href={ROUTES.QUESTIONS.ROOT}
             className={clsx(styles.mobileNavItem, isActive(ROUTES.QUESTIONS.ROOT) && styles.active)}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { FaGithub, FaLinkedin, FaArrowUp } from 'react-icons/fa';
+import { FiLock } from 'react-icons/fi';
 import clsx from 'clsx';
 import { ROUTES } from '@/shared/config';
 import Logo from '@/shared/components/Logo';
@@ -106,6 +107,7 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
   const { user } = useSession();
   const isLoggedIn = !!user;
 
+  // Community links – dynamic
   const communityLinks: Array<{ label: string; href: string }> = [
     { label: 'All Sheets', href: ROUTES.SHEETS.ROOT },
   ];
@@ -117,6 +119,7 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
     communityLinks.push({ label: 'Create Group', href: ROUTES.GROUPS.CREATE });
   }
 
+  // Account links – only visible when logged in
   const accountLinks: Array<{ label: string; href: string }> = [];
   if (isLoggedIn) {
     accountLinks.push({
@@ -125,6 +128,8 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
     });
   }
   accountLinks.push({ label: 'View Community', href: '/users' });
+
+  const loginHref = `/login?returnTo=${encodeURIComponent('/activity')}`;
 
   return (
     <footer className={clsx(styles.footer, className)}>
@@ -161,14 +166,41 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
             ]}
           />
 
-          <LinkGroup
-            title="Progress"
-            links={[
-              { label: 'Activity', href: '/activity' },
-              { label: 'Revisions', href: ROUTES.REVISIONS.ROOT },
-              { label: 'Goals', href: ROUTES.GOALS.ROOT },
-            ]}
-          />
+          {/* Progress section – shows login prompt when logged out */}
+          <div className={styles.linkGroup}>
+            <h4 className={styles.groupTitle}>Progress</h4>
+            <ul className={styles.linkList}>
+              {isLoggedIn ? (
+                <>
+                  <li>
+                    <Link href="/activity" className={styles.link}>
+                      Activity
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href={ROUTES.REVISIONS.ROOT} className={styles.link}>
+                      Revisions
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href={ROUTES.GOALS.ROOT} className={styles.link}>
+                      Goals
+                    </Link>
+                  </li>
+                </>
+              ) : (
+                <li className={styles.loginPromptFooter}>
+                  <FiLock className={styles.loginPromptFooterIcon} />
+                  <span className={styles.loginPromptFooterText}>
+                    <Link href={loginHref} className={styles.loginPromptFooterLink}>
+                      Sign in
+                    </Link>{' '}
+                    to track your progress
+                  </span>
+                </li>
+              )}
+            </ul>
+          </div>
 
           <LinkGroup title="Community" links={communityLinks} />
 

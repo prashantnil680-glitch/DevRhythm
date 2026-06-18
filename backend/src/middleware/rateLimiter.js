@@ -73,7 +73,7 @@ const userLimiter = createRedisLimiter(20 * 60 * 1000, 250, 'user');
 const progressSnapshotLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'snapshot');
 const notificationReadLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'notification');
 const leaderboardLimiter = createRedisLimiter(15 * 60 * 1000, 300, 'leaderboard');
-const publicLimiter = createRedisLimiter(60 * 1000, 60, 'public');
+const publicLimiter = createRedisLimiter(15 * 60 * 1000, 300, 'public');
 
 // Question endpoints
 const questionCreateLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'question:create');

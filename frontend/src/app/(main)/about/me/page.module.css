@@ -1,320 +1,495 @@
-/* ============================================================
-   About Page – Complete Styles
-   ============================================================ */
+/* F:\PERSONAL\DevRhythm\frontend\src\app\(main)\about\me\page.module.css */
 
 .container {
-  max-width: 940px;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 1rem;
-  animation: fadeInUp 0.4s ease-out both;
+  padding: 2rem 1.5rem 3rem;
 }
 
-/* ===== Hero Card ===== */
-.heroCard {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  margin-bottom: 1.5rem;
-  overflow: hidden;
-}
-
-.heroGrid {
-  display: flex;
-  gap: 2rem;
-  align-items: center;
-  padding: 2rem;
-}
-
-.avatarWrapper {
-  flex-shrink: 0;
-}
-
-.profileAvatar {
-  box-shadow: 0 8px 20px var(--shadow);
-}
-
-.intro {
-  flex: 1;
-}
-
-.name {
-  font-family: var(--font-heading);
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: 0.25rem;
-  color: var(--text-primary);
-}
-
-.role {
-  font-size: 1.1rem;
-  color: var(--accent-moss);
-  margin-bottom: 0.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.dot {
-  color: var(--text-muted);
-}
-
-.detail {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.75rem;
-}
-
-.bio {
-  font-size: 0.95rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
-
-/* ===== Story & Feature Cards ===== */
-.storyCard,
-.featuresCard,
-.socialCard {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  margin-bottom: 1.5rem;
-  padding: 1.5rem;
-}
-
-.sectionHeader {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.5rem;
-}
-
-.sectionIcon {
-  font-size: 1.5rem;
-  color: var(--accent-moss);
-}
-
-.sectionHeader h2 {
-  font-family: var(--font-heading);
-  font-size: 1.4rem;
-  font-weight: 500;
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.storyContent p {
-  color: var(--text-secondary);
-  line-height: 1.7;
-  margin-bottom: 1rem;
-}
-
-.highlight {
-  background: var(--bg-elevated);
-  padding: 1rem;
-  border-left: 3px solid var(--accent-moss);
-  border-radius: 6px;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-/* ===== Features Grid ===== */
-.featuresGrid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.5rem;
-}
-
-.feature {
-  text-align: center;
-  padding: 1rem;
-}
-
-.featureIcon {
-  font-size: 2rem;
-  color: var(--accent-moss);
-  margin-bottom: 0.5rem;
-}
-
-.feature h3 {
-  font-family: var(--font-heading);
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: var(--text-primary);
-}
-
-.feature p {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
-
-/* ===== LeetCode Thumbnail Card (matching project cards) ===== */
-.leetcodeCardFull {
-  background: transparent;
-  border: none;
-  padding: 0;
-  margin-bottom: 1.5rem;
-}
-
-.leetcodeCardLink {
-  text-decoration: none;
-  color: inherit;
-  display: block;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.leetcodeCardLink:hover {
-  transform: translateY(-4px);
-}
-
-.leetcodeCard {
-  background: var(--bg-elevated);
+/* Hero */
+.hero {
+  background: rgba(var(--accent-moss-rgb), 0.06);
   border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  transition: box-shadow 0.2s ease;
+  padding: 3rem 2rem;
+  text-align: center;
+  margin-bottom: 2.5rem;
 }
 
-.leetcodeCardLink:hover .leetcodeCard {
-  box-shadow: 0 8px 20px var(--shadow);
-  border-color: var(--accent-moss);
-}
-
-.leetcodeImageWrapper {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  background: var(--bg-surface);
-}
-
-.leetcodeImage {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.3s ease;
-}
-
-.leetcodeCardLink:hover .leetcodeImage {
-  transform: scale(1.05);
-}
-
-.leetcodeInfo {
-  padding: 1rem;
-}
-
-.leetcodeTitle {
-  font-family: var(--font-heading);
-  font-size: 1.1rem;
-  font-weight: 600;
+.heroIcon {
+  font-size: 2.8rem;
+  color: var(--accent-moss);
   margin-bottom: 0.5rem;
+  display: block;
+}
+
+.heroTitle {
+  font-family: var(--font-outfit);
+  font-size: 2.8rem;
+  font-weight: 600;
   color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+  letter-spacing: -0.02em;
 }
 
-.leetcodeDescription {
-  font-size: 0.85rem;
+.heroSubtitle {
+  font-size: 1.2rem;
   color: var(--text-secondary);
-  line-height: 1.4;
-  margin-bottom: 0.75rem;
+  margin: 0 0 0.75rem 0;
 }
 
-.leetcodeLinkText {
+.heroMeta {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.8rem;
-  color: var(--accent-moss);
-  transition: gap 0.2s;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 0.75rem;
 }
 
-.leetcodeCardLink:hover .leetcodeLinkText {
+/* Dividers */
+.divider {
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  margin: 2.5rem 0;
+  opacity: 0.6;
+}
+
+/* Sections */
+.section {
+  margin-bottom: 2rem;
+}
+
+.section h2 {
+  font-family: var(--font-outfit);
+  font-size: 1.6rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
   gap: 0.6rem;
+  margin-bottom: 1rem;
 }
 
-/* ===== Projects Section (thumbnail grid) ===== */
-.projectsSection {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  margin-bottom: 1.5rem;
-  padding: 1.5rem;
+.sectionIcon {
+  color: var(--accent-moss);
+  font-size: 1.3rem;
+  flex-shrink: 0;
 }
 
+.section p {
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  margin: 0.75rem 0;
+}
+
+.section p strong {
+  color: var(--text-primary);
+}
+
+.section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0;
+}
+
+.section ul li {
+  position: relative;
+  padding-left: 1.6rem;
+  margin-bottom: 0.6rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.section ul li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: var(--accent-moss);
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.section ul li strong {
+  color: var(--text-primary);
+}
+
+/* Pull quote */
+.pullQuote {
+  font-family: var(--font-outfit);
+  font-size: 1.3rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  border-left: 4px solid var(--accent-moss);
+  padding: 0.5rem 0 0.5rem 1.5rem;
+  margin: 1.5rem 0;
+  font-style: italic;
+  background: transparent;
+}
+
+/* Inline link */
+.inlineLink {
+  color: var(--accent-moss);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: border-color 0.2s;
+  font-weight: 500;
+}
+
+.inlineLink:hover {
+  border-bottom-color: var(--accent-moss);
+}
+
+/* Memory Comparison */
+.memoryWrapper {
+  margin: 1.5rem 0 1rem;
+  padding: 1rem 0;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.memoryWrapper.animate {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.memoryGraph {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  background: transparent;
+}
+
+.memorySvg {
+  width: 100%;
+  height: auto;
+  background: transparent;
+}
+
+.axisLabel {
+  font-family: var(--font-commissioner);
+  font-size: 10px;
+  fill: var(--text-muted);
+}
+
+.forgettingCurve {
+  stroke-dashoffset: 1000;
+  animation: drawForgetting 2.5s ease-in-out forwards;
+  animation-delay: 0.5s;
+}
+
+.spacedRepetitionCurve {
+  stroke-dashoffset: 1000;
+  animation: drawSpacedRep 3s ease-in-out forwards;
+  animation-delay: 0.8s;
+}
+
+.revisionDot {
+  opacity: 0;
+  animation: popDot 0.4s ease-out forwards;
+}
+
+.revisionDot:nth-child(1) { animation-delay: 1.8s; }
+.revisionDot:nth-child(2) { animation-delay: 2.1s; }
+.revisionDot:nth-child(3) { animation-delay: 2.4s; }
+.revisionDot:nth-child(4) { animation-delay: 2.7s; }
+.revisionDot:nth-child(5) { animation-delay: 3.0s; }
+
+@keyframes drawForgetting {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes drawSpacedRep {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes popDot {
+  0% { opacity: 0; transform: scale(0.5); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.memoryCaption {
+  text-align: center;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  margin-top: 1rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Bio Card */
+.bioCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  padding: 1.5rem 0;
+  margin: 0.5rem 0;
+}
+
+.bioAvatar {
+  flex-shrink: 0;
+}
+
+.avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--bg-elevated);
+}
+
+.bioContent {
+  flex: 1;
+}
+
+.bioName {
+  font-family: var(--font-outfit);
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.15rem 0;
+}
+
+.bioRole {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem 0;
+}
+
+.bioDescription {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0 0 0.5rem 0;
+}
+
+.bioDescription:last-of-type {
+  margin-bottom: 0.75rem;
+}
+
+.bioLinks {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.bioLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: color 0.2s;
+}
+
+.bioLink:hover {
+  color: var(--accent-moss);
+}
+
+.bioLink svg {
+  font-size: 1rem;
+}
+
+/* CTA Section */
+.ctaSection {
+  text-align: center;
+  padding: 1rem 0 0.5rem;
+}
+
+.ctaTitle {
+  font-family: var(--font-outfit);
+  font-size: 1.8rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.ctaText {
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  margin: 0 0 1.5rem 0;
+}
+
+.ctaIcon {
+  font-size: 1.1rem;
+  margin-left: 0.2rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem 1rem 2rem;
+  }
+
+  .hero {
+    padding: 2rem 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .heroTitle {
+    font-size: 2rem;
+  }
+
+  .heroSubtitle {
+    font-size: 1rem;
+  }
+
+  .section h2 {
+    font-size: 1.3rem;
+  }
+
+  .section p {
+    font-size: 0.98rem;
+  }
+
+  .section ul li {
+    padding-left: 1.2rem;
+    font-size: 0.98rem;
+  }
+
+  .divider {
+    margin: 1.8rem 0;
+  }
+
+  .pullQuote {
+    font-size: 1.1rem;
+    padding-left: 1rem;
+  }
+
+  .bioCard {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .bioLinks {
+    justify-content: center;
+  }
+
+  .ctaTitle {
+    font-size: 1.4rem;
+  }
+
+  .memoryCaption {
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .heroTitle {
+    font-size: 1.6rem;
+  }
+
+  .heroIcon {
+    font-size: 2.2rem;
+  }
+
+  .section h2 {
+    font-size: 1.1rem;
+    flex-wrap: wrap;
+  }
+
+  .pullQuote {
+    font-size: 1rem;
+  }
+
+  .bioName {
+    font-size: 1.1rem;
+  }
+
+  .bioDescription {
+    font-size: 0.92rem;
+  }
+
+  .bioLinks {
+    gap: 0.75rem;
+  }
+
+  .axisLabel {
+    font-size: 8px;
+  }
+
+  .memoryCaption {
+    font-size: 0.8rem;
+  }
+}
+
+/* ============================================
+   PROJECTS SECTION
+   ============================================ */
 .projectsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 1.5rem;
-  margin-top: 1rem;
+  margin-top: 1.5rem;
 }
 
 .projectCardLink {
   text-decoration: none;
   color: inherit;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.projectCardLink:hover {
-  transform: translateY(-4px);
 }
 
 .projectCard {
   background: var(--bg-elevated);
-  border-radius: 12px;
-  overflow: hidden;
+  border-radius: 8px;
   border: 1px solid var(--border);
-  transition: box-shadow 0.2s ease;
+  overflow: hidden;
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
   height: 100%;
   display: flex;
   flex-direction: column;
 }
 
 .projectCard:hover {
-  box-shadow: 0 8px 20px var(--shadow);
+  transform: translateY(-4px);
   border-color: var(--accent-moss);
+  box-shadow: var(--shadow-md);
 }
 
 .projectImageWrapper {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  padding-top: 56.25%; /* 16:9 aspect ratio */
   overflow: hidden;
-  background: var(--bg-surface);
+  background: var(--bg-secondary);
 }
 
 .projectImage {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s ease;
+  transition: transform 0.4s ease;
 }
 
 .projectCard:hover .projectImage {
-  transform: scale(1.05);
+  transform: scale(1.02);
 }
 
 .projectInfo {
-  padding: 1rem;
+  padding: 1rem 1.25rem 1.25rem;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  flex: 1;
 }
 
 .projectTitle {
-  font-family: var(--font-heading);
+  font-family: var(--font-outfit);
   font-size: 1.1rem;
   font-weight: 600;
-  margin-bottom: 0.5rem;
   color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
 }
 
 .projectDescription {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: var(--text-secondary);
-  line-height: 1.4;
-  margin-bottom: 0.75rem;
+  line-height: 1.5;
+  margin: 0 0 0.75rem 0;
   flex: 1;
 }
 
@@ -322,189 +497,32 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 500;
   color: var(--accent-moss);
-  transition: gap 0.2s;
+  transition: gap 0.2s ease;
+}
+
+.projectLink svg {
+  font-size: 0.9rem;
 }
 
 .projectCardLink:hover .projectLink {
   gap: 0.6rem;
 }
 
-.note {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  text-align: center;
-  margin-top: 1rem;
-  border-top: 1px solid var(--border);
-  padding-top: 0.75rem;
-}
-
-/* ===== Social Links ===== */
-.socialCard {
-  padding: 1.5rem;
-}
-
-.socialLinks {
-  display: flex;
-  justify-content: center;
-  gap: 2rem;
-  flex-wrap: wrap;
-  margin: 1rem 0;
-}
-
-.socialLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: var(--bg-elevated);
-  padding: 0.6rem 1.2rem;
-  border-radius: 40px;
-  color: var(--text-primary);
-  text-decoration: none;
-  transition: all 0.2s ease;
-  font-size: 0.9rem;
-  border: 1px solid var(--border);
-}
-
-.socialLink:hover {
-  background: var(--hover-surface);
-  border-color: var(--accent-moss);
-  transform: translateY(-2px);
-}
-
-.socialNote {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  text-align: center;
-  margin-top: 0.75rem;
-}
-
-/* ===== CTA Button ===== */
-.ctaWrapper {
-  text-align: center;
-  margin: 2rem 0 1rem;
-}
-
-.ctaButton {
-  display: inline-block;
-  background: var(--accent-moss);
-  color: var(--bg-surface);
-  padding: 0.8rem 2rem;
-  border-radius: 40px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 8px var(--shadow);
-}
-
-.ctaButton:hover {
-  background: var(--primary-action);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px var(--shadow);
-}
-
-/* ===== Animation ===== */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* ===== Responsive Breakpoints ===== */
-@media (max-width: 767px) {
-  .container {
-    padding: 0.5rem;
-  }
-
-  .heroGrid {
-    flex-direction: column;
-    text-align: center;
-    padding: 1.5rem;
-  }
-
-  .featuresGrid {
-    grid-template-columns: 1fr;
-  }
-
+/* Projects responsive */
+@media (max-width: 768px) {
   .projectsGrid {
     grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-
-  .socialLinks {
-    gap: 1rem;
-  }
-
-  .name {
-    font-size: 1.6rem;
-  }
-
-  .sectionHeader h2 {
-    font-size: 1.2rem;
-  }
-
-  .leetcodeCardFull {
-    margin-bottom: 1rem;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
   }
 }
 
 @media (max-width: 480px) {
-  .heroGrid {
-    padding: 1rem;
-  }
-
-  .name {
-    font-size: 1.4rem;
-  }
-
-  .role {
-    font-size: 0.95rem;
-  }
-
-  .detail, .bio {
-    font-size: 0.85rem;
-  }
-
-  .projectTitle, .leetcodeTitle {
-    font-size: 1rem;
-  }
-
-  .projectDescription, .leetcodeDescription {
-    font-size: 0.8rem;
-  }
-
-  .ctaButton {
-    padding: 0.6rem 1.5rem;
-    font-size: 0.9rem;
-  }
-}
-
-/* ===== Reduced Motion ===== */
-@media (prefers-reduced-motion: reduce) {
-  .container {
-    animation: none;
-  }
-
-  .leetcodeCardLink:hover,
-  .projectCardLink:hover,
-  .socialLink:hover,
-  .ctaButton:hover {
-    transform: none;
-  }
-
-  .leetcodeImage,
-  .projectImage {
-    transition: none;
-  }
-
-  .leetcodeCardLink:hover .leetcodeImage,
-  .projectCardLink:hover .projectImage {
-    transform: none;
+  .projectsGrid {
+    grid-template-columns: 1fr;
   }
 }

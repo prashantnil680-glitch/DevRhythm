@@ -1,6 +1,8 @@
-/* page.module.css - Exact styles from the provided HTML, adapted for CSS Modules */
+/* page.module.css – Complete, cleaned styles for HomePage */
 
-/* Loader animation */
+/* ============================================
+   1. LOADER
+   ============================================ */
 .loadingScreen {
   position: fixed;
   inset: 0;
@@ -31,7 +33,9 @@
   color: var(--accent-moss);
 }
 @keyframes loadFadeIn {
-  to { opacity: 1; }
+  to {
+    opacity: 1;
+  }
 }
 .rhythmPulse {
   display: flex;
@@ -47,18 +51,42 @@
   background: var(--accent-moss);
   animation: rhythmBounce 1.2s ease-in-out infinite;
 }
-.pulseDot:nth-child(1) { animation-delay: 0s; }
-.pulseDot:nth-child(2) { animation-delay: 0.15s; background: var(--accent-moss-light); }
-.pulseDot:nth-child(3) { animation-delay: 0.3s; }
-.pulseDot:nth-child(4) { animation-delay: 0.45s; background: var(--accent-warm); }
-.pulseDot:nth-child(5) { animation-delay: 0.6s; }
+.pulseDot:nth-child(1) {
+  animation-delay: 0s;
+}
+.pulseDot:nth-child(2) {
+  animation-delay: 0.15s;
+  background: var(--accent-moss-light);
+}
+.pulseDot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.pulseDot:nth-child(4) {
+  animation-delay: 0.45s;
+  background: var(--accent-warm);
+}
+.pulseDot:nth-child(5) {
+  animation-delay: 0.6s;
+}
 @keyframes rhythmBounce {
-  0%, 100% { transform: translateY(0); opacity: 0.5; }
-  30% { transform: translateY(-10px); opacity: 1; }
-  60% { transform: translateY(0); opacity: 0.5; }
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
+  60% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
 }
 
-/* Parallax */
+/* ============================================
+   2. PARALLAX
+   ============================================ */
 .parallaxContainer {
   position: fixed;
   inset: 0;
@@ -77,25 +105,61 @@
   opacity: 0.04;
   background: var(--accent-moss);
 }
-.paraShape.warm { background: var(--accent-warm); opacity: 0.035; }
-.paraShape.xl { width: 320px; height: 320px; opacity: 0.022; }
-.paraShape.lg { width: 200px; height: 200px; }
-.paraShape.md { width: 130px; height: 130px; opacity: 0.05; }
-.paraShape.sm { width: 70px; height: 70px; opacity: 0.06; }
+.paraShape.warm {
+  background: var(--accent-warm);
+  opacity: 0.035;
+}
+.paraShape.xl {
+  width: 320px;
+  height: 320px;
+  opacity: 0.022;
+}
+.paraShape.lg {
+  width: 200px;
+  height: 200px;
+}
+.paraShape.md {
+  width: 130px;
+  height: 130px;
+  opacity: 0.05;
+}
+.paraShape.sm {
+  width: 70px;
+  height: 70px;
+  opacity: 0.06;
+}
 
-/* Main content & container */
-.mainContent { position: relative; z-index: 1; padding-top: 0; }
-.sectionContainer { max-width: 960px; margin: 0 auto; padding: 0 1.25rem; }
+/* ============================================
+   3. MAIN CONTENT
+   ============================================ */
+.mainContent {
+  position: relative;
+  z-index: 1;
+  padding-top: 0;
+}
+.sectionContainer {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
 
-/* Reveal animations */
+/* ============================================
+   4. REVEAL ANIMATIONS
+   ============================================ */
 .reveal {
   opacity: 0;
   transform: translateY(35px) scale(0.96);
-  transition: opacity 0.85s cubic-bezier(0.22, 0.61, 0.36, 1), transform 0.85s cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition: opacity 0.85s cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 0.85s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
-.reveal.visible { opacity: 1; transform: translateY(0) scale(1); }
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
 
-/* Hero section */
+/* ============================================
+   5. HERO SECTION
+   ============================================ */
 .heroSection {
   padding: 4rem 0 2.5rem;
   text-align: center;
@@ -119,8 +183,14 @@
   line-height: 0.93;
   will-change: transform, opacity;
 }
-.hl1 { display: inline-block; transform: rotate(-0.9deg); }
-.hl2 { display: inline-block; transform: rotate(0.7deg); }
+.hl1 {
+  display: inline-block;
+  transform: rotate(-0.9deg);
+}
+.hl2 {
+  display: inline-block;
+  transform: rotate(0.7deg);
+}
 .heroSubtitle {
   font-size: clamp(1rem, 1.7vw, 1.15rem);
   color: var(--text-secondary);
@@ -136,7 +206,9 @@
   margin-bottom: 2.5rem;
 }
 
-/* Heatmap Card */
+/* ============================================
+   6. HEATMAP CARD
+   ============================================ */
 .heatmapCard {
   background: var(--bg-surface);
   border: 1px solid var(--border);
@@ -150,7 +222,10 @@
   transition: box-shadow 0.4s ease;
   max-width: 100%;
 }
-.heatmapCard:hover { box-shadow: var(--shadow-xl); border-color: var(--accent-moss-light); }
+.heatmapCard:hover {
+  box-shadow: var(--shadow-xl);
+  border-color: var(--accent-moss-light);
+}
 .heatmapCard::before {
   content: '';
   position: absolute;
@@ -172,9 +247,15 @@
   gap: 0.5rem;
 }
 .heatmapTitle {
+  display: flex;
+  align-items: center;
   font-family: var(--font-heading);
   font-weight: 700;
   font-size: 0.9rem;
+}
+.heatmapTitle svg {
+  color: var(--accent-moss);
+  margin-right: 0.4rem;
 }
 .heatmapStreak {
   display: inline-flex;
@@ -196,10 +277,20 @@
   animation: pulseDot 1.6s ease-in-out infinite;
 }
 @keyframes pulseDot {
-  0%, 100% { opacity: 0.5; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.7); }
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.7);
+  }
 }
-.heatmapYearWrap { width: 100%; overflow: hidden; }
+.heatmapYearWrap {
+  width: 100%;
+  overflow: hidden;
+}
 .heatmapYearGrid {
   display: grid;
   grid-template-rows: repeat(7, 1fr);
@@ -216,11 +307,23 @@
   cursor: default;
   min-width: 8px;
 }
-.heatmapYearCell:hover { transform: scale(1.4); z-index: 2; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-.heatmapYearCell[data-level="1"] { background: var(--heat-1); }
-.heatmapYearCell[data-level="2"] { background: var(--heat-2); }
-.heatmapYearCell[data-level="3"] { background: var(--heat-3); }
-.heatmapYearCell[data-level="4"] { background: var(--heat-4); }
+.heatmapYearCell:hover {
+  transform: scale(1.4);
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.heatmapYearCell[data-level='1'] {
+  background: var(--heat-1);
+}
+.heatmapYearCell[data-level='2'] {
+  background: var(--heat-2);
+}
+.heatmapYearCell[data-level='3'] {
+  background: var(--heat-3);
+}
+.heatmapYearCell[data-level='4'] {
+  background: var(--heat-4);
+}
 .heatmapLegend {
   display: flex;
   align-items: center;
@@ -242,11 +345,27 @@
   text-align: center;
   margin-top: 0.45rem;
   font-style: italic;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+}
+.heatmapCaption svg {
+  color: var(--text-muted);
 }
 
-/* Journey Section */
-.journeySection { padding: 5rem 0 6rem; position: relative; z-index: 2; }
-.journeyHeader { text-align: center; margin-bottom: 4rem; }
+/* ============================================
+   7. JOURNEY SECTION
+   ============================================ */
+.journeySection {
+  padding: 5rem 0 6rem;
+  position: relative;
+  z-index: 2;
+}
+.journeyHeader {
+  text-align: center;
+  margin-bottom: 4rem;
+}
 .journeyEyebrow {
   font-size: 0.66rem;
   text-transform: uppercase;
@@ -255,9 +374,13 @@
   margin-bottom: 0.5rem;
   font-weight: 500;
 }
-.journeyHeading { font-size: clamp(1.5rem, 3vw, 2.1rem); font-weight: 800; }
+.journeyHeading {
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  font-weight: 800;
+}
 .cutoutLight {
-  text-shadow: 1px 1px 0 var(--bg-surface), -0.5px -0.5px 0 rgba(92, 107, 94, 0.25);
+  text-shadow: 1px 1px 0 var(--bg-surface),
+    -0.5px -0.5px 0 rgba(92, 107, 94, 0.25);
 }
 .journeyLayout {
   display: flex;
@@ -281,18 +404,32 @@
   position: relative;
   width: 3px;
   height: 100%;
-  background: linear-gradient(to bottom, rgba(92,107,94,0.08), rgba(92,107,94,0.35) 30%, rgba(92,107,94,0.35) 70%, rgba(92,107,94,0.08));
+  background: linear-gradient(
+    to bottom,
+    rgba(92, 107, 94, 0.08),
+    rgba(92, 107, 94, 0.35) 30%,
+    rgba(92, 107, 94, 0.35) 70%,
+    rgba(92, 107, 94, 0.08)
+  );
   border-radius: 3px;
 }
 .pathGlowPulse {
   position: absolute;
   inset: 0;
   background: transparent;
-  box-shadow: 0 0 22px var(--accent-moss-glow), 0 0 50px rgba(92,107,94,0.2);
+  box-shadow: 0 0 22px var(--accent-moss-glow), 0 0 50px rgba(92, 107, 94, 0.2);
   border-radius: 3px;
   animation: glowPulse 2.5s ease-in-out infinite;
 }
-@keyframes glowPulse { 0%,100%{opacity:0.5;} 50%{opacity:1;} }
+@keyframes glowPulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
 .pathNode {
   position: absolute;
   left: 50%;
@@ -349,11 +486,29 @@
   border-color: var(--accent-moss-light);
   transform: translateY(-3px) scale(1.01);
 }
-.stageCard h3 { font-size: 1.05rem; margin-bottom: 0.35rem; }
-.stageCard p { font-size: 0.83rem; color: var(--text-secondary); line-height: 1.6; }
+.stageCard h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  margin-bottom: 0.35rem;
+}
+.stageCard h3 svg {
+  color: var(--accent-moss);
+  flex-shrink: 0;
+}
+.stageCard p {
+  font-size: 0.83rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
 
-/* Trends Section */
-.trendsSection { padding: 3rem 0 4rem; }
+/* ============================================
+   8. TRENDS SECTION
+   ============================================ */
+.trendsSection {
+  padding: 3rem 0 4rem;
+}
 .trendsCard {
   background: var(--bg-surface);
   border: 1px solid var(--border);
@@ -363,7 +518,18 @@
   max-width: 800px;
   margin: 0 auto;
 }
-.chartWrap { width: 100%; height: 300px; }
+.trendsCard h3 {
+  display: flex;
+  align-items: center;
+}
+.trendsCard h3 svg {
+  color: var(--accent-moss);
+  margin-right: 0.5rem;
+}
+.chartWrap {
+  width: 100%;
+  height: 300px;
+}
 .chartNote {
   font-size: 0.68rem;
   color: var(--text-muted);
@@ -371,9 +537,17 @@
   margin-top: 0.7rem;
 }
 
-/* Comparison Section */
-.comparisonSection { padding: 3rem 0 5rem; text-align: center; }
-.comparisonHeading { font-size: clamp(1.4rem, 2.6vw, 1.75rem); font-weight: 800; }
+/* ============================================
+   9. COMPARISON SECTION
+   ============================================ */
+.comparisonSection {
+  padding: 3rem 0 5rem;
+  text-align: center;
+}
+.comparisonHeading {
+  font-size: clamp(1.4rem, 2.6vw, 1.75rem);
+  font-weight: 800;
+}
 .comparisonSubtitle {
   font-size: 0.88rem;
   color: var(--text-secondary);
@@ -394,13 +568,18 @@
   padding: 1.8rem;
   transition: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.compCard.alt { border-color: var(--accent-moss-light); background: var(--bg-elevated); }
+.compCard.alt {
+  border-color: var(--accent-moss-light);
+  background: var(--bg-elevated);
+}
 .compValue {
   font-family: var(--font-heading);
   font-size: 2.6rem;
   font-weight: 900;
 }
-.compValue.highlight { color: var(--accent-moss); }
+.compValue.highlight {
+  color: var(--accent-moss);
+}
 .compBadge {
   display: inline-block;
   background: var(--accent-moss);
@@ -412,11 +591,742 @@
   margin-top: 0.5rem;
 }
 
-/* CTA Section */
-.ctaSection { padding: 4rem 0 5rem; text-align: center; }
-.ctaSection h2 { font-size: clamp(1.5rem, 3.2vw, 2.2rem); font-weight: 800; }
+/* ============================================
+   10. CTA SECTION
+   ============================================ */
+.ctaSection {
+  padding: 4rem 0 5rem;
+  text-align: center;
+}
+.ctaSection h2 {
+  font-size: clamp(1.5rem, 3.2vw, 2.2rem);
+  font-weight: 800;
+}
 
-/* Responsive */
+/* ============================================
+   11. VIDEO SECTION
+   ============================================ */
+.videoSectionHeader {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+.videoSectionHeader h2 {
+  margin-bottom: 0.5rem;
+}
+.videoSectionHeader p {
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ============================================
+   12. CREATOR CREDIT
+   ============================================ */
+.creatorCredit {
+  text-align: center;
+  margin-top: 3rem;
+  padding: 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+}
+.creatorCredit a {
+  color: var(--accent-moss);
+  text-decoration: none;
+}
+.creatorCredit a:hover {
+  text-decoration: underline;
+}
+
+/* ============================================
+   13. PROBLEM SECTION (The Struggle)
+   ============================================ */
+.problemSection {
+  padding: 4rem 0;
+  background: var(--bg-secondary);
+  margin: 0;
+}
+.problemInner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+.problemHeader {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+.problemBadge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #d32f2f;
+  background: rgba(211, 47, 47, 0.1);
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  margin-bottom: 0.75rem;
+}
+.problemTitle {
+  font-family: var(--font-outfit);
+  font-size: 2.2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+.problemCycle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 2rem 0;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.problemSection.animate .problemCycle {
+  opacity: 1;
+  transform: translateY(0);
+}
+.cycleItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  animation: cyclePulse 2s ease-in-out infinite;
+}
+.cycleItem.active {
+  animation-delay: calc(var(--idx, 0) * 0.3s);
+}
+.cycleItem.repeat {
+  background: rgba(var(--accent-moss-rgb), 0.08);
+  border-color: var(--accent-moss);
+  color: var(--accent-moss);
+  font-weight: 500;
+}
+.cycleDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-moss);
+  flex-shrink: 0;
+}
+.cycleItem.active .cycleDot {
+  background: #ed6c02;
+}
+.cycleItem.repeat .cycleDot {
+  background: var(--accent-moss);
+  animation: dotPulse 1.5s ease-in-out infinite;
+}
+.cycleIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.cycleArrow {
+  color: var(--text-muted);
+  font-size: 1.2rem;
+}
+@keyframes cyclePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.85;
+  }
+}
+@keyframes dotPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.5);
+  }
+}
+.problemConclusion {
+  text-align: center;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.problemText {
+  font-family: var(--font-outfit);
+  font-size: 1.6rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0;
+}
+.problemText strong {
+  color: var(--accent-moss);
+}
+.problemSubtext {
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  margin: 0.5rem 0 0;
+}
+.problemSubtext strong {
+  color: var(--text-primary);
+}
+
+/* ============================================
+   14. SPACED REPETITION SECTION
+   ============================================ */
+.spacedRepSection {
+  padding: 4rem 0;
+}
+.spacedRepInner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+.spacedRepHeader {
+  text-align: center;
+  max-width: 700px;
+  margin: 0 auto 2.5rem;
+}
+.spacedRepContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  align-items: center;
+}
+.spacedRepGraph {
+  width: 100%;
+  max-width: 700px;
+}
+.memorySvg {
+  width: 100%;
+  height: auto;
+  background: transparent;
+}
+.axisLabel {
+  font-family: var(--font-commissioner);
+  font-size: 10px;
+  fill: var(--text-muted);
+}
+.forgettingCurve {
+  stroke-dashoffset: 1000;
+  animation: drawForgetting 2.5s ease-in-out forwards;
+  animation-delay: 0.5s;
+}
+.spacedRepetitionCurve {
+  stroke-dashoffset: 1000;
+  animation: drawSpacedRep 3s ease-in-out forwards;
+  animation-delay: 0.8s;
+}
+.revisionDot {
+  opacity: 0;
+  animation: popDot 0.4s ease-out forwards;
+}
+@keyframes drawForgetting {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes drawSpacedRep {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes popDot {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.spacedRepIntervals {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.intervalItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  min-width: 70px;
+}
+.intervalDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-moss);
+}
+.intervalLabel {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.intervalBadge {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ============================================
+   15. PATTERN SECTION
+   ============================================ */
+.patternSection {
+  padding: 4rem 0;
+  background: var(--bg-secondary);
+}
+.patternInner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+.patternGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin: 2rem 0;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.patternSection.animate .patternGrid {
+  opacity: 1;
+  transform: translateY(0);
+}
+.patternCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.25rem 0.75rem;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  transition: transform 0.2s, border-color 0.2s;
+}
+.patternCard:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-moss);
+}
+.patternIcon {
+  font-size: 1.5rem;
+  margin-bottom: 0.25rem;
+}
+.patternName {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+.patternBar {
+  width: 100%;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.patternFill {
+  height: 100%;
+  background: var(--accent-moss);
+  border-radius: 2px;
+  transition: width 1s ease;
+}
+.patternPercent {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+.patternCta {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+.patternStats {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+.patternStats svg {
+  color: var(--accent-moss);
+}
+
+/* ============================================
+   16. SHEETS SECTION
+   ============================================ */
+.sheetsSection {
+  padding: 4rem 0;
+}
+.sheetsInner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+.sheetsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin: 2rem 0;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.sheetsSection.animate .sheetsGrid {
+  opacity: 1;
+  transform: translateY(0);
+}
+.sheetCard {
+  padding: 1.5rem;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  transition: transform 0.2s, border-color 0.2s;
+}
+.sheetCard:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-moss);
+}
+.sheetHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.sheetCategory {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-moss);
+  background: rgba(var(--accent-moss-rgb), 0.1);
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+}
+.sheetCount {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.sheetName {
+  font-family: var(--font-outfit);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.15rem;
+}
+.sheetCreator {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0 0 0.75rem;
+}
+.sheetProgress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.sheetProgressBar {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.sheetProgressFill {
+  height: 100%;
+  background: var(--accent-moss);
+  border-radius: 2px;
+}
+.sheetProgressLabel {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.sheetsCta {
+  text-align: center;
+}
+.sheetsStats {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+.sheetsStats svg {
+  color: var(--accent-moss);
+}
+
+/* ============================================
+   17. REVISION SECTION
+   ============================================ */
+.revisionSection {
+  padding: 4rem 0;
+  background: var(--bg-secondary);
+}
+.revisionInner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+.revisionTimeline {
+  margin: 2rem 0;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.revisionSection.animate .revisionTimeline {
+  opacity: 1;
+  transform: translateY(0);
+}
+.revisionTrack {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: relative;
+  padding: 1.5rem 0;
+}
+.revisionItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  gap: 0.25rem;
+  position: relative;
+}
+.revisionDot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-moss);
+  background: var(--bg-primary);
+  transition: all 0.3s;
+}
+.revisionItem.completed .revisionDot {
+  background: var(--accent-moss);
+  border-color: var(--accent-moss);
+}
+.revisionItem.pending .revisionDot {
+  background: #ed6c02;
+  border-color: #ed6c02;
+  animation: dotPulse 1.5s ease-in-out infinite;
+}
+.revisionItem.upcoming .revisionDot {
+  background: var(--bg-primary);
+  border-color: var(--border);
+}
+.revisionLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.revisionDesc {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.revisionItem.completed .revisionDesc {
+  color: var(--accent-moss);
+}
+.revisionItem.pending .revisionDesc {
+  color: #ed6c02;
+  font-weight: 500;
+}
+.revisionConnector {
+  position: absolute;
+  top: 8px;
+  right: -50%;
+  width: 100%;
+  height: 2px;
+  background: var(--border);
+}
+.revisionConnector.completed {
+  background: var(--accent-moss);
+}
+.revisionConnector.pending {
+  background: var(--border);
+  border-top: 2px dashed var(--border);
+}
+.revisionStats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-top: 2rem;
+  text-align: center;
+}
+.revisionStat {
+  padding: 1rem;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.revisionStatValue {
+  display: block;
+  font-family: var(--font-outfit);
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.revisionStatLabel {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* ============================================
+   18. COMMUNITY SECTION
+   ============================================ */
+.communitySection {
+  padding: 4rem 0;
+}
+.communityInner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+.communityAvatars {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 2rem 0;
+  flex-wrap: wrap;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.communitySection.animate .communityAvatars {
+  opacity: 1;
+  transform: translateY(0);
+}
+.communityAvatar {
+  transition: transform 0.2s;
+}
+.communityAvatar:hover {
+  transform: translateY(-4px);
+}
+.communityCount {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  border: 1px solid var(--accent-moss);
+}
+.communityCountValue {
+  font-family: var(--font-outfit);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--accent-moss);
+}
+.communityCountLabel {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.communityMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-top: 2rem;
+  text-align: center;
+}
+.communityMetric {
+  padding: 1.5rem;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.communityMetricValue {
+  display: block;
+  font-family: var(--font-outfit);
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.communityMetricLabel {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.communityJoin {
+  text-align: center;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.communityJoinText {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.communityJoinText svg {
+  color: var(--accent-moss);
+}
+.communityJoinCta {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* ============================================
+   19. SECTION BADGE (generic)
+   ============================================ */
+.sectionBadge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-moss);
+  background: rgba(var(--accent-moss-rgb), 0.1);
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  margin-bottom: 0.75rem;
+}
+.sectionHeader {
+  text-align: center;
+  max-width: 700px;
+  margin: 0 auto 3rem;
+}
+.sectionTitle {
+  font-family: var(--font-outfit);
+  font-size: 2.4rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.02em;
+}
+.sectionSubtitle {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ============================================
+   20. RESPONSIVE
+   ============================================ */
 @media (max-width: 768px) {
   .journeyLayout {
     flex-direction: column;
@@ -430,9 +1340,15 @@
   .pathVisual {
     width: 100%;
     height: 3px;
-    background: linear-gradient(to right, rgba(92,107,94,0.08), rgba(92,107,94,0.35), rgba(92,107,94,0.08));
+    background: linear-gradient(
+      to right,
+      rgba(92, 107, 94, 0.08),
+      rgba(92, 107, 94, 0.35),
+      rgba(92, 107, 94, 0.08)
+    );
   }
-  .travelerDot, .pathNode {
+  .travelerDot,
+  .pathNode {
     top: 50% !important;
     transform: translateY(-50%);
   }
@@ -442,39 +1358,82 @@
   .comparisonCards {
     grid-template-columns: 1fr;
   }
+  .problemTitle {
+    font-size: 1.6rem;
+  }
+  .problemCycle {
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .cycleArrow {
+    transform: rotate(90deg);
+  }
+  .sectionTitle {
+    font-size: 1.8rem;
+  }
+  .sectionSubtitle {
+    font-size: 1rem;
+  }
+  .patternGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .sheetsGrid {
+    grid-template-columns: 1fr;
+  }
+  .revisionTrack {
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: center;
+  }
+  .revisionItem {
+    flex: 0 0 auto;
+    min-width: 60px;
+  }
+  .revisionConnector {
+    display: none;
+  }
+  .revisionStats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .communityMetrics {
+    grid-template-columns: 1fr;
+  }
+  .problemText {
+    font-size: 1.2rem;
+  }
 }
 
-.creatorCredit {
-  text-align: center;
-  margin-top: 3rem;
-  padding: 1rem;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  border-top: 1px solid var(--border);
-}
-
-.creatorCredit a {
-  color: var(--accent-moss);
-  text-decoration: none;
-}
-
-.creatorCredit a:hover {
-  text-decoration: underline;
-}
-
-
-/* Video section header */
-.videoSectionHeader {
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.videoSectionHeader h2 {
-  margin-bottom: 0.5rem;
-}
-
-.videoSectionHeader p {
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
+@media (max-width: 480px) {
+  .patternGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  .patternCard {
+    padding: 0.75rem 0.5rem;
+  }
+  .patternName {
+    font-size: 0.7rem;
+  }
+  .spacedRepIntervals {
+    gap: 0.5rem;
+  }
+  .intervalItem {
+    padding: 0.5rem 0.5rem;
+    min-width: 50px;
+  }
+  .intervalLabel {
+    font-size: 0.7rem;
+  }
+  .intervalBadge {
+    font-size: 0.55rem;
+  }
+  .revisionStats {
+    gap: 0.5rem;
+  }
+  .revisionStat {
+    padding: 0.75rem;
+  }
+  .revisionStatValue {
+    font-size: 1.3rem;
+  }
 }

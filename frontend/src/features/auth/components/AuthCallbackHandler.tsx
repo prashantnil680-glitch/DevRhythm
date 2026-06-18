@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { tokenStorage } from '../utils/tokenStorage';
 import { useSession } from '../hooks/useSession';
 import apiClient from '@/shared/lib/apiClient';
-import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import { isPublicPath } from '@/shared/lib/publicPaths';
 import styles from './AuthCallbackHandler.module.css';
 
@@ -64,9 +63,11 @@ export const AuthCallbackHandler: React.FC = () => {
       return;
     }
 
-    apiClient.post('/auth/exchange', { code })
+    apiClient
+      .post('/auth/exchange', { code })
       .then(async (response) => {
-        const { token, refreshToken, userId, showWelcome, showWelcomeBack } = response.data;
+        const { token, refreshToken, userId, showWelcome, showWelcomeBack } =
+          response.data;
         tokenStorage.setTokens(token, refreshToken, userId);
 
         if (showWelcome === true) {
@@ -117,10 +118,15 @@ export const AuthCallbackHandler: React.FC = () => {
 
   return (
     <div className={styles.loading}>
-      <SkeletonLoader variant="card" width={300} height={120} />
-      <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>
-        Completing authentication...
-      </p>
+      <div className={styles.brandText}>DevRhythm</div>
+      <div className={styles.subText}>
+        <span>Almost there</span>
+        <span className={styles.dots}>
+          <span>.</span>
+          <span>.</span>
+          <span>.</span>
+        </span>
+      </div>
     </div>
   );
 };

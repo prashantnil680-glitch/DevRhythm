@@ -52,7 +52,7 @@
 /* Sticky state – applied when scrolled past sentinel */
 .filterWrapper.sticky {
   position: sticky;
-  top: 4rem;
+  top: 3.5rem;
   z-index: 10;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);

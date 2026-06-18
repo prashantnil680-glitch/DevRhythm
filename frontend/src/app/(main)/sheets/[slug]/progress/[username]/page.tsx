@@ -29,10 +29,10 @@ async function getSheetMetadata(slug: string) {
   }
 }
 
-// Fetch user data
-async function getUserMetadata(username: string) {
+// Fetch user metadata with optional token
+async function getUserMetadata(username: string, token?: string) {
   try {
-    const user = await userServiceServer.getUserByUsername(username);
+    const user = await userServiceServer.getUserByUsername(username, token);
     if (!user?._id) return null;
     return user;
   } catch (error) {
@@ -41,9 +41,12 @@ async function getUserMetadata(username: string) {
   }
 }
 
-// Fetch user progress summary (used for metadata)
-async function getUserProgressSummary(slug: string, username: string) {
+// Fetch user progress summary (optional, used for metadata)
+async function getUserProgressSummary(slug: string, username: string, token?: string) {
   try {
+    // sheetService.getUserProgress may not accept a token, but we can pass it if the server service supports it.
+    // Currently, the server service does not support token, so we skip it.
+    // If needed, we could extend sheetService to accept a token.
     const response = await sheetService.getUserProgress(slug, username, { limit: 1 });
     return response;
   } catch (error) {
@@ -53,10 +56,12 @@ async function getUserProgressSummary(slug: string, username: string) {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug, username } = await params;
-  const [sheet, user, progress] = await Promise.all([
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth_token')?.value;
+
+  const [sheet, user] = await Promise.all([
     getSheetMetadata(slug),
-    getUserMetadata(username),
-    getUserProgressSummary(slug, username),
+    getUserMetadata(username, token),
   ]);
 
   if (!sheet || !user) {
@@ -67,11 +72,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  const displayName = user.displayName || user.username;
+  // Fetch progress summary for metadata (optional, fallback to default stats)
+  const progress = await getUserProgressSummary(slug, username, token);
   const solvedCount = progress?.stats?.solvedCount ?? 0;
   const totalQuestions = sheet.totalQuestions ?? 0;
   const percentComplete = totalQuestions > 0 ? Math.round((solvedCount / totalQuestions) * 100) : 0;
 
+  const displayName = user.displayName || user.username;
   const title = `${displayName} · Progress on "${sheet.name}" | DevRhythm`;
   const description = `${displayName} has solved ${solvedCount}/${totalQuestions} questions (${percentComplete}%) in the "${sheet.name}" coding sheet. View their progress, revision status, and more.`;
   const keywords = [
@@ -135,10 +142,10 @@ export const viewport: Viewport = {
 };
 
 // Generate structured data
-async function generateSchemas(slug: string, username: string) {
+async function generateSchemas(slug: string, username: string, token?: string) {
   const [sheet, user] = await Promise.all([
     getSheetMetadata(slug),
-    getUserMetadata(username),
+    getUserMetadata(username, token),
   ]);
   if (!sheet || !user) return null;
 
@@ -183,18 +190,19 @@ export default async function UserProgressPage({ params }: PageProps) {
   const isAuthenticated = !!token;
 
   const sheet = await getSheetMetadata(slug);
-  const user = await getUserMetadata(username);
-  const schemas = await generateSchemas(slug, username);
+  const user = await getUserMetadata(username, token);
+  const schemas = await generateSchemas(slug, username, token);
 
   if (!sheet || !user) {
     notFound();
   }
 
+  // ===== RESTORED BREADCRUMB =====
   const breadcrumbItems = [
     { label: 'Home', href: ROUTES.DASHBOARD },
     { label: 'Sheets', href: ROUTES.SHEETS.ROOT },
-    { label: sheet.name, href: `${ROUTES.SHEETS.DETAIL(slug)}` },
-    { label: user.displayName || user.username },
+    { label: 'Sheet', href: `${ROUTES.SHEETS.DETAIL(slug)}` },
+    { label: `Progress of ${username}` },
   ];
 
   const renderLink = (item: { href?: string }, props: { className: string; children: React.ReactNode }) => {

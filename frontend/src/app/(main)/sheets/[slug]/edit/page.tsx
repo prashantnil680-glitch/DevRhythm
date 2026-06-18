@@ -19,14 +19,12 @@ export default function EditSheetPage() {
   const { data: sheetData, isLoading, error } = useSheet(originalSlug);
   const updateMutation = useUpdateSheet();
 
-  // Unique draft key for this specific sheet
   const draftKey = `sheet_edit_draft_${originalSlug}`;
 
   const handleSubmit = async (formData: {
     name: string;
     description: string;
     questions: string[];
-    targetDate: string;
     specialTag?: string;
     originalSourceName?: string;
     originalSourceUrl?: string;
@@ -43,7 +41,6 @@ export default function EditSheetPage() {
         originalSourceUrl,
       },
     });
-    // Clear the draft for this sheet after successful update
     localStorage.removeItem(draftKey);
     const newSlug = result?.sheet?.slug || originalSlug;
     router.push(ROUTES.SHEETS.DETAIL(newSlug));
@@ -104,14 +101,15 @@ export default function EditSheetPage() {
 
       <ManualTab
         initialData={initialData}
-        onSuccess={() => {}} // Not used for edit
+        onSuccess={() => {}}
         onSubmit={handleSubmit}
         onCancel={() => router.push(ROUTES.SHEETS.DETAIL(originalSlug))}
         isSubmitting={updateMutation.isPending}
         submitButtonText="Update Sheet"
         hideTargetDate={true}
-        disableDraftSaving={false} // Enable draft for edit
+        disableDraftSaving={false}
         draftKey={draftKey}
+        mode="edit"
       />
     </div>
   );

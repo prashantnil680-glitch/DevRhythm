@@ -497,21 +497,32 @@ const getDetailedRevisionStats = async (userId, timeZone = 'UTC') => {
   for (const plat in byPlatform) computeStats(byPlatform[plat]);
   for (const pat in byPattern) computeStats(byPattern[pat]);
 
-  const totalActiveSchedules = allSchedules.filter(s => s.status !== 'completed').length;
-  const totalRevisionsScheduled = allSchedules.reduce((sum, s) => sum + s.schedule.length, 0);
-  const dynamicCompletionRate = totalRevisionsScheduled ? (totalCompletedRevisions / totalRevisionsScheduled) * 100 : 0;
+  let totalPendingRevisionEntries = 0;
+  const activeSchedules = allSchedules.filter(s => s.status !== 'completed');
+  for (const schedule of activeSchedules) {
+    const completedCount = schedule.completedRevisions.length;
+    const totalSlots = schedule.schedule.length;
+    totalPendingRevisionEntries += (totalSlots - completedCount);
+  }
+
+  // --- Summary: use active schedules only for completion rate denominator ---
+  const totalActiveSchedules = activeSchedules.length;
+  const totalRevisionsScheduledForActive = activeSchedules.reduce((sum, s) => sum + s.schedule.length, 0);
+  const dynamicCompletionRate = totalRevisionsScheduledForActive
+    ? (totalCompletedRevisions / totalRevisionsScheduledForActive) * 100
+    : 0;
 
   // Overdue and upcoming lists (kept as before, but ensure they are arrays)
-  const overdueRevisions = []; // simplified for brevity – keep existing logic
-  const upcomingRevisions = []; // simplified for brevity – keep existing logic
+  const overdueRevisions = [];
+  const upcomingRevisions = [];
 
-  // Build final response (same structure as original)
   const detailedStats = {
     summary: {
       totalActiveSchedules,
       totalRevisionsCompleted: totalCompletedRevisions,
-      totalRevisionsScheduled,
-      totalRevisionsPending: baseStats.pendingWeek,
+      totalRevisionsScheduled: totalRevisionsScheduledForActive,
+      upcomingSchedulesCount: baseStats.pendingWeek,
+      totalPendingRevisionEntries,
       completionRate: Math.round(dynamicCompletionRate),
     },
     byRevisionIndex,

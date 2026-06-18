@@ -5,7 +5,6 @@ import { revisionService } from '@/features/revision/services/revisionService';
 import { revisionKeys } from '@/shared/lib/react-query';
 import HeroStats from './HeroStats';
 import RevisionFunnel from './RevisionFunnel';
-import QuickStats from './QuickStats';
 import RhythmCenter from './RhythmCenter';
 import { DifficultyStones, PlatformSeeds, TopPatterns } from './WisdomBoard';
 import { RevisionDashboardSkeleton } from './RevisionDashboardSkeleton';
@@ -66,25 +65,22 @@ export default function RevisionDashboardClient() {
     monthly: data.trends?.monthly || [],
   };
 
-  const quickStats = {
-    totalCompleted: data.summary.totalCompletedSchedules || 0,
-    pending: data.summary.totalRevisionsPending || 0,
-    avgConfidence: data.confidenceStats?.overallAverageAfter
-      ? parseFloat(data.confidenceStats.overallAverageAfter as any)
-      : 0,
-    totalTimeSpent: data.timeStats?.totalMinutesSpent || 0,
-    longestStreak: data.summary.revisionStreak?.longest || 0,
-  };
 
   return (
     <div className={styles.container}>
-      <HeroStats stats={data.summary} />
+      <HeroStats
+        stats={{
+          totalActiveSchedules: data.summary.totalActiveSchedules,
+          totalRevisionsCompleted: data.summary.totalRevisionsCompleted,
+          totalRevisionsScheduled: data.summary.totalRevisionsScheduled,
+          totalPendingRevisionEntries: data.summary.totalPendingRevisionEntries,
+          upcomingSchedulesCount: data.summary.upcomingSchedulesCount,
+          completionRate: data.summary.completionRate,
+        }}
+      />
       <div className={styles.twoColumnCore}>
         {/* <div className={styles.leftColumn}>
           <RevisionFunnel data={byRevisionIndex} />
-        </div> */}
-        {/* <div className={styles.rightColumn}>
-          <QuickStats {...quickStats} />
         </div> */}
       </div>
       <RhythmCenter trends={transformedTrends} />

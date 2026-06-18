@@ -42,15 +42,16 @@ export interface RevisionStats {
 export interface RevisionDashboardStats {
   summary: {
     totalActiveSchedules: number;
-    totalCompletedSchedules: number;
-    totalOverdueSchedules: number;
     totalRevisionsCompleted: number;
     totalRevisionsScheduled: number;
-    totalRevisionsPending: number;
+    upcomingSchedulesCount: number;
+    totalPendingRevisionEntries: number;
     completionRate: number;
-    averageOverdueDays: number;
-    maxOverdueDays: number;
-    revisionStreak: { current: number; longest: number };
+    totalCompletedSchedules?: number;
+    totalOverdueSchedules?: number;
+    averageOverdueDays?: number;
+    maxOverdueDays?: number;
+    revisionStreak?: { current: number; longest: number };
   };
   byRevisionIndex: Array<{
     index: number;
@@ -141,10 +142,10 @@ export interface UpcomingRevisionsListResponse {
       };
       revisionIndex: number;
       status: string;
-      scheduledDate?: string;      
-      totalTimeSpent?: number;     
-      attempts?: number;           
-      confidenceAfter?: number;           
+      scheduledDate?: string;
+      totalTimeSpent?: number;
+      attempts?: number;
+      confidenceAfter?: number;
     }>;
   }>;
   pagination?: {
@@ -164,14 +165,14 @@ export interface OverdueRevisionsListResponse {
     schedule: string[];
     currentRevisionIndex: number;
     status: string;
-    platformQuestionId?: string;   
-    title?: string;                
-    difficulty?: string;           
-    platform?: string;             
-    scheduledDate?: string;        
-    totalTimeSpent?: number;       
-    confidenceAfter?: number | null; 
-    overdue?: boolean;             
+    platformQuestionId?: string;
+    title?: string;
+    difficulty?: string;
+    platform?: string;
+    scheduledDate?: string;
+    totalTimeSpent?: number;
+    confidenceAfter?: number | null;
+    overdue?: boolean;
   }>;
   pagination?: {
     page: number;

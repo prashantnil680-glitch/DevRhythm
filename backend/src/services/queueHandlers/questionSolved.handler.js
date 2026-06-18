@@ -12,7 +12,7 @@ const {
   invalidateCache,
   invalidateDashboardCache,
 } = require("../../middleware/cache");
-const { getStartOfDay, parseDate } = require("../../utils/helpers/date");
+const { getStartOfDay, getEndOfDay, parseDate } = require("../../utils/helpers/date");
 const heatmapService = require("../heatmap.service");
 const { updateUserActivity } = require("../user.service");
 const { client: redisClient } = require("../../config/redis");
@@ -255,6 +255,7 @@ const handleQuestionSolved = async (job) => {
       });
 
       if (!existingPodNotification) {
+        const expiresAt = getEndOfDay(new Date(), userTimeZone);
         await Notification.create({
           userId,
           type: 'pod_solved',
@@ -270,6 +271,7 @@ const handleQuestionSolved = async (job) => {
           channel: 'in-app',
           status: 'sent',
           scheduledAt: new Date(),
+          expiresAt,
         });
         await invalidateCache(`notifications:${userId}:*`);
         console.log(`[question.solved] Created pod_solved notification for user ${userId}`);
@@ -357,11 +359,6 @@ const handleQuestionSolved = async (job) => {
       },
       timestamp: solvedDate,
     });
-
-    // ========== HEATMAP UPDATE REMOVED ==========
-    // The core execution (executeCodeCore) already updates the heatmap.
-    // Do NOT increment again here to avoid double counting.
-    // ============================================
 
     if (isFirstSolve) {
       await Notification.create({

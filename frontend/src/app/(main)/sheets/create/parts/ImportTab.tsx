@@ -5,7 +5,19 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
-import { FiCalendar, FiTag, FiLink, FiUpload, FiAlertOctagon, FiCheck, FiLoader } from 'react-icons/fi';
+import {
+  FiCalendar,
+  FiTag,
+  FiLink,
+  FiUpload,
+  FiAlertOctagon,
+  FiCheck,
+  FiLoader,
+  FiChevronDown,
+  FiChevronRight,
+  FiFile,
+  FiFileText,
+} from 'react-icons/fi';
 import Link from 'next/link';
 import Input from '@/shared/components/Input';
 import Button from '@/shared/components/Button';
@@ -73,6 +85,10 @@ export default function ImportTab({
   const [showLoadingModal, setShowLoadingModal] = useState(false);
   const [currentStage, setCurrentStage] = useState(0);
   const stageTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Format guide state – compact
+  const [showFormatGuide, setShowFormatGuide] = useState(false);
+  const [formatTab, setFormatTab] = useState<'json' | 'csv' | 'excel'>('json');
 
   const {
     register,
@@ -317,6 +333,62 @@ export default function ImportTab({
 
   const showClearDraftButton = backendDraftData !== null && !isHydrating;
 
+  // Helper to render format examples
+  const renderFormatExample = () => {
+    switch (formatTab) {
+      case 'json':
+        return (
+          <pre className={styles.formatCodeBlock}>
+            {`[
+  { "title": "Two Sum", "platformQuestionId": "two-sum" },
+  { "title": "Add Two Numbers", "platformQuestionId": "add-two-numbers" },
+  { "platformQuestionId": "longest-substring-without-repeating-characters" }
+]`}
+          </pre>
+        );
+      case 'csv':
+        return (
+          <pre className={styles.formatCodeBlock}>
+            {`Title,PlatformQuestionId
+"Two Sum","two-sum"
+"Add Two Numbers","add-two-numbers"
+"Longest Substring Without Repeating Characters","longest-substring-without-repeating-characters"
+"",valid-parentheses`}
+          </pre>
+        );
+      case 'excel':
+        return (
+          <div className={styles.excelPreview}>
+            <table className={styles.excelTable}>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>PlatformQuestionId</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Two Sum</td>
+                  <td>two-sum</td>
+                </tr>
+                <tr>
+                  <td>Add Two Numbers</td>
+                  <td>add-two-numbers</td>
+                </tr>
+                <tr>
+                  <td></td>
+                  <td>valid-parentheses</td>
+                </tr>
+              </tbody>
+            </table>
+            <p className={styles.formatNote}>
+              💡 Either column works – <strong>PlatformQuestionId</strong> takes precedence if both are provided.
+            </p>
+          </div>
+        );
+    }
+  };
+
   return (
     <>
       {isHydrating && (
@@ -478,16 +550,68 @@ export default function ImportTab({
                   {isUploading && <p className={styles.hint}>Uploading file...</p>}
                   {fileError && <p className={styles.error}>{fileError}</p>}
                   <p className={styles.hint}>Supported formats: .xlsx, .xls, .csv, .json</p>
+
+                  {/* Compact Format Guide Toggle */}
+                  <button
+                    type="button"
+                    className={styles.formatToggle}
+                    onClick={() => setShowFormatGuide(!showFormatGuide)}
+                  >
+                    {showFormatGuide ? <FiChevronDown /> : <FiChevronRight />}
+                    <span>Format Guide</span>
+                    <span className={styles.formatToggleBadge}>
+                      {formatTab === 'json' ? 'JSON' : formatTab === 'csv' ? 'CSV' : 'Excel'}
+                    </span>
+                  </button>
+
+                  {showFormatGuide && (
+                    <div className={styles.formatGuideCompact}>
+                      <div className={styles.formatTabsCompact}>
+                        <button
+                          type="button"
+                          className={`${styles.formatTabCompact} ${formatTab === 'json' ? styles.formatTabActiveCompact : ''}`}
+                          onClick={() => setFormatTab('json')}
+                        >
+                          <FiFileText size={12} /> JSON
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.formatTabCompact} ${formatTab === 'csv' ? styles.formatTabActiveCompact : ''}`}
+                          onClick={() => setFormatTab('csv')}
+                        >
+                          <FiFile size={12} /> CSV
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.formatTabCompact} ${formatTab === 'excel' ? styles.formatTabActiveCompact : ''}`}
+                          onClick={() => setFormatTab('excel')}
+                        >
+                          <FiFile size={12} /> Excel
+                        </button>
+                      </div>
+                      <div className={styles.formatContentCompact}>
+                        <p className={styles.formatDescriptionCompact}>
+                          {formatTab === 'excel'
+                            ? 'Use the first row as header with "Title" and/or "PlatformQuestionId" columns.'
+                            : formatTab === 'csv'
+                            ? 'CSV with header row: Title, PlatformQuestionId'
+                            : 'JSON array of objects with title/platformQuestionId'}
+                        </p>
+                        {renderFormatExample()}
+                      </div>
+                    </div>
+                  )}
+
                   <div className={styles.platformWarning}>
                     <div className={styles.warningHeader}>
                       <FiAlertOctagon className={styles.warningIcon} />
-                      <span className={styles.warningBadge}>IMPORTANT NOTE</span>
+                      <span className={styles.warningBadge}>IMPORTANT</span>
                     </div>
                     <div className={styles.warningContent}>
-                      <p className={styles.warningTitle}>Only LeetCode problems are supported for import at this time.</p>
+                      <p className={styles.warningTitle}>Only LeetCode problems are supported</p>
                       <p className={styles.warningDescription}>
                         If your file contains problems from other platforms (Codeforces, HackerRank, etc.), they will be
-                        skipped. Please ensure your sheet only includes LeetCode problem exact titles.
+                        skipped. Please ensure your sheet only includes LeetCode problem exact titles or slugs.
                       </p>
                     </div>
                   </div>

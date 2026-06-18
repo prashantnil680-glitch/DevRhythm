@@ -25,8 +25,8 @@
 .navLinks {
   display: flex;
   align-items: center;
-  gap: 0.2rem; /* reduced from 0.25rem */
-  flex-wrap: nowrap; /* prevent wrapping on desktop */
+  gap: 0.2rem;
+  flex-wrap: nowrap;
   justify-content: flex-end;
 }
 
@@ -39,10 +39,10 @@
 
 /* Nav link (desktop) – compact */
 .navLink {
-  height: 36px; /* reduced from 40px */
+  height: 36px;
   border-radius: 36px !important;
   font-weight: 500 !important;
-  font-size: 0.85rem !important; /* explicit smaller font */
+  font-size: 0.85rem !important;
   padding: 0 0.6rem !important;
   color: var(--text-secondary) !important;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
@@ -74,7 +74,7 @@
 }
 
 .navLink svg {
-  font-size: 1.1rem; /* slightly smaller icon */
+  font-size: 1.1rem;
 }
 
 /* Badge on nav link – compact */
@@ -221,7 +221,7 @@
   box-shadow: 0 4px 12px var(--shadow);
 }
 
-/* ===== New streak pill (desktop) – compact ===== */
+/* ===== Streak pill (desktop) – compact ===== */
 .streakPill {
   display: inline-flex;
   align-items: center;
@@ -255,9 +255,9 @@
   transform-origin: center;
 }
 
-/* Smooth slow motion fire animation */
 @keyframes flameFlicker {
-  0% {
+  0%,
+  100% {
     transform: scale(1);
     opacity: 1;
     filter: drop-shadow(0 0 2px #ff8c00);
@@ -277,14 +277,9 @@
     opacity: 0.95;
     filter: drop-shadow(0 0 3px #ff8c00);
   }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-    filter: drop-shadow(0 0 2px #ff8c00);
-  }
 }
 
-/* ===== Mobile Header (top bar) – unchanged ===== */
+/* ===== Mobile Header (top bar) ===== */
 .mobileHeader {
   display: flex;
   align-items: center;
@@ -325,7 +320,7 @@
   transform: rotate(90deg) !important;
 }
 
-/* ===== Drawer – unchanged ===== */
+/* ===== Drawer ===== */
 .drawerOverlay {
   position: fixed;
   inset: 0;
@@ -335,8 +330,12 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .drawer {
@@ -355,8 +354,12 @@
 }
 
 @keyframes slideIn {
-  from { transform: translateX(100%); }
-  to   { transform: translateX(0); }
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
 .drawerClose {
@@ -415,29 +418,19 @@
   font-size: 1.1rem;
 }
 
-.drawerLoginLink {
-  display: block;
-  width: 100%;
-  padding: 0.75rem 1rem;
-  background-color: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 40px;
-  color: var(--text-primary);
-  font-weight: 500;
-  text-align: center;
-  text-decoration: none;
-  transition: all 0.2s ease;
-  margin-bottom: 1rem;
-  font-size: 1rem;
-  box-sizing: border-box;
+.drawerLoginSection {
+  padding: 0.5rem 0;
 }
 
-.drawerLoginLink:hover {
-  color: var(--accent-moss);
-  background-color: var(--hover-surface);
-  border-color: var(--accent-moss);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px var(--shadow);
+/* ===== FIX: Ensure Sign In button text is visible ===== */
+.drawerLoginButton {
+  width: 100%;
+  /* Override text color to ensure visibility in both modes */
+  color: var(--primary-text-on-action, #ffffff) !important;
+}
+
+.drawerLoginButton:hover {
+  color: var(--primary-text-on-action, #ffffff) !important;
 }
 
 .drawerSection h3 {
@@ -530,7 +523,72 @@
   animation: flameFlicker 2.5s infinite ease-in-out;
 }
 
-/* ===== Mobile bottom navigation – unchanged ===== */
+/* ===== Login Prompt inside dropdown ===== */
+.loginPrompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  text-align: center;
+}
+
+.loginPromptIcon {
+  font-size: 1.8rem;
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.loginPromptText {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.loginPromptButton {
+  width: 100%;
+  margin-top: 0.25rem;
+  /* Ensure button text is visible */
+  color: var(--primary-text-on-action, #ffffff) !important;
+}
+
+.loginPromptButton:hover {
+  color: var(--primary-text-on-action, #ffffff) !important;
+}
+
+/* ===== Drawer Login Prompt ===== */
+.drawerLoginPrompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  text-align: center;
+}
+
+.drawerLoginPromptIcon {
+  font-size: 1.8rem;
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.drawerLoginPromptText {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.drawerLoginPromptButton {
+  width: 100%;
+  margin-top: 0.25rem;
+  /* Ensure button text is visible */
+  color: var(--primary-text-on-action, #ffffff) !important;
+}
+
+.drawerLoginPromptButton:hover {
+  color: var(--primary-text-on-action, #ffffff) !important;
+}
+
+/* ===== Mobile bottom navigation ===== */
 .mobileNavbar {
   position: fixed;
   bottom: 0;
@@ -569,7 +627,6 @@
 
 .mobileNavItem.active {
   color: var(--accent-moss);
-  /* background-color: var(--hover-surface); */
   font-weight: 600;
 }
 
@@ -638,11 +695,10 @@
 }
 
 .mobileSpacer {
-  /* Optional spacer if needed */
+  /* Optional spacer */
 }
 
 /* ===== Responsive adjustments ===== */
-
 /* Hide mobile UI on larger screens */
 @media (min-width: 769px) {
   .mobileHeader,
@@ -669,18 +725,15 @@
   .streakPill {
     padding: 0.2rem 0.5rem;
   }
-
   /* Reduce nav link padding and font size further */
   .navLink {
     padding: 0 0.4rem !important;
     font-size: 0.8rem !important;
   }
-
   /* Slightly reduce container padding */
   .desktopContainer {
     padding: 0.5rem 0.75rem;
   }
-
   /* Reduce gap between nav items */
   .navLinks {
     gap: 0.1rem;

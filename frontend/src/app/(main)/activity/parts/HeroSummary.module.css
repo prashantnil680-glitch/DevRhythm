@@ -27,7 +27,7 @@
 
 .title {
   font-family: var(--font-heading);
-  font-size: 1.4rem;        /* increased from 1.1rem */
+  font-size: 1.4rem;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
@@ -42,7 +42,6 @@
   color: var(--accent-moss);
 }
 
-/* Actions */
 .actions {
   display: flex;
   align-items: center;
@@ -95,79 +94,177 @@
   cursor: not-allowed;
 }
 
-/* Stats row (inline) – larger numbers */
-.statsRow {
+/* ===== TWO ROWS ===== */
+.row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;           /* ensures exactly one row */
   align-items: baseline;
-  gap: 0.5rem 1rem;
-  font-size: 1rem;           /* increased from 0.85rem */
-  color: var(--text-secondary);
-  margin-bottom: 0.75rem;
+  gap: 0.5rem 1.5rem;
+  margin-bottom: 0.25rem;
+  width: 100%;
 }
 
-.stat {
+.row:last-child {
+  margin-bottom: 0;
+}
+
+.statItem {
   display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-family: var(--font-code);
-  color: var(--text-primary);
+  align-items: baseline;
+  gap: 0.2rem;
+  white-space: nowrap;
+  transition: transform 0.2s ease;
+  cursor: default;
+  flex: 1 1 0;                 /* equal width items */
+  min-width: 0;                /* prevents overflow */
 }
 
-.stat strong {
+.statItem:hover {
+  transform: translateY(-1px);
+}
+
+.statItem strong {
   font-weight: 700;
-  font-size: 1.2rem;        /* larger bold numbers */
+  color: var(--text-primary);
+  font-size: 1.8rem;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  transition: color 0.2s ease;
+}
+
+.statItem:hover strong {
+  color: var(--accent-moss);
+}
+
+.statLabel {
+  cursor: help;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 1px;
+  transition: border-color 0.2s ease, color 0.2s ease;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.statLabel:hover {
+  border-color: var(--accent-moss);
   color: var(--text-primary);
 }
 
-.separator {
-  color: var(--text-muted);
-  font-size: 1rem;
+/* ===== Colored Numbers ===== */
+.passedNumber {
+  color: #40c463 !important;
 }
 
-/* Star icon for great progress */
+.failedNumber {
+  color: #E57373 !important;
+}
+
+/* ===== Icons ===== */
+.statItem svg {
+  font-size: 1.3rem;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
+  transform-origin: center;
+}
+
+.statItem:hover svg {
+  transform: scale(1.2) rotate(-6deg);
+}
+
+.iconSolved {
+  color: #40c463;
+}
+.statItem:hover .iconSolved {
+  color: #2e9e4a;
+}
+
+.iconRevision {
+  color: #f5b042;
+}
+.statItem:hover .iconRevision {
+  color: #e6a017;
+}
+
+.iconTime {
+  color: #6C5CE7;
+}
+.statItem:hover .iconTime {
+  color: #4a3db5;
+}
+
+.iconSubmissions {
+  color: #4A90D9;
+}
+.statItem:hover .iconSubmissions {
+  color: #2c6fb0;
+}
+
+.iconPassed {
+  color: #40c463;
+}
+.statItem:hover .iconPassed {
+  color: #2e9e4a;
+}
+
+.iconFailed {
+  color: #E57373;
+}
+.statItem:hover .iconFailed {
+  color: #d32f2f;
+}
+
 .starIcon {
   color: #f5b042;
   font-size: 1rem;
   cursor: help;
-  transition: transform 0.1s ease;
+  transition: transform 0.2s ease;
+  display: inline-block;
 }
 
 .starIcon:hover {
-  transform: scale(1.1);
+  transform: scale(1.2) rotate(12deg);
 }
 
-/* Progress bar (optional, currently commented out) */
-.progressWrapper {
-  display: flex;
+/* ===== Insight Chip ===== */
+.insightChip {
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin-top: 0.5rem;
-}
-
-.progressBar {
-  flex: 1;
-  height: 6px;
-  background: var(--border);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.progressFill {
-  height: 100%;
-  background: var(--accent-moss);
-  border-radius: 6px;
-  transition: width 0.3s ease;
-}
-
-.progressLabel {
-  font-size: 0.8rem;
-  color: var(--text-muted);
+  gap: 0.4rem;
+  padding: 0.2rem 0.8rem;
+  border-radius: 30px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-family: var(--font-body, sans-serif);
+  border: 1px solid var(--border);
+  background-color: var(--bg-elevated);
+  color: var(--text-secondary);
   white-space: nowrap;
+  flex-shrink: 0;              /* prevents the chip from shrinking */
+  margin-left: auto;           /* pushes it to the right */
 }
 
-/* Skeleton (adjusted for larger text) */
+.insightChip svg {
+  font-size: 0.9rem;
+}
+
+.insightChip.success {
+  border-color: var(--color-success, #2e7d32);
+  background-color: rgba(46, 125, 50, 0.08);
+  color: var(--color-success, #2e7d32);
+}
+
+.insightChip.warning {
+  border-color: var(--color-warning, #ed6c02);
+  background-color: rgba(237, 108, 2, 0.08);
+  color: var(--color-warning, #ed6c02);
+}
+
+.insightChip.danger {
+  border-color: var(--color-danger, #d32f2f);
+  background-color: rgba(211, 47, 47, 0.08);
+  color: var(--color-danger, #d32f2f);
+}
+
+/* ===== Skeleton ===== */
 .skeletonDate {
   width: 240px;
   height: 28px;
@@ -185,19 +282,10 @@
 }
 
 .skeletonStat {
-  width: 100px;
-  height: 24px;
+  height: 36px;
   background: var(--bg-elevated);
   border-radius: 4px;
-  animation: pulse 1.5s infinite;
-}
-
-.skeletonProgress {
-  height: 6px;
-  width: 100%;
-  background: var(--bg-elevated);
-  border-radius: 6px;
-  margin-top: 0.5rem;
+  flex: 1;
   animation: pulse 1.5s infinite;
 }
 
@@ -206,7 +294,6 @@
   50% { opacity: 0.5; }
 }
 
-/* Error state */
 .errorState {
   text-align: center;
   padding: 0.5rem;
@@ -214,30 +301,62 @@
   font-size: 0.9rem;
 }
 
-/* Responsive */
-@media (max-width: 767px) {
-  .container {
-    padding: 0.6rem 0 0.8rem 0;
+/* ===== Responsive ===== */
+/* Tablets: reduce font sizes and gaps */
+@media (max-width: 940px) {
+  .statItem strong {
+    font-size: 1.5rem;
   }
-  .title {
+  .statItem svg {
+    font-size: 1.1rem;
+  }
+  .statLabel {
+    font-size: 0.7rem;
+  }
+  .row {
+    gap: 0.3rem 1rem;
+  }
+  .insightChip {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.6rem;
+  }
+}
+
+/* Mobile: scale down further */
+@media (max-width: 600px) {
+  .statItem strong {
     font-size: 1.2rem;
   }
-  .statsRow {
-    font-size: 0.85rem;
-    gap: 0.5rem;
+  .statItem svg {
+    font-size: 0.9rem;
   }
-  .stat strong {
-    font-size: 1rem;
+  .statLabel {
+    font-size: 0.6rem;
   }
-  .progressWrapper {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.3rem;
+  .row {
+    gap: 0.2rem 0.5rem;
   }
-  .progressBar {
-    width: 100%;
+  .insightChip {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.5rem;
+    gap: 0.2rem;
   }
-  .progressLabel {
+  .insightChip svg {
     font-size: 0.7rem;
+  }
+}
+
+/* Very small screens: force new row for chip if needed */
+@media (max-width: 480px) {
+  .row:last-child {
+    flex-wrap: wrap;
+  }
+  .row:last-child .statItem {
+    flex: 1 1 30%;
+  }
+  .insightChip {
+    flex: 0 0 auto;
+    margin-left: 0;
+    margin-top: 0.2rem;
   }
 }

@@ -132,6 +132,26 @@ class MetadataService {
     }
     return results;
   }
+
+  /**
+   * Extract metadata directly from a user's code string.
+   * @param {string} code - The user's submitted code.
+   * @param {string} language - One of 'python', 'java', 'cpp', 'javascript'.
+   * @returns {Object|null} Metadata object or null if extraction fails.
+   */
+  extractFromCode(code, language) {
+    if (!extractors[language]) {
+      console.warn(`[Metadata] Unsupported language for extraction: ${language}`);
+      return null;
+    }
+    try {
+      const extractor = extractors[language];
+      return extractor.extract(code);
+    } catch (err) {
+      console.warn(`[Metadata] Failed to extract from user code: ${err.message}`);
+      return null;
+    }
+  }
 }
 
 module.exports = new MetadataService();

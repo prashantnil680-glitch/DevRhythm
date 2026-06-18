@@ -1,6 +1,7 @@
 const User = require('../../models/User');
 const Notification = require('../../models/Notification');
 const { invalidateCache } = require('../../middleware/cache');
+const { getEndOfDay } = require('../../utils/helpers/date');
 
 const BATCH_SIZE = 500;
 
@@ -8,6 +9,7 @@ const BATCH_SIZE = 500;
  * Handle pod.available job
  * Creates a POD available notification for all active users.
  * Processes users in batches to avoid memory issues.
+ * Each notification is set to expire at the end of the user's local day.
  */
 const handlePodAvailable = async (job) => {
   const { title, titleSlug, link, date } = job.data;
@@ -18,29 +20,35 @@ const handlePodAvailable = async (job) => {
 
   while (true) {
     const users = await User.find({ isActive: true })
-      .select('_id')
+      .select('_id preferences.timezone')
       .skip(skip)
       .limit(BATCH_SIZE)
       .lean();
 
     if (users.length === 0) break;
 
-    const notifications = users.map(user => ({
-      userId: user._id,
-      type: 'pod_available',
-      title: 'New Problem of the Day',
-      message: `Today's problem: "${title}" is now available.`,
-      data: {
-        title,
-        titleSlug,
-        platformQuestionId: titleSlug,
-        link,
-        date,
-      },
-      channel: 'in-app',
-      status: 'sent',
-      scheduledAt: new Date(),
-    }));
+    const notifications = users.map((user) => {
+      const timezone = user.preferences?.timezone || 'UTC';
+      const expiresAt = getEndOfDay(new Date(), timezone);
+
+      return {
+        userId: user._id,
+        type: 'pod_available',
+        title: 'New Problem of the Day',
+        message: `Today's problem: "${title}" is now available.`,
+        data: {
+          title,
+          titleSlug,
+          platformQuestionId: titleSlug,
+          link,
+          date,
+        },
+        channel: 'in-app',
+        status: 'sent',
+        scheduledAt: new Date(),
+        expiresAt,
+      };
+    });
 
     await Notification.insertMany(notifications, { ordered: false });
     totalCreated += notifications.length;

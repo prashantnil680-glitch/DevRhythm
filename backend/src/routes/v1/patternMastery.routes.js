@@ -9,7 +9,7 @@ const rateLimiters = require('../../middleware/rateLimiter');
 
 router.get('/', 
   auth, 
-  rateLimiters.userLimiter, 
+  rateLimiters.patternMasteryLimiter,  // updated
   validate(Joi.object({
     page: Joi.number().integer().min(1).default(1),
     limit: Joi.number().integer().min(1).max(100).default(20),
@@ -27,14 +27,14 @@ router.get('/',
 
 router.get('/stats', 
   auth, 
-  rateLimiters.userLimiter, 
+  rateLimiters.patternMasteryLimiter,  // updated
   cache(60, 'pattern-mastery:stats'),   
   patternMasteryController.getPatternStats
 );
 
 router.get('/recommendations', 
   auth, 
-  rateLimiters.userLimiter, 
+  rateLimiters.patternMasteryLimiter,  // updated
   validate(Joi.object({
     limit: Joi.number().integer().min(1).max(10).default(5),
     focus: Joi.string().valid('weakest', 'needsPractice', 'highestPotential').default('weakest')
@@ -45,7 +45,7 @@ router.get('/recommendations',
 
 router.get('/weakest', 
   auth, 
-  rateLimiters.userLimiter, 
+  rateLimiters.patternMasteryLimiter,  // updated
   validate(Joi.object({
     limit: Joi.number().integer().min(1).max(20).default(5),
     metric: Joi.string().valid('confidence', 'masteryRate', 'lastPracticed').default('confidence')
@@ -56,7 +56,7 @@ router.get('/weakest',
 
 router.get('/strongest', 
   auth, 
-  rateLimiters.userLimiter, 
+  rateLimiters.patternMasteryLimiter,  // updated
   validate(Joi.object({
     limit: Joi.number().integer().min(1).max(20).default(5),
     metric: Joi.string().valid('confidence', 'masteryRate', 'lastPracticed').default('confidence')
@@ -67,7 +67,7 @@ router.get('/strongest',
 
 router.get('/progress', 
   auth, 
-  rateLimiters.userLimiter, 
+  rateLimiters.patternMasteryLimiter,  // updated
   validate(Joi.object({
     patternName: Joi.string().trim(),
     startDate: Joi.date(),
@@ -80,7 +80,7 @@ router.get('/progress',
 
 router.get('/:patternName', 
   auth, 
-  rateLimiters.userLimiter, 
+  rateLimiters.patternMasteryLimiter,  // updated
   validate(Joi.object({
     patternName: Joi.string().trim().required()
   }), 'params'), 

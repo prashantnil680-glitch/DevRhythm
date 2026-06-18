@@ -508,12 +508,45 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
   // ---------- Main render ----------
   return (
     <div className={styles.container}>
-      {/* Stats Grid */}
-      <div className={styles.statsGrid}>
-        <StatCard icon={<FiGrid />} value={totalPatternsStat} label="patterns" rotation="-0.5deg" />
-        <StatCard icon={<FiCheckCircle />} value={totalSolvedCount} label="solved question" rotation="0.5deg" />
-        <StatCard icon={<FiStar />} value={totalMasteredCount} label="mastered" rotation="-0.3deg" />
-        <StatCard icon={<FiBarChart2 />} value={parseFloat(avgConfidence.toFixed(1))} label="avg confidence" rotation="0.3deg" />
+      {/* Stats Row */}
+      <div className={styles.statsRow}>
+        <span className={styles.statItem}>
+          <FiGrid className={`${styles.statIcon} ${styles.iconPatterns}`} />
+          <strong>{totalPatternsStat}</strong>
+          <Tooltip content="Total number of distinct coding patterns you've encountered">
+            <span className={styles.statLabel}>patterns</span>
+          </Tooltip>
+        </span>
+
+        <span className={styles.separator}>•</span>
+
+        <span className={styles.statItem}>
+          <FiCheckCircle className={`${styles.statIcon} ${styles.iconSolved}`} />
+          <strong>{totalSolvedCount.toLocaleString()}</strong>
+          <Tooltip content="Total number of problems you've solved across all patterns">
+            <span className={styles.statLabel}>solved</span>
+          </Tooltip>
+        </span>
+
+        <span className={styles.separator}>•</span>
+
+        <span className={styles.statItem}>
+          <FiStar className={`${styles.statIcon} ${styles.iconMastered}`} />
+          <strong>{totalMasteredCount.toLocaleString()}</strong>
+          <Tooltip content="Problems you've fully mastered (solved + revised to confidence ≥ 4)">
+            <span className={styles.statLabel}>mastered</span>
+          </Tooltip>
+        </span>
+
+        <span className={styles.separator}>•</span>
+
+        <span className={styles.statItem}>
+          <FiBarChart2 className={`${styles.statIcon} ${styles.iconConfidence}`} />
+          <strong>{avgConfidence.toFixed(1)}</strong>
+          <Tooltip content="Average confidence level across all patterns (1–5)">
+            <span className={styles.statLabel}>avg confidence</span>
+          </Tooltip>
+        </span>
       </div>
 
       {/* Hero Area */}

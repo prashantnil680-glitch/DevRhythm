@@ -20,7 +20,6 @@ export function CreateSheetWrapper({ isAuthenticated }: CreateSheetWrapperProps)
   const searchParams = useSearchParams();
   const [authModalOpen, setAuthModalOpen] = useState(!isAuthenticated);
 
-  // Read tab from URL query parameter
   const tabParam = searchParams.get('tab');
   const initialTab = tabParam === 'import' ? 'import' : 'manual';
   const [activeTab, setActiveTab] = useState<'manual' | 'import'>(initialTab);
@@ -28,7 +27,6 @@ export function CreateSheetWrapper({ isAuthenticated }: CreateSheetWrapperProps)
   const createMutation = useCreateSheet();
   const importMutation = useImportSheet();
 
-  // Update URL when activeTab changes, but only if the URL doesn't already match
   useEffect(() => {
     const currentSearch = window.location.search;
     const params = new URLSearchParams(currentSearch);
@@ -39,7 +37,6 @@ export function CreateSheetWrapper({ isAuthenticated }: CreateSheetWrapperProps)
     }
     const newSearch = params.toString();
     const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}`;
-    // Only replace if the URL would actually change
     if (newUrl !== window.location.href) {
       router.replace(newUrl, { scroll: false });
     }
@@ -76,7 +73,6 @@ export function CreateSheetWrapper({ isAuthenticated }: CreateSheetWrapperProps)
     window.location.href = `/login?returnTo=${returnTo}`;
   };
 
-  // If not authenticated, show a modal overlay
   if (!isAuthenticated) {
     return (
       <>
@@ -144,6 +140,7 @@ export function CreateSheetWrapper({ isAuthenticated }: CreateSheetWrapperProps)
             onCancel={handleCancel}
             isSubmitting={isSubmitting}
             onSuccess={() => {}}
+            mode="create"
           />
         )}
         {activeTab === 'import' && (

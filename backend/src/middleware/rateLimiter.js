@@ -69,11 +69,11 @@ const createRedisLimiter = (windowMs, max, keyPrefix) => {
 const oauthLimiter = createRedisLimiter(15 * 60 * 1000, 200, 'oauth');
 const tokenLimiter = createRedisLimiter(15 * 60 * 1000, 300, 'token');
 const logoutLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'logout');
-const userLimiter = createRedisLimiter(15 * 60 * 1000, 250, 'user');
+const userLimiter = createRedisLimiter(20 * 60 * 1000, 250, 'user');
 const progressSnapshotLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'snapshot');
 const notificationReadLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'notification');
 const leaderboardLimiter = createRedisLimiter(15 * 60 * 1000, 300, 'leaderboard');
-const publicLimiter = createRedisLimiter(60 * 1000, 60, 'public');
+const publicLimiter = createRedisLimiter(15 * 60 * 1000, 300, 'public');
 
 // Question endpoints
 const questionCreateLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'question:create');
@@ -87,6 +87,7 @@ const progressUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 200, 'progress:
 
 // Revision endpoints
 const revisionCompleteLimiter = createRedisLimiter(15 * 60 * 1000, 200, 'revision:complete');
+const revisionStatsLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'revision-stats');
 
 // Share endpoints
 const shareCreateLimiter = createRedisLimiter(15 * 60 * 1000, 50, 'share:create');
@@ -122,11 +123,11 @@ const progressLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'progress');
 const rankParticipantsLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'rank-participants');
 
 // ===== NEW: Code execution async limiters =====
-// Submitting code execution jobs (stricter limit: 10 per minute per user)
 const codeExecuteAsyncLimiter = createRedisLimiter(60 * 1000, 10, 'code:execute-async');
-
-// Polling for results (higher limit: 30 per minute per user)
 const codeResultPollLimiter = createRedisLimiter(60 * 1000, 30, 'code:result-poll');
+
+// ===== NEW: Pattern Mastery limiter (higher limit) =====
+const patternMasteryLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'pattern-mastery');
 
 module.exports = {
   oauthLimiter,
@@ -147,6 +148,7 @@ module.exports = {
   progressUpdateLimiter,
 
   revisionCompleteLimiter,
+  revisionStatsLimiter,
 
   shareCreateLimiter,
   shareUpdateLimiter,
@@ -176,9 +178,11 @@ module.exports = {
   progressLimiter,
   rankParticipantsLimiter,
 
-  // NEW exports
   codeExecuteAsyncLimiter,
   codeResultPollLimiter,
+
+  // NEW export
+  patternMasteryLimiter,
 
   // Keep helpers for any custom use
   createMemoryLimiter,

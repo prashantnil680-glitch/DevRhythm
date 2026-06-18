@@ -3,7 +3,6 @@ import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION } from '@/shared/config/seo';
 import { sheetService } from '@/features/sheets/server';
 import SheetsClient from './client';
 import { GetSheetsParams } from '@/features/sheets/types/sheets.types';
-import Script from 'next/script';
 
 // Force dynamic rendering (no static caching for this page)
 export const dynamic = 'force-dynamic';
@@ -103,7 +102,7 @@ const webpageSchema = {
     '@type': 'ItemList',
     name: 'Coding Sheets',
     description: 'List of curated coding problem sets',
-    numberOfItems: 0, // Will be updated client‑side; placeholder for SEO.
+    numberOfItems: 0,
     itemListElement: [],
   },
 };
@@ -132,20 +131,22 @@ async function getInitialSheets() {
 }
 
 export default async function SheetsPage() {
-  const initialData = await getInitialSheets();
+  let initialData;
+  try {
+    initialData = await getInitialSheets();
+  } catch (error) {
+    console.error('Failed to fetch initial sheets for page:', error);
+    initialData = { sheets: [], pagination: null };
+  }
 
   return (
     <>
-      <Script
-        id="schema-breadcrumb"
+      <script
         type="application/ld+json"
-        strategy="beforeInteractive"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
-      <Script
-        id="schema-webpage"
+      <script
         type="application/ld+json"
-        strategy="beforeInteractive"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(webpageSchema) }}
       />
       <SheetsClient initialData={initialData} />

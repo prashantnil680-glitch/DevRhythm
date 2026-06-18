@@ -3,13 +3,26 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, addDays, subDays } from 'date-fns';
-import { FiArrowLeft, FiArrowRight, FiCalendar, FiEye, FiStar } from 'react-icons/fi';
+import {
+  FiArrowLeft,
+  FiArrowRight,
+  FiCalendar,
+  FiEye,
+  FiStar,
+  FiCheckCircle,
+  FiRefreshCw,
+  FiClock,
+  FiTrendingUp,
+  FiActivity,
+  FiCheck,
+  FiXCircle,
+} from 'react-icons/fi';
 import { useTodayActivity, useDayActivity } from '@/features/activity/hooks/useActivityData';
 import Tooltip from '@/shared/components/Tooltip';
 import styles from './HeroSummary.module.css';
 
 interface HeroSummaryProps {
-  date?: string; // YYYY-MM-DD – if provided, fetch for that date; otherwise today
+  date?: string;
 }
 
 export default function HeroSummary({ date }: HeroSummaryProps) {
@@ -29,15 +42,10 @@ export default function HeroSummary({ date }: HeroSummaryProps) {
   }
 
   const handlePrevDay = () => {
-    if (prevDate) {
-      router.push(`/activity/${format(prevDate, 'yyyy-MM-dd')}`);
-    }
+    if (prevDate) router.push(`/activity/${format(prevDate, 'yyyy-MM-dd')}`);
   };
-
   const handleNextDay = () => {
-    if (nextDate) {
-      router.push(`/activity/${format(nextDate, 'yyyy-MM-dd')}`);
-    }
+    if (nextDate) router.push(`/activity/${format(nextDate, 'yyyy-MM-dd')}`);
   };
 
   const formatStudyTime = (minutes: number) => {
@@ -56,26 +64,23 @@ export default function HeroSummary({ date }: HeroSummaryProps) {
           <div className={styles.skeletonDate} />
           <div className={styles.skeletonActions} />
         </div>
-        <div className={styles.statsRow}>
-          <div className={styles.skeletonStat} />
-          <div className={styles.skeletonStat} />
-          <div className={styles.skeletonStat} />
-          <div className={styles.skeletonStat} />
+        <div className={styles.statsGrid}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className={styles.skeletonStat} />
+          ))}
         </div>
-        <div className={styles.skeletonProgress} />
       </div>
     );
   }
 
   if (error || !data) {
-    const errorMessage = error?.message || 'Unable to load activity data';
     return (
       <div className={styles.container}>
         <div className={styles.headerRow}>
           <h3 className={styles.title}>{date ? `Activity for ${date}` : "Today's Activity"}</h3>
         </div>
         <div className={styles.errorState}>
-          <Tooltip content={errorMessage}>
+          <Tooltip content={error?.message || 'Unable to load activity'}>
             <span>Could not load activity{date ? ` for ${date}` : ' today'}</span>
           </Tooltip>
         </div>
@@ -85,11 +90,47 @@ export default function HeroSummary({ date }: HeroSummaryProps) {
 
   const formattedDate = format(new Date(data.date), 'EEEE, MMMM d, yyyy');
   const studyTime = formatStudyTime(data.studyTimeMinutes);
-  const goalPercent = data.goalCompletion || 0;
 
-  // Progress highlighting thresholds
   const isHighProblems = data.problemsSolved >= 5;
   const isHighStudyTime = data.studyTimeMinutes >= 120;
+
+  // Insight chip logic
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isToday = isDayPage && data.date === todayStr;
+
+  let insightIcon = <FiTrendingUp />;
+  let insightLabel = 'Keep going!';
+  let insightType: 'success' | 'warning' | 'danger' = 'success';
+
+  if (data.problemsSolved >= 5) {
+    insightIcon = <FiStar />;
+    insightLabel = '🌟 Great progress!';
+    insightType = 'success';
+  } else if (data.problemsSolved >= 3) {
+    insightIcon = <FiTrendingUp />;
+    insightLabel = 'Good start!';
+    insightType = 'warning';
+  } else if (data.problemsSolved === 0 && data.revisionsCompleted === 0) {
+    if (isToday) {
+      insightIcon = <FiClock />;
+      insightLabel = '📝 Start your day with a problem!';
+      insightType = 'warning';
+    } else {
+      insightIcon = <FiClock />;
+      insightLabel = 'No activity on this day';
+      insightType = 'danger';
+    }
+  } else {
+    if (!isToday) {
+      insightIcon = <FiCheckCircle />;
+      insightLabel = `✓ ${data.problemsSolved} problem${data.problemsSolved > 1 ? 's' : ''} solved`;
+      insightType = 'success';
+    } else {
+      insightIcon = <FiTrendingUp />;
+      insightLabel = 'Keep going!';
+      insightType = 'warning';
+    }
+  }
 
   return (
     <div className={styles.container}>
@@ -123,41 +164,76 @@ export default function HeroSummary({ date }: HeroSummaryProps) {
         </div>
       </div>
 
-      {/* Stats row (inline with separators) */}
-      <div className={styles.statsRow}>
-        <span className={styles.stat}>
-          <strong>{data.problemsSolved}</strong> problems solved
+      {/* ===== TWO ROWS ===== */}
+      {/* Row 1: Solved, Revisions, Study Time */}
+      <div className={styles.row}>
+        <div className={styles.statItem}>
+          <FiCheckCircle className={styles.iconSolved} />
+          <strong>{data.problemsSolved}</strong>
+          <Tooltip content="Number of problems solved today">
+            <span className={styles.statLabel}>Problem Solved</span>
+          </Tooltip>
           {isHighProblems && (
             <Tooltip content="Great progress! 5+ problems solved today! 🎉">
               <FiStar className={styles.starIcon} />
             </Tooltip>
           )}
-        </span>
-        <span className={styles.separator}>•</span>
-        <span className={styles.stat}>
-          <strong>{data.revisionsCompleted}</strong> revisions completed
-        </span>
-        <span className={styles.separator}>•</span>
-        <span className={styles.stat}>
-          <strong>{studyTime}</strong> study time
+        </div>
+
+        <div className={styles.statItem}>
+          <FiRefreshCw className={styles.iconRevision} />
+          <strong>{data.revisionsCompleted}</strong>
+          <Tooltip content="Revisions completed today">
+            <span className={styles.statLabel}>Revisions Complete</span>
+          </Tooltip>
+        </div>
+
+        <div className={styles.statItem}>
+          <FiClock className={styles.iconTime} />
+          <strong>{studyTime}</strong>
+          <Tooltip content="Total study time today">
+            <span className={styles.statLabel}>Study Time</span>
+          </Tooltip>
           {isHighStudyTime && (
             <Tooltip content="Amazing focus! 2+ hours of study today! 💪">
               <FiStar className={styles.starIcon} />
             </Tooltip>
           )}
-        </span>
-        {/* Goal percent is commented out as requested */}
+        </div>
       </div>
 
-      {/* Progress bar (commented out – uncomment if needed) */}
-      {/* <div className={styles.progressWrapper}>
-        <div className={styles.progressBar}>
-          <div className={styles.progressFill} style={{ width: `${goalPercent}%` }} />
+      {/* Row 2: Submissions, Passed, Failed, Insight Chip */}
+      <div className={styles.row}>
+        <div className={styles.statItem}>
+          <FiActivity className={styles.iconSubmissions} />
+          <strong>{data.submissions ?? 0}</strong>
+          <Tooltip content="Total code submissions today">
+            <span className={styles.statLabel}>Submissions</span>
+          </Tooltip>
         </div>
-        <span className={styles.progressLabel}>
-          {data.problemsSolved}/{data.goalTarget} problems completed today
-        </span>
-      </div> */}
+
+        <div className={styles.statItem}>
+          <FiCheck className={styles.iconPassed} />
+          <strong className={styles.passedNumber}>{data.passedCount ?? 0}</strong>
+          <Tooltip content="Test cases passed today">
+            <span className={styles.statLabel}>Passed</span>
+          </Tooltip>
+        </div>
+
+        <div className={styles.statItem}>
+          <FiXCircle className={styles.iconFailed} />
+          <strong className={styles.failedNumber}>{data.failedCount ?? 0}</strong>
+          <Tooltip content="Test cases failed today">
+            <span className={styles.statLabel}>Failed</span>
+          </Tooltip>
+        </div>
+
+        {/* Insight chip – appears on the second row, aligned to the right */}
+        <div className={`${styles.insightChip} ${styles[insightType]}`}>
+          {insightIcon}
+          <span>{insightLabel}</span>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,8 +1,10 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import type { ApiResponse, PaginatedResponse } from '@/shared/types';
 import { isPublicPath } from './publicPaths';
+import { getRateLimitedGlobal } from '@/shared/contexts/RateLimitContext';
 
 // ========== Configuration ==========
+
 const getBaseUrl = (): string => {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (!baseUrl) {
@@ -43,11 +45,14 @@ export interface ApiClientResponse<T = any> {
 
 export function isPaginatedResponse<T>(
   response: ApiClientResponse<T>
-): response is ApiClientResponse<T> & { meta: { pagination: NonNullable<PaginatedResponse<T>['meta']['pagination']> } } {
+): response is ApiClientResponse<T> & {
+  meta: { pagination: NonNullable<PaginatedResponse<T>['meta']['pagination']> };
+} {
   return !!response.meta?.pagination;
 }
 
 // ========== Create Axios Instance ==========
+
 const apiClient: AxiosInstance = axios.create({
   baseURL: getBaseUrl(),
   timeout: 30000,
@@ -57,8 +62,12 @@ const apiClient: AxiosInstance = axios.create({
 });
 
 // ========== Token Refresh Queue ==========
+
 let isRefreshing = false;
-let failedQueue: Array<{ resolve: (value?: unknown) => void; reject: (reason?: any) => void; }> = [];
+let failedQueue: Array<{
+  resolve: (value?: unknown) => void;
+  reject: (reason?: any) => void;
+}> = [];
 let isRedirecting = false;
 
 const processQueue = (error: Error | null, token: string | null = null) => {
@@ -72,19 +81,19 @@ const processQueue = (error: Error | null, token: string | null = null) => {
   failedQueue = [];
 };
 
-// 🔧 MODIFIED: Check public path before redirect
 const clearTokensAndRedirect = () => {
   if (typeof window === 'undefined') return;
   if (isRedirecting) return;
 
   const currentPath = window.location.pathname;
-  // ✅ Do not redirect if on a public path
+
   if (isPublicPath(currentPath)) {
     console.log('Skipping redirect – public path:', currentPath);
     return;
   }
 
   isRedirecting = true;
+
   const isLoginPage = currentPath === '/login';
   const isCallbackPage = currentPath === '/auth/callback';
 
@@ -93,7 +102,9 @@ const clearTokensAndRedirect = () => {
   localStorage.removeItem('user_id');
 
   const secure = window.location.protocol === 'https:';
-  document.cookie = `auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=strict${secure ? '; secure' : ''}`;
+  document.cookie = `auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=strict${
+    secure ? '; secure' : ''
+  }`;
 
   if (isLoginPage || isCallbackPage) {
     isRedirecting = false;
@@ -104,12 +115,14 @@ const clearTokensAndRedirect = () => {
   if (!returnTo.startsWith('/login')) {
     localStorage.setItem('returnTo', returnTo);
   }
+
   window.location.href = '/login';
 };
 
 // ========== Conditionally Add Interceptors (only in browser) ==========
+
 if (typeof window !== 'undefined') {
-  // Request interceptor – add token
+  // ---- Request interceptor – add token ----
   apiClient.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
       const token = getToken();
@@ -121,7 +134,7 @@ if (typeof window !== 'undefined') {
     error => Promise.reject(error)
   );
 
-  // Response interceptor – handle 401 and token refresh
+  // ---- Response interceptor – handle 401, 429, and token refresh ----
   apiClient.interceptors.response.use(
     response => {
       const apiResponse = response.data as ApiResponse;
@@ -131,6 +144,7 @@ if (typeof window !== 'undefined') {
         (error as any).isApiError = true;
         throw error;
       }
+
       return {
         data: apiResponse.data,
         meta: apiResponse.meta,
@@ -145,29 +159,59 @@ if (typeof window !== 'undefined') {
       const requestUrl = originalRequest?.url || '';
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
 
-      // 🛡️ Homepage guard: skip 401 handling for /users/me on the root path
+      // ---- HOMEPAGE GUARD: skip 401 handling for /users/me on the root path ----
       if (currentPath === '/' && requestUrl.includes('/users/me')) {
         return Promise.reject(error);
       }
 
-      // ---- Guards to prevent loops ----
-      const pathname = window.location.pathname;
+      // ---- RATE LIMIT HANDLING (429) ----
+      if (error.response?.status === 429) {
+        const retryAfterHeader = error.response.headers['retry-after'];
+        let seconds = 60;
+        if (retryAfterHeader) {
+          const parsed = parseInt(retryAfterHeader, 10);
+          if (!isNaN(parsed) && parsed > 0) {
+            seconds = parsed;
+          }
+        }
+
+        // Notify the global rate‑limit context (if available)
+        const setRateLimited = getRateLimitedGlobal();
+        if (setRateLimited && originalRequest) {
+          setRateLimited(originalRequest, seconds);
+        }
+
+        // Reject with a custom error so that calling code can detect rate limits
+        const rateLimitError = new Error('Rate limit exceeded');
+        Object.assign(rateLimitError, {
+          rateLimit: true,
+          retryAfter: seconds,
+        });
+        return Promise.reject(rateLimitError);
+      }
+
+      // ---- AUTH GUARDS: skip 401 handling for public paths and auth endpoints ----
+      const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+
       if (isPublicPath(pathname)) {
-        // ✅ If on a public page, do not redirect – just reject the error
         return Promise.reject(error);
       }
+
       if (pathname === '/login' || pathname === '/auth/callback') {
         return Promise.reject(error);
       }
+
       if (requestUrl.includes('/auth/refresh') || requestUrl.includes('/auth/exchange')) {
         return Promise.reject(error);
       }
 
+      // ---- 401 HANDLING WITH TOKEN REFRESH ----
       if (error.response?.status !== 401 || originalRequest._retry) {
         return Promise.reject(error);
       }
 
       originalRequest._retry = true;
+
       const refreshToken = localStorage.getItem('refresh_token');
       if (!refreshToken) {
         clearTokensAndRedirect();
@@ -188,21 +232,34 @@ if (typeof window !== 'undefined') {
       }
 
       isRefreshing = true;
+
       try {
         const refreshResponse = await axios.post(
           `${getBaseUrl()}/auth/refresh`,
           { refreshToken },
-          { headers: { 'Content-Type': 'application/json' } }
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
         );
+
         const { token: newAccessToken, refreshToken: newRefreshToken } = refreshResponse.data.data;
+
         localStorage.setItem('auth_token', newAccessToken);
         localStorage.setItem('refresh_token', newRefreshToken);
+
         const secure = window.location.protocol === 'https:';
-        document.cookie = `auth_token=${newAccessToken}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=strict${secure ? '; secure' : ''}`;
+        document.cookie = `auth_token=${newAccessToken}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=strict${
+          secure ? '; secure' : ''
+        }`;
+
         processQueue(null, newAccessToken);
+
         if (originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         }
+
         return apiClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError as Error, null);

@@ -728,11 +728,11 @@ export interface Notification extends Timestamp {
     | 'question_solved'
     | 'question_mastered'
     | 'revision_completed'
-    | 'pod_solved'      // ✅ added
-    | 'pod_available';  // ✅ added
+    | 'pod_available'
+    | 'pod_solved';
   title: string;
   message: string;
-  data: Record<string, any>; // flexible, based on type
+  data: Record<string, any>;
   channel: 'in-app' | 'email' | 'both';
   status: 'pending' | 'sent' | 'failed';
   scheduledAt: ISODateString;
@@ -741,57 +741,98 @@ export interface Notification extends Timestamp {
   expiresAt?: ISODateString;
 }
 
-// ===== New types for Revision Dashboard =====
+// ===== Updated types for Revision Dashboard =====
 
 /**
  * Detailed revision statistics for the dashboard.
- * Returned by GET /revisions/stats?detailed=true
+ * Matches the backend response from GET /revisions/stats?detailed=true
  */
 export interface RevisionDashboardStats {
   summary: {
     totalActiveSchedules: number;
-    completionRate: number;
-    revisionStreak: { current: number; longest: number };
-    totalOverdueSchedules: number;
+    totalRevisionsCompleted: number;
+    totalRevisionsScheduled: number;
+    upcomingSchedulesCount: number;       // schedules with upcoming revisions
+    totalPendingRevisionEntries: number;  // total incomplete revision slots
+    completionRate: number;               // percentage
+    // Optional fields (may not always be present)
+    totalCompletedSchedules?: number;
+    totalOverdueSchedules?: number;
+    averageOverdueDays?: number;
+    maxOverdueDays?: number;
+    revisionStreak?: { current: number; longest: number };
   };
   byRevisionIndex: Array<{
     index: number;
-    stage: string; // "1st review", "2nd review", etc.
     totalQuestions: number;
     completed: number;
-  }>;
-  byDifficulty: Array<{
-    difficulty: 'Easy' | 'Medium' | 'Hard';
-    totalRevisions: number;
     completionRate: number;
-  }>;
-  byPlatform: Array<{
-    platform: string;
-    totalRevisions: number;
-    completionRate: number;
-  }>;
-  byPattern: Array<{
-    patternName: string;
-    totalRevisions: number;
-    completed: number;
-    completionRate: number;
+    skipped: number;
+    averageTimeSpent: number;
+    averageConfidenceAfter: number | null;
+    dropoutRate: number;
   }>;
   trends: {
     daily: Array<{
       date: string; // YYYY-MM-DD
       completed: number;
-      avgConfidence: number;
-      totalTimeSpent: number;
+      timeSpent: number;
+      avgConfidence: number | null;
     }>;
+    weekly: any[];
+    monthly: any[];
   };
-  overdueDistribution: any;
-  questionLevelDetails: Array<{
-    _id: string;
-    title: string;
-    difficulty: 'Easy' | 'Medium' | 'Hard';
-    status: string;
-    nextRevisionDue: string;
+  overdueDistribution: Record<string, number>;
+  byDifficulty: Record<string, {
+    totalRevisions: number;
+    completed: number;
+    totalTimeSpent: number;
+    confidenceSum: number;
+    confidenceCount: number;
+    overdueCount: number;
+    completionRate: number;
+    averageTimeSpent: string;
+    averageConfidenceAfter: string | null;
   }>;
+  byPlatform: Record<string, {
+    totalRevisions: number;
+    completed: number;
+    totalTimeSpent: number;
+    confidenceSum: number;
+    confidenceCount: number;
+    overdueCount: number;
+    completionRate: number;
+    averageTimeSpent: string;
+    averageConfidenceAfter: string | null;
+  }>;
+  byPattern: Array<{
+    patternName: string;
+    slug: string;
+    totalRevisions: number;
+    completed: number;
+    totalTimeSpent: number;
+    confidenceSum: number;
+    confidenceCount: number;
+    overdueCount: number;
+    completionRate: number;
+    averageTimeSpent: string;
+    averageConfidenceAfter: string | null;
+  }>;
+  timeStats: {
+    totalMinutesSpent: number;
+    averageMinutesPerRevision: string;
+    averageMinutesPerDay: number;
+    mostProductiveDay: string | null;
+    mostProductiveDayMinutes: number;
+    timeByDifficulty: Record<string, number>;
+  };
+  confidenceStats: {
+    overallAverageAfter: number | null;
+    confidenceDistributionAfter: Record<string, number>;
+    confidenceImprovementByRevisionIndex: any[];
+  };
+  overdueRevisions?: any[];
+  upcomingRevisions?: any[];
 }
 
 /**
@@ -806,11 +847,17 @@ export interface UpcomingRevisionsListResponse {
       _id: string;
       questionId: {
         _id: string;
+        platformQuestionId: string;
         title: string;
         difficulty: string;
         platform: string;
       };
       revisionIndex: number;
+      status: string;
+      scheduledDate?: string;
+      totalTimeSpent?: number;
+      attempts?: number;
+      confidenceAfter?: number;
     }>;
   }>;
   stats?: any;
@@ -830,15 +877,18 @@ export interface UpcomingRevisionsListResponse {
 export interface OverdueRevisionsListResponse {
   revisions: Array<{
     _id: string;
-    questionId: {
-      _id: string;
-      title: string;
-      difficulty: string;
-      platform: string;
-    };
-    scheduledDate: string;
-    revisionIndex: number;
+    questionId: string | null;
+    schedule: string[];
+    currentRevisionIndex: number;
     status: string;
+    platformQuestionId?: string;
+    title?: string;
+    difficulty?: string;
+    platform?: string;
+    scheduledDate?: string;
+    totalTimeSpent?: number;
+    confidenceAfter?: number | null;
+    overdue?: boolean;
   }>;
   pagination?: {
     page: number;

@@ -40,6 +40,7 @@ interface ManualTabProps {
   hideTargetDate?: boolean;
   disableDraftSaving?: boolean;
   draftKey?: string;
+  mode?: 'create' | 'edit';
 }
 
 const manualSchema = z.object({
@@ -63,15 +64,16 @@ const STAGES = [
 export default function ManualTab({
   initialData,
   onSuccess,
-  onSubmit: _onSubmit,
+  onSubmit,
   onCancel,
   isSubmitting: externalIsSubmitting,
   submitButtonText = 'Create Sheet',
   hideTargetDate = false,
   disableDraftSaving = false,
   draftKey,
+  mode = 'create',
 }: ManualTabProps) {
-  const isEditMode = !!draftKey;
+  const isEditMode = mode === 'edit';
   const storageKey = draftKey || 'sheet_create_draft_manual';
 
   const [selectedQuestions, setSelectedQuestions] = useState<SelectedQuestion[]>(
@@ -225,8 +227,24 @@ export default function ManualTab({
     }, 2000);
   }, [onSuccess]);
 
-  const handleAsyncSubmit = useCallback(async (data: ManualFormData) => {
+  // Main submission handler – branches based on mode
+  const handleFormSubmit = useCallback(async (data: ManualFormData) => {
     if (selectedQuestions.length === 0) return;
+
+    // --- EDIT MODE: call onSubmit prop (update flow) ---
+    if (isEditMode) {
+      onSubmit({
+        name: data.name,
+        description: data.description || '',
+        questions: selectedQuestions.map(sq => sq.id),
+        specialTag: data.specialTag || undefined,
+        originalSourceName: data.originalSourceName || undefined,
+        originalSourceUrl: data.originalSourceUrl || undefined,
+      });
+      return;
+    }
+
+    // --- CREATE MODE: async creation with progress ---
     setIsAsyncCreating(true);
     setShowProgressModal(true);
     setProgressData(null);
@@ -249,7 +267,7 @@ export default function ManualTab({
       setShowProgressModal(false);
       setIsAsyncCreating(false);
     }
-  }, [selectedQuestions, pollProgress]);
+  }, [selectedQuestions, pollProgress, onSubmit, isEditMode]);
 
   const handleClearDraft = useCallback(async () => {
     await sheetService.deleteDraft('manual');
@@ -286,20 +304,46 @@ export default function ManualTab({
       const viewSheetUrl = `/sheets/${slug}`;
       const isDuplicateError = error?.toLowerCase().includes('already exists');
 
+      // Duplicate sheet error
+      if (isDuplicateError) {
+        return (
+          <div className={styles.errorContent}>
+            <FiAlertOctagon className={styles.errorIcon} />
+            <h3 className={styles.errorTitle}>Sheet Already Exists</h3>
+            <p className={styles.errorMessage}>
+              A sheet with the name <strong>“{sheetName}”</strong> already exists in your account.
+              Please choose a different name or view the existing sheet.
+            </p>
+            <div className={styles.errorActions}>
+              <Link href={viewSheetUrl} className={styles.viewSheetLink}>
+                <Button variant="primary">View Existing Sheet</Button>
+              </Link>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowProgressModal(false);
+                  setProgressData(null);
+                  setJobId(null);
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+      // Generic error – show the actual error message
       return (
         <div className={styles.errorContent}>
           <FiAlertOctagon className={styles.errorIcon} />
-          <h3 className={styles.errorTitle}>Sheet Already Exists</h3>
+          <h3 className={styles.errorTitle}>Unable to create the sheet</h3>
           <p className={styles.errorMessage}>
-            A sheet with the name <strong>“{sheetName}”</strong> already exists in your account.
-            Please choose a different name or view the existing sheet.
+            {error || 'An unexpected error occurred during sheet creation.'}
           </p>
           <div className={styles.errorActions}>
-            <Link href={viewSheetUrl} className={styles.viewSheetLink}>
-              <Button variant="primary">View Existing Sheet</Button>
-            </Link>
             <Button
-              variant="outline"
+              variant="primary"
               onClick={() => {
                 setShowProgressModal(false);
                 setProgressData(null);
@@ -375,7 +419,7 @@ export default function ManualTab({
           <p>Loading draft...</p>
         </div>
       )}
-      <form onSubmit={handleSubmit(handleAsyncSubmit)} className={styles.form} style={{ opacity: isHydrating ? 0.5 : 1, pointerEvents: isHydrating ? 'none' : 'auto' }}>
+      <form onSubmit={handleSubmit(handleFormSubmit)} className={styles.form} style={{ opacity: isHydrating ? 0.5 : 1, pointerEvents: isHydrating ? 'none' : 'auto' }}>
         <div className={styles.topActions}>
           <div className={styles.leftActions}>
             {showClearDraftButton && (

@@ -1,13 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useUserProgress, useSheet } from '@/features/sheets';
+import { useUserProgress, useSheet, useToggleBookmark } from '@/features/sheets';
 import { useUser } from '@/features/user';
 import { ROUTES } from '@/shared/config';
-import Breadcrumb from '@/shared/components/Breadcrumb';
-import type { BreadcrumbItem } from '@/shared/components/Breadcrumb';
 import Pagination from '@/shared/components/Pagination';
 import NotFoundPage from '@/shared/components/NotFoundPage';
 import Modal from '@/shared/components/Modal';
@@ -29,9 +27,17 @@ export default function UserProgressPageClient({ requiresAuth = false }: UserPro
   const { user } = useUser();
   const [loginModalOpen, setLoginModalOpen] = useState(requiresAuth);
 
-  // Fetch sheet name separately
+  // Fetch sheet data for bookmark state and sheet name
   const { data: sheetData, isLoading: sheetLoading } = useSheet(slug);
   const sheetName = sheetData?.sheet?.name || '';
+  const isBookmarked = sheetData?.sheet?.isBookmarked || false;
+  const bookmarkCount = sheetData?.sheet?.bookmarkCount || 0;
+
+  // Bookmark mutation
+  const toggleBookmarkMutation = useToggleBookmark();
+  const handleToggleBookmark = useCallback(() => {
+    toggleBookmarkMutation.mutate(slug);
+  }, [slug, toggleBookmarkMutation]);
 
   // Filter & pagination state
   const [page, setPage] = useState(1);
@@ -119,17 +125,6 @@ export default function UserProgressPageClient({ requiresAuth = false }: UserPro
       <>
         {sheetLoading ? <UserProgressSkeleton /> : (
           <div className={styles.container}>
-            <Breadcrumb
-              items={[
-                { label: 'Home', href: ROUTES.DASHBOARD },
-                { label: 'Sheets', href: ROUTES.SHEETS.ROOT },
-                { label: 'Sheet', href: ROUTES.SHEETS.DETAIL(slug) },
-                { label: `Progress of ${username}` },
-              ]}
-              renderLink={(item, props) => (
-                item.href ? <Link href={item.href} className={props.className}>{props.children}</Link> : <span {...props}>{props.children}</span>
-              )}
-            />
             <Modal
               isOpen={loginModalOpen}
               onClose={() => setLoginModalOpen(false)}
@@ -182,22 +177,8 @@ export default function UserProgressPageClient({ requiresAuth = false }: UserPro
     pagination,
   } = data;
 
-  const breadcrumbItems: BreadcrumbItem[] = [
-    { label: 'Home', href: ROUTES.DASHBOARD },
-    { label: 'Sheets', href: ROUTES.SHEETS.ROOT },
-    { label: 'Sheet', href: ROUTES.SHEETS.DETAIL(slug) },
-    { label: `Progress of ${username}` },
-  ];
-
-  const renderLink = (item: BreadcrumbItem, props: { className: string; children: React.ReactNode }) => {
-    if (!item.href) return <span {...props}>{props.children}</span>;
-    return <Link href={item.href} className={props.className}>{props.children}</Link>;
-  };
-
   return (
     <div className={styles.container}>
-      <Breadcrumb items={breadcrumbItems} renderLink={renderLink} />
-
       <UserProgressHeader
         username={username}
         sheetSlug={slug}
@@ -210,9 +191,10 @@ export default function UserProgressPageClient({ requiresAuth = false }: UserPro
         shareLink={shareLink}
         isAuthenticated={!!user}
         hasJoinedSheet={true}
-        isBookmarked={false}
-        bookmarkCount={0}
-        onToggleBookmark={() => {}}
+        isBookmarked={isBookmarked}
+        bookmarkCount={bookmarkCount}
+        onToggleBookmark={handleToggleBookmark}
+        isBookmarkPending={toggleBookmarkMutation.isPending}
         onJoinSheet={() => {}}
       />
 

@@ -173,7 +173,9 @@ const getQuestions = async (req, res, next) => {
         for (const [key, value] of Object.entries(query)) {
           if (key !== '_id') andConditions.push({ [key]: value });
         }
-        if (query._id) andConditions.push({ _id: { $in: query._id } });
+        if (solvedIds && solvedIds.length > 0) {
+          andConditions.push({ _id: { $in: solvedIds } });
+        }
 
         const pipeline = [
           { $match: { $and: andConditions } },
@@ -213,7 +215,9 @@ const getQuestions = async (req, res, next) => {
       for (const [key, value] of Object.entries(query)) {
         if (key !== '_id') andConditions.push({ [key]: value });
       }
-      if (query._id) andConditions.push({ _id: { $in: query._id } });
+      if (solvedIds && solvedIds.length > 0) {
+        andConditions.push({ _id: { $in: solvedIds } });
+      }
 
       const pipeline = [
         { $match: { $and: andConditions } },

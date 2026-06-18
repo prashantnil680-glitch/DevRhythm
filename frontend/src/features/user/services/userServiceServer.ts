@@ -1,28 +1,93 @@
-import { serverFetch } from '@/shared/lib/serverApiClient';
-import type { User, HeatmapData, PublicProgressItem } from '@/shared/types';
-import { buildQueryString } from '@/shared/lib/apiClient';
+/**
+ * Server-side user service for fetching user data.
+ * Used in Next.js server components and route handlers.
+ * All methods accept an optional token to authenticate the request.
+ */
+
+import { userService } from './userService';
 
 export const userServiceServer = {
-  async getUserByUsername(username: string): Promise<User> {
-    const data = await serverFetch<{ user: User }>(`/users/${username}`);
-    return data.user;
+  /**
+   * Fetch a user by their username.
+   * @param username – The user's unique username.
+   * @param token – Optional authentication token (e.g., from cookies).
+   * @returns The user object or null if not found / error.
+   */
+  async getUserByUsername(username: string, token?: string) {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/users/${username}`,
+        {
+          headers,
+          next: { revalidate: 0 },
+        }
+      );
+
+      if (!res.ok) {
+        if (res.status === 404 || res.status === 403 || res.status === 401) {
+          return null;
+        }
+        console.error(`Failed to fetch user ${username}:`, res.status, res.statusText);
+        return null;
+      }
+
+      const data = await res.json();
+      return data.data?.user || null;
+    } catch (error) {
+      console.error(`Error fetching user ${username}:`, error);
+      return null;
+    }
   },
 
-  async getUserPublicProgress(
-    userId: string,
-    options?: { limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
-  ): Promise<PublicProgressItem[]> {
-    const params: Record<string, any> = {};
-    if (options?.limit) params.limit = options.limit;
-    if (options?.sortBy) params.sortBy = options.sortBy;
-    if (options?.sortOrder) params.sortOrder = options.sortOrder;
-    const query = buildQueryString(params);
-    const data = await serverFetch<{ progress: PublicProgressItem[] }>(`/users/${userId}/progress${query}`);
-    return data.progress;
-  },
+  /**
+   * Fetch public progress of a user.
+   * @param userId – The user's ID.
+   * @param params – Optional pagination/limit parameters.
+   * @param token – Optional authentication token.
+   * @returns The user's public progress data or null.
+   */
+  async getUserPublicProgress(userId: string, params?: { limit?: number; sortBy?: string; sortOrder?: string }, token?: string) {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
 
-  async getUserHeatmap(userId: string, year: number): Promise<HeatmapData> {
-    const data = await serverFetch<HeatmapData>(`/users/${userId}/heatmap/${year}`);
-    return data;
+    const query = new URLSearchParams();
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.sortBy) query.set('sortBy', params.sortBy);
+    if (params?.sortOrder) query.set('sortOrder', params.sortOrder);
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/users/${userId}/progress?${query.toString()}`,
+        {
+          headers,
+          next: { revalidate: 0 },
+        }
+      );
+
+      if (!res.ok) {
+        if (res.status === 404 || res.status === 403 || res.status === 401) {
+          return null;
+        }
+        console.error(`Failed to fetch user progress for ${userId}:`, res.status, res.statusText);
+        return null;
+      }
+
+      const data = await res.json();
+      return data.data?.progress || null;
+    } catch (error) {
+      console.error(`Error fetching user progress for ${userId}:`, error);
+      return null;
+    }
   },
 };

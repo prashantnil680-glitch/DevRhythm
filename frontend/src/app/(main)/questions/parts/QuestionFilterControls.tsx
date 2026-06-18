@@ -83,17 +83,17 @@ export const QuestionFilterControls: React.FC<QuestionFilterControlsProps> = ({
         />
       </div>
 
-      {/* Platform */}
+      {/* Patterns (MultiSelect) */}
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
-          <FiList className={styles.sectionIcon} />
-          <span className={styles.sectionTitle}>Platform</span>
+           <FiRepeat className={styles.sectionIcon} />
+          <span className={styles.sectionTitle}>Patterns</span>
         </div>
-        <Select
-          options={platformOptions}
-          value={filters.platform}
-          onChange={val => onFilterChange('platform', val)}
-          placeholder="All platforms"
+        <MultiSelect
+          options={tagOptions}
+          values={filters.tags}
+          onChange={val => onFilterChange('tags', val)}
+          placeholder="Select patterns"
         />
       </div>
 
@@ -141,17 +141,17 @@ export const QuestionFilterControls: React.FC<QuestionFilterControlsProps> = ({
         </div>
       </div>
 
-      {/* Patterns (MultiSelect) */}
+      {/* Platform */}
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
-           <FiRepeat className={styles.sectionIcon} />
-          <span className={styles.sectionTitle}>Patterns</span>
+          <FiList className={styles.sectionIcon} />
+          <span className={styles.sectionTitle}>Platform</span>
         </div>
-        <MultiSelect
-          options={tagOptions}
-          values={filters.tags}
-          onChange={val => onFilterChange('tags', val)}
-          placeholder="Select patterns"
+        <Select
+          options={platformOptions}
+          value={filters.platform}
+          onChange={val => onFilterChange('platform', val)}
+          placeholder="All platforms"
         />
       </div>
 

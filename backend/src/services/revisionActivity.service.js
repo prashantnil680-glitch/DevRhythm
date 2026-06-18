@@ -172,13 +172,11 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
   await revision.save();
 
   // ========== SYNC UPDATES ==========
-  // 1. Increment totalRevisions in User stats
   await User.updateOne(
     { _id: userId },
     { $inc: { 'stats.totalRevisions': 1 } }
   );
 
-  // 2. Increment revisionCount in UserQuestionProgress and update lastRevisedAt
   await UserQuestionProgress.updateOne(
     { userId, questionId },
     {
@@ -188,7 +186,6 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
     { upsert: true }
   );
 
-  // 3. Increment confidence in UserQuestionProgress (+0.25, max 5)
   const currentConfidence = progress?.confidenceLevel || 0;
   let newConfidence = currentConfidence + 0.25;
   if (newConfidence > 5) newConfidence = 5;
@@ -197,7 +194,6 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
     { $set: { confidenceLevel: newConfidence } }
   );
 
-  // 4. Update heatmap for revision
   await heatmapService.incrementDailyActivityDirect(
     userId,
     new Date(),
@@ -207,16 +203,23 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
       totalSubmissions: 1,
       revisionProblems: 1,
     },
-    false, // isFirstSolve
-    null,  // difficulty
-    null   // platform
+    false,
+    null,
+    null
   );
 
-  // 5. Update user streak and active days (NEW)
   await updateUserActivity(userId, new Date(), timeZone);
   // ========== END SYNC UPDATES ==========
 
   await invalidateCache(`revisions:*:user:${userId}:*`);
+
+  // ========== Invalidate question details cache ==========
+  const question = await Question.findById(questionId).select('platform platformQuestionId').lean();
+  if (question) {
+    await invalidateCache(`question-details:*:user:${userId}:*/questions/${questionId}/details*`);
+    await invalidateCache(`question-details:platform:*:user:${userId}:*/platform/${question.platform}/${question.platformQuestionId}/details*`);
+  }
+  // =========================================================
 
   console.log(`[DEBUG] Revision completed successfully. overdueCompleted=${isOverdue}, outOfOrder=${targetIndex !== revision.currentRevisionIndex}`);
 
@@ -376,13 +379,11 @@ const completePastRevision = async (userId, questionId, targetDate, confidence =
   await revision.save();
 
   // ========== SYNC UPDATES ==========
-  // 1. Increment totalRevisions in User stats
   await User.updateOne(
     { _id: userId },
     { $inc: { 'stats.totalRevisions': 1 } }
   );
 
-  // 2. Increment revisionCount in UserQuestionProgress and update lastRevisedAt
   await UserQuestionProgress.updateOne(
     { userId, questionId },
     {
@@ -392,7 +393,6 @@ const completePastRevision = async (userId, questionId, targetDate, confidence =
     { upsert: true }
   );
 
-  // 3. Increment confidence in UserQuestionProgress (+0.25, max 5)
   const progress = await UserQuestionProgress.findOne({ userId, questionId });
   const currentConfidence = progress?.confidenceLevel || 0;
   let newConfidence = currentConfidence + 0.25;
@@ -402,7 +402,6 @@ const completePastRevision = async (userId, questionId, targetDate, confidence =
     { $set: { confidenceLevel: newConfidence } }
   );
 
-  // 4. Update heatmap for revision
   await heatmapService.incrementDailyActivityDirect(
     userId,
     new Date(),
@@ -412,12 +411,11 @@ const completePastRevision = async (userId, questionId, targetDate, confidence =
       totalSubmissions: 1,
       revisionProblems: 1,
     },
-    false, // isFirstSolve
-    null,  // difficulty
-    null   // platform
+    false,
+    null,
+    null
   );
 
-  // 5. Update user streak and active days (NEW)
   await updateUserActivity(userId, new Date(), timeZone);
   // ========== END SYNC UPDATES ==========
 
@@ -435,6 +433,14 @@ const completePastRevision = async (userId, questionId, targetDate, confidence =
 
   await deleteRevisionSession(userId, questionId, targetDate);
   await invalidateCache(`revisions:*:user:${userId}:*`);
+
+  // ========== NEW: Invalidate question details cache ==========
+  const question = await Question.findById(questionId).select('platform platformQuestionId').lean();
+  if (question) {
+    await invalidateCache(`question-details:*:user:${userId}:*/questions/${questionId}/details*`);
+    await invalidateCache(`question-details:platform:*:user:${userId}:*/platform/${question.platform}/${question.platformQuestionId}/details*`);
+  }
+  // =========================================================
 
   // Create activity log for this overdue revision completion
   await ActivityLog.create({
@@ -621,7 +627,7 @@ async function addActiveSecondsToAllSessions(userId, questionId, seconds) {
   return { updated: updatedCount, completed: completedCount };
 }
 
-// ========== UPDATE module.exports ==========
+// ========== EXPORTS ==========
 module.exports = {
   recordTimeSpent,
   recordCodeSubmission,
@@ -635,5 +641,5 @@ module.exports = {
   deleteRevisionSession,
   getDayRevisions,
   completeAllPastSessionsForQuestion,
-  addActiveSecondsToAllSessions,   // <-- NEW EXPORT
+  addActiveSecondsToAllSessions,
 };

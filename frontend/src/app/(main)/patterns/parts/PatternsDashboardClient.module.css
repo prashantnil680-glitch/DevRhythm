@@ -3,73 +3,106 @@
   width: 100%;
 }
 
-/* ===== Stats Grid ===== */
-.statsGrid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-  margin-bottom: 2.5rem;
-}
-
-.statCard {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1rem;
-  text-align: center;
-  cursor: default;
+/* ===== Stats Row – compact, inline ===== */
+.statsRow {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1.2rem;
+  font-family: var(--font-code, monospace);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  padding: 0.5rem 0.25rem;
+  border-bottom: 1px solid var(--divider, rgba(0,0,0,0.06));
+  margin-bottom: 1.5rem;
 }
 
-.statIcon {
-  font-size: 2.2rem;
-  color: var(--accent-moss);
-  transition: color 0.25s ease, transform 0.25s ease;
+.statItem {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  white-space: nowrap;
+  transition: transform 0.2s ease;
+  cursor: default;
 }
 
-.statCard:first-child:hover .statIcon {
-  color: #7C8B7A;
-  transform: scale(1.08);
-}
-.statCard:nth-child(2):hover .statIcon {
-  color: #40c463;
-  transform: scale(1.08);
-}
-.statCard:nth-child(3):hover .statIcon {
-  color: #FFD966;
-  transform: scale(1.08);
-}
-.statCard:nth-child(4):hover .statIcon {
-  color: #6C5CE7;
-  transform: scale(1.08);
+.statItem:hover {
+  transform: translateY(-1px);
 }
 
-.statValue {
-  font-family: var(--font-code);
-  font-size: 2rem;
+.statItem strong {
   font-weight: 700;
   color: var(--text-primary);
+  font-size: 2rem;
+  letter-spacing: -0.02em;
   line-height: 1.2;
-  transition: color 0.25s ease;
+  transition: color 0.2s ease;
 }
 
-.statCard:hover .statValue {
+.statItem:hover strong {
   color: var(--accent-moss);
 }
 
 .statLabel {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  cursor: help;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 1px;
+  transition: border-color 0.2s ease, color 0.2s ease;
+  font-size: 0.8rem;
   color: var(--text-muted);
-  transition: color 0.25s ease;
 }
 
-.statCard:hover .statLabel {
-  color: var(--text-secondary);
+.statLabel:hover {
+  border-color: var(--accent-moss);
+  color: var(--text-primary);
+}
+
+/* ===== Icon base ===== */
+.statIcon {
+  font-size: 1.3rem;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
+  transform-origin: center;
+  display: inline-block;
+}
+
+.statItem:hover .statIcon {
+  transform: scale(1.25) rotate(-6deg);
+}
+
+/* ===== Individual icon colors ===== */
+.iconPatterns {
+  color: #7C8B7A;
+}
+.statItem:hover .iconPatterns {
+  color: #5a6b58;
+}
+
+.iconSolved {
+  color: #40c463;
+}
+.statItem:hover .iconSolved {
+  color: #2e9e4a;
+}
+
+.iconMastered {
+  color: #FFD966;
+}
+.statItem:hover .iconMastered {
+  color: #f5c542;
+}
+
+.iconConfidence {
+  color: #6C5CE7;
+}
+.statItem:hover .iconConfidence {
+  color: #4a3db5;
+}
+
+.separator {
+  color: var(--divider, #ccc);
+  font-weight: 300;
+  font-size: 1.2rem;
+  opacity: 0.5;
 }
 
 /* ===== Hero Area ===== */
@@ -223,12 +256,6 @@
   font-size: 0.75rem;
 }
 
-.statPillLabel {
-  color: var(--text-muted);
-  margin-left: 2px;
-  font-size: 0.75rem;
-}
-
 .recentSection {
   margin-top: 1rem;
 }
@@ -319,13 +346,6 @@
 }
 
 /* ===== Pattern List ===== */
-.listHeader {
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px dashed var(--border);
-}
-
-/* List header with two-column layout */
 .listHeader {
   display: flex;
   justify-content: space-between;
@@ -431,7 +451,6 @@
   gap: 0.25rem;
   font-size: 0.85rem;
 }
-
 
 /* ===== Tabs ===== */
 .tabsContainer {
@@ -557,35 +576,6 @@
   color: var(--accent-moss);
 }
 
-/* Responsive adjustments for all patterns grid */
-@media (max-width: 939px) {
-  .allPatternsGrid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 767px) {
-  .tabsContainer {
-    gap: 1rem;
-  }
-  .allPatternsGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 480px) {
-  .allPatternsGrid {
-    grid-template-columns: 1fr;
-  }
-  .allPatternCard {
-    padding: 0.6rem;
-  }
-  .loadMoreButton {
-    width: 100%;
-    justify-content: center;
-  }
-}
-
 /* ===== Pagination ===== */
 .paginationWrapper {
   margin-top: 2rem;
@@ -638,12 +628,6 @@
 /* ===== Responsive Breakpoints ===== */
 
 @media (max-width: 939px) {
-  .statsGrid {
-    gap: 0.8rem;
-  }
-  .statCard {
-    padding: 0.8rem;
-  }
   .heroArea {
     flex-direction: column;
   }
@@ -662,29 +646,12 @@
   .paginationWrapper {
     justify-content: center;
   }
+  .allPatternsGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (max-width: 767px) {
-  .statsGrid {
-    grid-template-columns: repeat(2, 2fr);
-    gap: 0.8rem;
-  }
-  .statCard {
-    flex-direction: row;
-    justify-content: flex-start;
-    gap: 1rem;
-    padding: 0.8rem;
-    text-align: left;
-  }
-  .statIcon {
-    font-size: 1.8rem;
-  }
-  .statValue {
-    font-size: 1.5rem;
-  }
-  .statLabel {
-    font-size: 0.65rem;
-  }
   .heroTitle {
     font-size: 1.6rem;
   }
@@ -719,25 +686,41 @@
     width: 7px;
     height: 7px;
   }
+  .tabsContainer {
+    gap: 1rem;
+  }
+  .allPatternsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 480px) {
-  .statCard {
-    padding: 0.6rem;
+  /* Stats Row mobile */
+  .statsRow {
+    gap: 0.2rem 0.75rem;
+    font-size: 0.7rem;
+    padding: 0.3rem 0;
   }
-  .statIcon {
+  .statItem strong {
     font-size: 1.5rem;
   }
-  .statValue {
-    font-size: 1.3rem;
+  .statIcon {
+    font-size: 1.1rem;
   }
+  .statLabel {
+    font-size: 0.7rem;
+  }
+  .separator {
+    font-size: 1rem;
+  }
+
+  /* Hero mobile */
   .heroTitle {
     font-size: 1.4rem;
   }
   .weakestTitle {
     font-size: 1rem;
   }
-  
   .recentItem {
     flex-wrap: wrap;
     white-space: normal;
@@ -745,5 +728,15 @@
   .recentLink {
     white-space: normal;
     word-break: break-word;
+  }
+  .allPatternsGrid {
+    grid-template-columns: 1fr;
+  }
+  .allPatternCard {
+    padding: 0.6rem;
+  }
+  .loadMoreButton {
+    width: 100%;
+    justify-content: center;
   }
 }

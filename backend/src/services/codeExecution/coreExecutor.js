@@ -180,6 +180,50 @@ const cleanupExecutionHistory = async (userId, questionId, language) => {
 };
 
 /**
+ * Merge starter metadata with user‑code metadata, overriding parameter types
+ * when the user provides a more specific type.
+ * @param {object} starter - Metadata from starter code.
+ * @param {object} user - Metadata from user code.
+ * @returns {object} Merged metadata object.
+ */
+function mergeMetadata(starter, user) {
+  if (!starter) return user || starter;
+  if (!user) return starter;
+
+  // Use starter's class name, method name, return type, etc.
+  const merged = { ...starter };
+
+  // Ensure method names match; if not, log and keep starter.
+  if (starter.methodName && user.methodName && starter.methodName !== user.methodName) {
+    console.warn(`[Merge] Method name mismatch: starter="${starter.methodName}", user="${user.methodName}". Using starter.`);
+  }
+
+  // Merge parameters: override type if user provides a meaningful type.
+  if (starter.parameters && Array.isArray(starter.parameters)) {
+    const userParams = user.parameters || [];
+    const userParamMap = new Map(userParams.map(p => [p.name, p.type]));
+
+    merged.parameters = starter.parameters.map(param => {
+      const userType = userParamMap.get(param.name);
+      if (userType && userType !== 'Any' && userType !== 'object' && userType !== 'None') {
+        // Use user type only if it's more specific (not a generic "Any").
+        // Additionally, keep the type if it's a known structure (TreeNode, ListNode, etc.)
+        // or a container thereof.
+        const isUseful = /(?:TreeNode|ListNode|Node|NestedInteger|List\[.*\]|Optional\[.*\])/.test(userType);
+        if (isUseful) {
+          console.log(`[Merge] Overriding parameter "${param.name}" type: "${param.type}" → "${userType}"`);
+          return { ...param, type: userType };
+        }
+      }
+      return param;
+    });
+  }
+
+  // Preserve other fields from starter (dataStructures, interactive, methods, constructorParams).
+  return merged;
+}
+
+/**
  * Core execution logic – atomic and race‑free.
  * @returns {Promise<object>} Result object.
  */
@@ -224,10 +268,17 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
   ]);
   if (!question) throw new AppError('Question not found', 404);
 
-  let metadata;
+  // ========== METADATA EXTRACTION ==========
   timing.start('validation.metadata_extraction');
+  let metadata;
   try {
-    metadata = await metadataService.getExecutionMetadata(questionId, language);
+    // Get starter metadata
+    const starterMetadata = await metadataService.getExecutionMetadata(questionId, language);
+    // Extract metadata from user code
+    const userMetadata = metadataService.extractFromCode(code, language);
+    // Merge them
+    metadata = mergeMetadata(starterMetadata, userMetadata);
+    // console.log(`[Metadata] Merged metadata: ${JSON.stringify(metadata)}`);
     timing.end('validation.metadata_extraction');
   } catch (err) {
     timing.end('validation.metadata_extraction');

@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useLayoutEffect } from 'react';
+import React, { useState, useLayoutEffect, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 import { queryClient } from '@/shared/lib/react-query';
-import { ToastProvider } from '@/shared/components/Toast';
+import { ToastProvider, toast as hotToast } from '@/shared/components/Toast';
 import { useMediaQuery } from '@/shared/hooks';
 import Navbar from '@/shared/components/Navbar';
 import Footer from '@/shared/components/Footer';
@@ -16,6 +16,8 @@ import { AddProgressModal } from '@/features/progress/components/AddProgressModa
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { isPublicPath } from '@/shared/lib/publicPaths';
+import RateLimitProvider, { useRateLimit } from '@/shared/contexts/RateLimitContext';
+import RateLimitToast from '@/shared/components/RateLimitToast/RateLimitToast';
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -24,6 +26,48 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const { user } = useSession();
   const isDesktop = useMediaQuery('(min-width: 940px)');
   const isMobile = useMediaQuery('(max-width: 768px)');
+
+  // Rate‑limit toast management
+  const { isRateLimited, remainingTime, retryRequest, clearRateLimited } =
+    useRateLimit();
+  const toastIdRef = useRef<string | null>(null);
+
+  // Show or update the rate‑limit toast based on state
+  useEffect(() => {
+    if (isRateLimited) {
+      // Update or create the toast
+      const toastContent = (t: any) => (
+        <RateLimitToast
+          toastId={t.id}
+          remainingTime={remainingTime}
+          onRetry={retryRequest}
+          onDismiss={clearRateLimited}
+        />
+      );
+
+      if (toastIdRef.current) {
+        // Update existing toast
+        hotToast.custom(toastContent, {
+          id: toastIdRef.current,
+          duration: Infinity,
+          position: 'top-center',
+        });
+      } else {
+        // Create new toast
+        const id = hotToast.custom(toastContent, {
+          duration: Infinity,
+          position: 'top-center',
+        });
+        toastIdRef.current = id;
+      }
+    } else {
+      // Dismiss the toast if it exists
+      if (toastIdRef.current) {
+        hotToast.dismiss(toastIdRef.current);
+        toastIdRef.current = null;
+      }
+    }
+  }, [isRateLimited, remainingTime, retryRequest, clearRateLimited]);
 
   // Wait for pathname to be available
   useLayoutEffect(() => {
@@ -86,7 +130,9 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
         disableTransitionOnChange
       >
         <ToastProvider position="top-center">
-          <LayoutContent>{children}</LayoutContent>
+          <RateLimitProvider>
+            <LayoutContent>{children}</LayoutContent>
+          </RateLimitProvider>
           <Analytics />
           <SpeedInsights />
         </ToastProvider>

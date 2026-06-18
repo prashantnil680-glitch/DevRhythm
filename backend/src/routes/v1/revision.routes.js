@@ -87,7 +87,7 @@ router.delete('/question/:questionId', auth, rateLimiters.progressUpdateLimiter,
 router.get('/stats',
   auth,
   attachUserTimeZone,   
-  rateLimiters.userLimiter,
+  rateLimiters.revisionStatsLimiter,
   cache(30, 'revisions:stats'),
   (req, res, next) => {
     if (req.query.detailed === 'true') {

@@ -348,3 +348,38 @@
     height: 36px !important;
   }
 }
+
+/* ===== Login Prompt in Footer ===== */
+.loginPromptFooter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.loginPromptFooterIcon {
+  font-size: 0.9rem;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.loginPromptFooterText {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.loginPromptFooterLink {
+  color: var(--accent-moss);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.loginPromptFooterLink:hover {
+  color: var(--accent-moss-hover);
+  text-decoration: underline;
+}

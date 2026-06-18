@@ -1,3 +1,4 @@
+/* ===== Form Layout ===== */
 .form {
   width: 100%;
   max-width: 1200px;
@@ -45,7 +46,7 @@
 .detailsScroll {
   position: relative;
   padding-left: 2rem;
-  max-height: 70vh;
+  max-height: 92vh;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
@@ -203,12 +204,7 @@
   margin-bottom: 1.5rem;
 }
 
-.hint {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  margin-top: 0.25rem;
-}
-
+/* ===== Platform Warning ===== */
 .platformWarning {
   margin-top: 1rem;
   padding: 0.75rem 1rem;
@@ -219,7 +215,6 @@
   transition: all 0.2s ease;
 }
 
-/* Dark mode support */
 .dark .platformWarning {
   background-color: #3b2e1e;
   border-color: #8b5e3c;
@@ -283,7 +278,161 @@
   color: #fde68a;
 }
 
-/* Loading Modal Styles */
+/* ===== Compact Format Guide ===== */
+.formatToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  margin-top: 0.5rem;
+}
+
+.formatToggle:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.formatToggleBadge {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.05rem 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.formatGuideCompact {
+  width: 100%;
+  margin-top: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  overflow: hidden;
+}
+
+.formatTabsCompact {
+  display: flex;
+  gap: 0;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0.2rem 0.5rem;
+}
+
+.formatTabCompact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: none;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.formatTabCompact:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.formatTabActiveCompact {
+  background: var(--accent-moss);
+  color: white;
+}
+
+.formatTabActiveCompact:hover {
+  color: white;
+  background: var(--accent-moss);
+}
+
+.formatContentCompact {
+  padding: 0.6rem 0.8rem;
+}
+
+.formatDescriptionCompact {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.formatCodeBlock {
+  background: var(--code-bg);
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  font-family: var(--font-code);
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--code-text);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid var(--border);
+  margin: 0;
+}
+
+/* Excel Table Preview */
+.excelPreview {
+  margin-top: 0.25rem;
+}
+
+.excelTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.7rem;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.excelTable th,
+.excelTable td {
+  padding: 0.3rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-code);
+}
+
+.excelTable th {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  letter-spacing: 0.3px;
+}
+
+.excelTable td {
+  color: var(--text-primary);
+}
+
+.excelTable tr:last-child td {
+  border-bottom: none;
+}
+
+.excelTable tr:hover td {
+  background: var(--bg-elevated);
+}
+
+.formatNote {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.4rem;
+}
+
+/* ===== Loading Modal ===== */
 .loadingModalContent {
   display: flex;
   flex-direction: column;
@@ -300,11 +449,6 @@
   font-size: 2.5rem;
   color: var(--accent-moss);
   animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 
 .loadingMessage {
@@ -367,19 +511,7 @@
   font-weight: 500;
 }
 
-/* Responsive */
-@media (max-width: 767px) {
-  .platformWarning {
-    padding: 0.5rem;
-  }
-  .warningContent {
-    margin-left: 0;
-  }
-  .warningHeader {
-    margin-bottom: 0.25rem;
-  }
-}
-
+/* ===== Error Modals ===== */
 .errorModalContent {
   display: flex;
   flex-direction: column;
@@ -479,8 +611,23 @@
   margin-bottom: 1rem;
 }
 
+/* ===== Keyframes (single definition) ===== */
 @keyframes spin {
+  from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 767px) {
+  .platformWarning {
+    padding: 0.5rem;
+  }
+  .warningContent {
+    margin-left: 0;
+  }
+  .warningHeader {
+    margin-bottom: 0.25rem;
+  }
 }
 
 @media (max-width: 480px) {
@@ -491,6 +638,25 @@
   .errorActions button,
   .viewSheetLink {
     width: 100%;
+  }
+  .formatTabsCompact {
+    flex-wrap: wrap;
+    gap: 0.2rem;
+  }
+  .formatTabCompact {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+  }
+  .excelTable {
+    font-size: 0.6rem;
+  }
+  .excelTable th,
+  .excelTable td {
+    padding: 0.2rem 0.4rem;
+  }
+  .formatCodeBlock {
+    font-size: 0.6rem;
+    padding: 0.4rem 0.6rem;
   }
 }
 

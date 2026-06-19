@@ -172,6 +172,7 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
     data: details,
     isLoading: detailsLoading,
     error: detailsError,
+    refetch: refetchDetails,
   } = useQuestionDetails(initialQuestion._id, { enabled: isAuthenticated && mounted });
 
   const progress = details?.progress ?? undefined;
@@ -182,7 +183,7 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
   const markRevisionMutation = useMarkRevision(initialQuestion._id);
   const saveNotesMutation = useSaveNotes(initialQuestion._id);
   const runCodeMutation = useRunCodeWithPolling();
-  const { status: executionStatus, resetStatus } = runCodeMutation; // NEW: destructure status
+  const { status: executionStatus, resetStatus } = runCodeMutation;
   const deleteQuestionMutation = useDeleteQuestion();
 
   useEffect(() => {
@@ -232,26 +233,20 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
         testCases: sanitizedTestCases,
       });
       setExecutionError(null);
-      
-      // Invalidate and refetch question details
-      await queryClient.invalidateQueries({ queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'] });
-      await queryClient.refetchQueries({ queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'] });
 
-      // If tests failed, extract the first meaningful error message from the results
-      if (!result.allPassed && result.results && result.results.length > 0) {
-        const failedResult = result.results.find(r => !r.passed);
-        if (failedResult?.error) {
-          setExecutionError(failedResult.error);
-        } else if (result.results.some(r => !r.passed && r.error)) {
-          const firstError = result.results.find(r => r.error)?.error;
-          if (firstError) setExecutionError(firstError);
-        } else {
-          setExecutionError('Some test cases failed. Check the results tab for details.');
-        }
+      // Always store results regardless of pass/fail
+      if (result.results) {
+        setPersistedResults(result.results);
+        localStorage.setItem(`lastResult-${initialQuestion._id}`, JSON.stringify(result.results));
       }
+
+      // --- REFETCH DETAILS TO UPDATE HISTORY ---
+      await refetchDetails();
+
+      // Note: We do NOT set executionError for test failures here.
+      // Test failures are shown in the results tab.
     } catch (error: any) {
       console.error('Run code error:', error);
-      // Extract error message from the response
       const apiMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message;
       if (apiMessage && typeof apiMessage === 'string') {
         setExecutionError(apiMessage);
@@ -259,7 +254,7 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
         setExecutionError('Code execution failed. Please try again.');
       }
     }
-  }, [initialQuestion._id, runCodeMutation, queryClient]);
+  }, [initialQuestion._id, runCodeMutation, refetchDetails]);
 
   const handleEditQuestion = useCallback(() => {
     router.push(`/questions/${initialQuestion._id}/edit`);
@@ -482,7 +477,7 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
             initialHistory={codeHistory}
             activeTab={rightActiveTab}
             onTabChange={setRightActiveTab}
-            executionStatus={executionStatus}   // NEW: pass execution status
+            executionStatus={executionStatus}
           />
         </div>
       </div>

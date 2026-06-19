@@ -14,6 +14,40 @@ const { cache } = require('../middleware/cache');
 //  HELPERS
 // ----------------------------------------------------------------------
 
+/**
+ * Sorts grouped items by the latest timestamp in their timeline.
+ * @param {Object} grouped - Object with question IDs as keys and { question, solves_timeline } or { question, revision_timeline }
+ * @param {string} timelineKey - The key of the timeline array ('solves_timeline' or 'revision_timeline')
+ * @returns {Object} New object with keys sorted by latest timestamp (descending)
+ */
+function sortGroupedByLatestTimestamp(grouped, timelineKey) {
+  if (!grouped || typeof grouped !== 'object') return grouped;
+  const entries = Object.entries(grouped);
+  if (entries.length === 0) return grouped;
+
+  const withLatest = entries.map(([key, value]) => {
+    const timeline = value[timelineKey] || [];
+    let latest = null;
+    if (timeline.length > 0) {
+      latest = new Date(Math.max(...timeline.map(item => new Date(item.timestamp).getTime())));
+    }
+    return { key, value, latest };
+  });
+
+  withLatest.sort((a, b) => {
+    if (a.latest === null && b.latest === null) return 0;
+    if (a.latest === null) return 1;
+    if (b.latest === null) return -1;
+    return b.latest.getTime() - a.latest.getTime();
+  });
+
+  const sorted = {};
+  for (const item of withLatest) {
+    sorted[item.key] = item.value;
+  }
+  return sorted;
+}
+
 const groupQuestionLogs = (logs) => {
   const grouped = {};
   for (const log of logs) {
@@ -343,6 +377,23 @@ const getTodayActivity = async (req, res, next) => {
       group_challenge_completed: groupChallengeCompleted
     };
 
+    // ----- SORT GROUPED DATA BY LATEST TIMESTAMP -----
+    if (grouped.question_solved) {
+      grouped.question_solved = sortGroupedByLatestTimestamp(grouped.question_solved, 'solves_timeline');
+    }
+    if (grouped.question_mastered) {
+      grouped.question_mastered = sortGroupedByLatestTimestamp(grouped.question_mastered, 'solves_timeline');
+    }
+    if (grouped.revision_completed) {
+      if (grouped.revision_completed.on_time) {
+        grouped.revision_completed.on_time = sortGroupedByLatestTimestamp(grouped.revision_completed.on_time, 'revision_timeline');
+      }
+      if (grouped.revision_completed.overdue) {
+        grouped.revision_completed.overdue = sortGroupedByLatestTimestamp(grouped.revision_completed.overdue, 'revision_timeline');
+      }
+    }
+    // ------------------------------------------------
+
     // Merge revision completions into solved questions
     const mergedSolved = mergeRevisionsIntoSolved(
       grouped.question_solved,
@@ -350,8 +401,11 @@ const getTodayActivity = async (req, res, next) => {
       grouped.revision_completed.overdue
     );
 
+    // Also sort mergedSolved by latest timestamp (since it may contain new groups from revisions)
+    const mergedSorted = sortGroupedByLatestTimestamp(mergedSolved, 'solves_timeline');
+
     // Recalculate solved count from merged object
-    const uniqueSolved = countUniqueQuestions(mergedSolved);
+    const uniqueSolved = countUniqueQuestions(mergedSorted);
     const uniqueMastered = countUniqueQuestions(grouped.question_mastered);
     const uniqueRevisedOnTime = countUniqueQuestions(grouped.revision_completed.on_time);
     const uniqueRevisedOverdue = countUniqueQuestions(grouped.revision_completed.overdue);
@@ -367,7 +421,7 @@ const getTodayActivity = async (req, res, next) => {
       dayOfWeek: localDayOfWeek,
       todayStudyTimeInMinutes: summary.studyTimeMinutes,
       ...grouped,
-      question_solved: mergedSolved,   // override with merged version
+      question_solved: mergedSorted,   // override with merged and sorted version
     };
 
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
@@ -454,6 +508,23 @@ const getDayActivityByDate = async (req, res, next) => {
       group_challenge_completed: groupChallengeCompleted
     };
 
+    // ----- SORT GROUPED DATA BY LATEST TIMESTAMP -----
+    if (grouped.question_solved) {
+      grouped.question_solved = sortGroupedByLatestTimestamp(grouped.question_solved, 'solves_timeline');
+    }
+    if (grouped.question_mastered) {
+      grouped.question_mastered = sortGroupedByLatestTimestamp(grouped.question_mastered, 'solves_timeline');
+    }
+    if (grouped.revision_completed) {
+      if (grouped.revision_completed.on_time) {
+        grouped.revision_completed.on_time = sortGroupedByLatestTimestamp(grouped.revision_completed.on_time, 'revision_timeline');
+      }
+      if (grouped.revision_completed.overdue) {
+        grouped.revision_completed.overdue = sortGroupedByLatestTimestamp(grouped.revision_completed.overdue, 'revision_timeline');
+      }
+    }
+    // ------------------------------------------------
+
     // Merge revision completions into solved questions
     const mergedSolved = mergeRevisionsIntoSolved(
       grouped.question_solved,
@@ -461,8 +532,11 @@ const getDayActivityByDate = async (req, res, next) => {
       grouped.revision_completed.overdue
     );
 
+    // Also sort mergedSolved by latest timestamp (since it may contain new groups from revisions)
+    const mergedSorted = sortGroupedByLatestTimestamp(mergedSolved, 'solves_timeline');
+
     // Recalculate solved count from merged object
-    const uniqueSolved = countUniqueQuestions(mergedSolved);
+    const uniqueSolved = countUniqueQuestions(mergedSorted);
     const uniqueMastered = countUniqueQuestions(grouped.question_mastered);
     const uniqueRevisedOnTime = countUniqueQuestions(grouped.revision_completed.on_time);
     const uniqueRevisedOverdue = countUniqueQuestions(grouped.revision_completed.overdue);
@@ -478,7 +552,7 @@ const getDayActivityByDate = async (req, res, next) => {
       dayOfWeek: outputDayOfWeek,
       todayStudyTimeInMinutes: summary.studyTimeMinutes,
       ...grouped,
-      question_solved: mergedSolved,
+      question_solved: mergedSorted,
     };
 
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');

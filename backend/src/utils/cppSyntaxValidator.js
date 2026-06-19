@@ -1,3 +1,12 @@
+/**
+ * src/utils/cppSyntaxValidator.js
+ *
+ * Validates C++ code syntax using the system's C++ compiler.
+ * We explicitly use -std=c++14 to match the default standard used by
+ * the OnlineCompiler.io provider (g++-15 default is pre-C++17).
+ * This ensures that local validation catches C++17 features early.
+ */
+
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -22,8 +31,10 @@ function getCppCompiler() {
 }
 
 /**
- * Validates C++ code syntax using compiler's -fsyntax-only flag.
+ * Validates C++ code syntax using the compiler's -fsyntax-only flag.
  * Auto-includes standard headers and using namespace std; if missing.
+ * Forces -std=c++14 to align with the execution provider's default.
+ *
  * @param {string} code - C++ source code
  * @returns {string|null} Clean error message if invalid, otherwise null.
  */
@@ -39,8 +50,9 @@ function validateCppSyntax(code) {
   const tempFile = path.join(os.tmpdir(), `_syntax_check_${Date.now()}.cpp`);
   try {
     fs.writeFileSync(tempFile, fullCode, 'utf8');
-    // Use -fsyntax-only to check syntax without generating output
-    execSync(`${compiler} -fsyntax-only "${tempFile}"`, { stdio: 'pipe', shell: true });
+    // Use -fsyntax-only to check syntax without generating output.
+    // Force -std=c++14 to match the default standard used by onlinecompiler.io (g++-15 default is C++14 or earlier).
+    execSync(`${compiler} -std=c++14 -fsyntax-only "${tempFile}"`, { stdio: 'pipe', shell: true });
     return null;
   } catch (err) {
     const stderr = err.stderr ? err.stderr.toString() : err.message;

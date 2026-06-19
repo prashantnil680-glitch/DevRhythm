@@ -28,10 +28,8 @@ const fetchAndStoreDailyQuestion = async () => {
   // Acquire Redis lock to prevent multiple instances from fetching simultaneously
   let acquired = false;
   try {
-    const result = await redisClient.set(key, '1', {
-      NX: true,
-      EX: getSecondsUntilNext545('Asia/Kolkata'),
-    });
+    // Use string-based options for compatibility
+    const result = await redisClient.set(key, '1', 'EX', getSecondsUntilNext545('Asia/Kolkata'), 'NX');
     acquired = result === 'OK';
   } catch (err) {
     console.error('[DailyQuestion] Redis lock failed:', err.message);

@@ -340,7 +340,7 @@ const exportHeatmap = async (req, res, next) => {
 
     const downloadUrl = `${config.backendUrl}/api/v1/heatmap/export/${exportId}?format=${format}`;
 
-    await redisClient.setEx(`export:${exportId}`, 24 * 60 * 60, JSON.stringify({
+    await redisClient.setex(`export:${exportId}`, 24 * 60 * 60, JSON.stringify({
       userId: req.user._id.toString(),
       userDisplayName: req.user.displayName,
       year,

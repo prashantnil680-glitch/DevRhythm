@@ -1,6 +1,7 @@
-const redis = require('redis');
+const Redis = require('ioredis');
 const config = require('./index');
 
+let redisClient = null;
 let redisErrorLogged = false;
 let heartbeatInterval = null;
 
@@ -12,40 +13,32 @@ const createRedisClient = () => {
     }
 
     const isTLS = url.startsWith('rediss://');
-    const socketOptions = {
-      reconnectStrategy: (retries) => {
-        if (retries > 50) {
+    const options = {
+      password: config.redis.password,
+      db: config.redis.db,
+      retryStrategy: (times) => {
+        if (times > 50) {
           console.error('Redis: Too many reconnect attempts, stopping.');
-          return new Error('Too many retries');
+          return null;
         }
-        const delay = Math.min(Math.pow(2, retries) * 100, 10000);
-        console.log(`Redis reconnect attempt ${retries}, waiting ${delay}ms`);
+        const delay = Math.min(Math.pow(2, times) * 100, 10000);
+        console.log(`Redis reconnect attempt ${times}, waiting ${delay}ms`);
         return delay;
       },
-      keepAlive: true,
-      keepAliveInitialDelay: 5000,
+      keepAlive: 5000,
       connectTimeout: 10000,
     };
 
-    // Only add TLS options if using rediss:// and certificate validation is required
     if (isTLS) {
-      // Use environment variable to control certificate validation (default: true)
-      const rejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED !== 'false';
-      socketOptions.tls = { rejectUnauthorized };
+      options.tls = { rejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED !== 'false' };
     }
 
-    const client = redis.createClient({
-      url: config.redis.url,
-      password: config.redis.password,
-      database: config.redis.db,
-      socket: socketOptions,
-    });
+    const client = new Redis(url, options);
 
     client.on('error', (err) => {
       if (!redisErrorLogged) {
         console.error('Redis Client Error:', err.message);
         redisErrorLogged = true;
-        // 🔥 Log a clear warning that rate limiters will fall back to memory
         console.warn(
           '⚠️ Redis is unavailable. Rate limiters will fall back to memory store. ' +
           'Retry-After headers will still be sent (handled by the rate limiter logic).'
@@ -57,10 +50,9 @@ const createRedisClient = () => {
     client.on('ready', () => {
       console.log('Redis client ready');
       if (heartbeatInterval) clearInterval(heartbeatInterval);
-      // Heartbeat every 30 seconds to keep connection alive
       heartbeatInterval = setInterval(async () => {
         try {
-          if (client.isReady) {
+          if (client.status === 'ready') {
             await client.ping();
           }
         } catch (err) {
@@ -90,22 +82,36 @@ const client = createRedisClient();
 
 const waitForRedis = async () => {
   if (!client) throw new Error('Redis client not created');
-  try {
-    await client.connect();
+  // ioredis auto-connects; wait for ready state
+  if (client.status === 'ready') {
     console.log('Redis connected successfully');
     if (process.env.NODE_ENV === 'development') {
-      await client.flushAll();
+      await client.flushall();
       console.log('Redis cache cleared for development');
     }
-  } catch (err) {
-    console.error('Redis connection error:', err);
-    // 🔥 Log fallback warning
-    console.warn(
-      '⚠️ Redis connection failed. Rate limiters will fall back to memory store. ' +
-      'Retry-After headers will still be sent (handled by the rate limiter logic).'
-    );
-    throw err;
+    return;
   }
+  // Wait for ready event
+  return new Promise((resolve, reject) => {
+    client.once('ready', () => {
+      console.log('Redis connected successfully');
+      if (process.env.NODE_ENV === 'development') {
+        client.flushall().then(() => {
+          console.log('Redis cache cleared for development');
+          resolve();
+        }).catch(reject);
+      } else {
+        resolve();
+      }
+    });
+    client.once('error', (err) => {
+      reject(err);
+    });
+    // If connection already ended, reject
+    if (client.status === 'end') {
+      reject(new Error('Redis connection ended'));
+    }
+  });
 };
 
 process.on('SIGINT', async () => {

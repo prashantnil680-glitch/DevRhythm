@@ -496,7 +496,7 @@ const completePastRevision = async (req, res, next) => {
       title: question.title,
       startedAt: new Date().toISOString(),
     });
-    let lockSet = await redisClient.set(lockKey, lockValue, { NX: true });
+    let lockSet = await redisClient.set(lockKey, lockValue, 'NX');
     if (!lockSet) {
       const existingLockRaw = await redisClient.get(lockKey);
       let stale = false;

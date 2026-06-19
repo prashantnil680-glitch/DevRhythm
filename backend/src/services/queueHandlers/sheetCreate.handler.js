@@ -13,7 +13,7 @@ const updateProgress = async (jobId, update) => {
   if (current) {
     const data = JSON.parse(current);
     const updated = { ...data, ...update, lastUpdated: new Date().toISOString() };
-    await redisClient.setEx(progressKey, 3600, JSON.stringify(updated));
+    await redisClient.setex(progressKey, 3600, JSON.stringify(updated));
   }
 };
 

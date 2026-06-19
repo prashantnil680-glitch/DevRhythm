@@ -85,9 +85,10 @@ async function setCachedSyntaxValidation(language, codeHash, error) {
   try {
     const cacheKey = `syntax:valid:${language}:${codeHash}`;
     const value = JSON.stringify({ error: error || null });
-    await redisClient.setEx(cacheKey, 300, value); // TTL 5 minutes
+    await redisClient.setex(cacheKey, 300, value); // TTL 5 minutes
   } catch (err) {
-    console.warn('[SyntaxCache] Redis set error:', err.message);
+    console.error('[SyntaxCache] Failed to cache syntax validation:', err.message);
+    // Do not throw – caching failure should not block execution.
   }
 }
 
@@ -190,15 +191,12 @@ function mergeMetadata(starter, user) {
   if (!starter) return user || starter;
   if (!user) return starter;
 
-  // Use starter's class name, method name, return type, etc.
   const merged = { ...starter };
 
-  // Ensure method names match; if not, log and keep starter.
   if (starter.methodName && user.methodName && starter.methodName !== user.methodName) {
     console.warn(`[Merge] Method name mismatch: starter="${starter.methodName}", user="${user.methodName}". Using starter.`);
   }
 
-  // Merge parameters: override type if user provides a meaningful type.
   if (starter.parameters && Array.isArray(starter.parameters)) {
     const userParams = user.parameters || [];
     const userParamMap = new Map(userParams.map(p => [p.name, p.type]));
@@ -206,9 +204,6 @@ function mergeMetadata(starter, user) {
     merged.parameters = starter.parameters.map(param => {
       const userType = userParamMap.get(param.name);
       if (userType && userType !== 'Any' && userType !== 'object' && userType !== 'None') {
-        // Use user type only if it's more specific (not a generic "Any").
-        // Additionally, keep the type if it's a known structure (TreeNode, ListNode, etc.)
-        // or a container thereof.
         const isUseful = /(?:TreeNode|ListNode|Node|NestedInteger|List\[.*\]|Optional\[.*\])/.test(userType);
         if (isUseful) {
           console.log(`[Merge] Overriding parameter "${param.name}" type: "${param.type}" → "${userType}"`);
@@ -219,7 +214,6 @@ function mergeMetadata(starter, user) {
     });
   }
 
-  // Preserve other fields from starter (dataStructures, interactive, methods, constructorParams).
   return merged;
 }
 
@@ -234,9 +228,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
 
   let { language, code, stdin, expected, testCases, questionId } = body;
   
-  // ========== STORE ORIGINAL USER CODE FOR HISTORY ==========
   const originalUserCode = code;
-  // =========================================================
 
   language = normalizeLanguage(language);
 
@@ -248,17 +240,14 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
   }
   if (!questionId) throw new AppError('questionId is required', 400);
 
-  // ========== AUTO-INJECT IMPORTS FOR PYTHON ==========
+  // Auto‑inject imports/includes
   if (language === 'python') {
     const autoImports = getPythonImports();
     if (!code.includes('# === Auto-injected imports (LeetCode‑style) ===')) {
       code = autoImports + '\n\n' + code;
     }
   }
-
-  // ========== AUTO-INJECT INCLUDES FOR C++ ==========
   if (language === 'cpp') {
-    // Use shared function that prepends includes only if missing
     code = prependCppAutoIncludes(code);
   }
 
@@ -268,17 +257,13 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
   ]);
   if (!question) throw new AppError('Question not found', 404);
 
-  // ========== METADATA EXTRACTION ==========
+  // Metadata extraction
   timing.start('validation.metadata_extraction');
   let metadata;
   try {
-    // Get starter metadata
     const starterMetadata = await metadataService.getExecutionMetadata(questionId, language);
-    // Extract metadata from user code
     const userMetadata = metadataService.extractFromCode(code, language);
-    // Merge them
     metadata = mergeMetadata(starterMetadata, userMetadata);
-    // console.log(`[Metadata] Merged metadata: ${JSON.stringify(metadata)}`);
     timing.end('validation.metadata_extraction');
   } catch (err) {
     timing.end('validation.metadata_extraction');
@@ -300,7 +285,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
   const codeHash = getCodeHash(code);
   let syntaxError = null;
 
-  // ========== SYNTAX VALIDATION WITH CACHING (Python & C++) ==========
+  // Syntax validation with caching (Python & C++)
   if (language === 'python') {
     timing.start('validation.syntax_validation');
     const { error: cachedError, cached } = await getCachedSyntaxValidation('python', codeHash);
@@ -339,7 +324,6 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
     if (cached) {
       syntaxError = cachedError;
     } else {
-      // Note: validateCppSyntax internally uses prependCppAutoIncludes, so it's safe to pass the raw code
       syntaxError = validateCppSyntax(code);
       await setCachedSyntaxValidation('cpp', codeHash, syntaxError);
     }
@@ -367,7 +351,6 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
   }
 
   timing.start('validation.normalization');
-  // Normalization is a no‑op in current implementation; just mark as 0ms
   timing.end('validation.normalization');
 
   const generator = GENERATORS[language];
@@ -440,7 +423,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
         expectedParsed = JSON.parse(expectedOutput);
       }
     } catch (e) {
-      // If JSON parsing fails, fall back to string comparison
+      // Fallback to string comparison
     }
 
     if (actualParsed !== null && expectedParsed !== null) {
@@ -539,6 +522,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
     });
     await invalidateCache(`revisions:*:user:${userId}:*`);
     await invalidateCache(`question-details:*:${questionId}:*`);
+    await invalidateCache(`question-details:user:${userId}:*`);
   }
   timing.end('processing.revision_update');
 
@@ -553,7 +537,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
     customTestCasesCount: customToSave.length,
   };
 
-  // ----- ATOMIC UPDATES FOR SYNC STATS, HEATMAP, ETC. -----
+  // ----- ATOMIC UPDATES FOR SYNC STATS, HEATMAP, ETC. (ActivityLog removed) -----
   if (allPassed) {
     const now = new Date();
     const totalActiveQuestions = await Question.countDocuments({ isActive: true });
@@ -573,24 +557,8 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
 
     await updateUserActivity(userId, now, timeZone);
 
-    timing.start('processing.activity_creation');
-    await ActivityLog.create({
-      userId,
-      action: 'question_solved',
-      targetId: questionId,
-      targetModel: 'Question',
-      metadata: {
-        title: question.title,
-        platformQuestionId: question.platformQuestionId,
-        difficulty: question.difficulty,
-        platform: question.platform,
-        pattern: question.pattern,
-        timeSpent: body.timeSpent || 0,
-        isFirstSolve,
-      },
-      timestamp: now,
-    });
-    timing.end('processing.activity_creation');
+    // ##### REMOVED: Direct ActivityLog.create – now handled by question.solved queue handler #####
+    // No longer create ActivityLog here to avoid duplication.
 
     await invalidateProgressCache(userId);
 
@@ -621,13 +589,11 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
       responseData.revisionOverdueCompleted = revisionResult.overdueCompleted || false;
     }
 
-    // ========== NEW: Complete any past revision sessions (from /complete-past) ==========
     const pastResult = await revisionActivityService.completeAllPastSessionsForQuestion(userId, questionId);
     if (pastResult.completed > 0) {
       responseData.pastRevisionsCompleted = pastResult.completed;
       console.log(`[CodeExecution] Completed ${pastResult.completed} past revision session(s) for question ${questionId}`);
     }
-    // ====================================================================================
 
     timing.end('processing.confidence_update');
   }

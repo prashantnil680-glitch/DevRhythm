@@ -93,11 +93,13 @@ UserQuestionProgressSchema.index({ userId: 1, lastActivityDate: 1 });
 // These hooks update status (Not Started → Attempted → Solved → Mastered)
 // but do NOT modify confidenceLevel. Confidence is managed separately
 // via background jobs (confidence.increment).
+
 UserQuestionProgressSchema.post('save', async function(doc) {
   if (doc.__statusUpdating) return;
   doc.__statusUpdating = true;
   try {
-    const changed = updateProgressStatus(doc);
+    // Await the async function to ensure the status update and ActivityLog creation complete
+    const changed = await updateProgressStatus(doc);
     if (changed) {
       await doc.save();
     }
@@ -112,7 +114,7 @@ UserQuestionProgressSchema.post('findOneAndUpdate', async function(doc) {
   if (!doc || doc.__statusUpdating) return;
   doc.__statusUpdating = true;
   try {
-    const changed = updateProgressStatus(doc);
+    const changed = await updateProgressStatus(doc);
     if (changed) {
       await doc.save();
     }

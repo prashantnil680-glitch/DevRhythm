@@ -30,7 +30,7 @@ async function getPatternNameBySlug(slug) {
 
   if (found && redisClient) {
     try {
-      await redisClient.setEx(cacheKey, 86400, found);
+      await redisClient.setex(cacheKey, 86400, found);
     } catch (err) {
       console.warn('Redis set error:', err.message);
     }

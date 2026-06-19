@@ -35,6 +35,7 @@
     "express-session": "^1.17.3",
     "geoip-lite": "^1.4.10",
     "helmet": "^7.0.0",
+    "ioredis": "^5.11.1",
     "joi": "^17.9.2",
     "jsonwebtoken": "^9.0.2",
     "luxon": "^3.7.2",

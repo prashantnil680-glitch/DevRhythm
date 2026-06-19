@@ -24,7 +24,6 @@ async function atomicIncrementUserStats(userId, deltaSolved, deltaTimeSpent, tot
   if (!user) return null;
 
   const newTotalSolved = (user.stats.totalSolved || 0) + deltaSolved;
-  // Cap mastery rate at 100
   const rawMastery = totalActiveQuestions > 0 ? (newTotalSolved / totalActiveQuestions) * 100 : 0;
   const newMasteryRate = Math.min(100, rawMastery);
 
@@ -42,17 +41,20 @@ async function atomicIncrementUserStats(userId, deltaSolved, deltaTimeSpent, tot
 
 /**
  * Atomically update question progress for a solve event.
+ * Handles both first and subsequent solves:
+ * - Always increments totalTimeSpent and attempts.count.
+ * - Only sets status to 'Solved' if not already Solved/Mastered.
  * Returns { progress: object, isFirstSolve: boolean }
  */
 async function atomicUpdateQuestionProgressOnSolve(userId, questionId, solvedAt, timeSpent) {
   if (!userId || !questionId) throw new Error('userId and questionId are required');
 
+  // Step 1: Always increment time and attempts (regardless of current status)
   await UserQuestionProgress.updateOne(
     { userId, questionId },
     {
       $inc: { totalTimeSpent: timeSpent, 'attempts.count': 1 },
       $set: {
-        'attempts.lastAttemptAt': solvedAt,
         updatedAt: solvedAt,
         solvedToday: true,
         lastActivityDate: solvedAt,
@@ -60,7 +62,6 @@ async function atomicUpdateQuestionProgressOnSolve(userId, questionId, solvedAt,
       $setOnInsert: {
         userId,
         questionId,
-        status: 'Not Started',
         revisionCount: 0,
         confidenceLevel: 0,
         'attempts.firstAttemptAt': solvedAt,
@@ -69,7 +70,9 @@ async function atomicUpdateQuestionProgressOnSolve(userId, questionId, solvedAt,
     { upsert: true }
   );
 
-  const statusUpdateResult = await UserQuestionProgress.updateOne(
+  // Step 2: Atomically set status to 'Solved' only if not already Solved or Mastered.
+  // The modifiedCount indicates if this was the first solve.
+  const statusResult = await UserQuestionProgress.updateOne(
     {
       userId,
       questionId,
@@ -79,21 +82,15 @@ async function atomicUpdateQuestionProgressOnSolve(userId, questionId, solvedAt,
       $set: {
         status: 'Solved',
         'attempts.solvedAt': solvedAt,
-        updatedAt: solvedAt,
       },
     }
   );
 
-  const isFirstSolve = statusUpdateResult.modifiedCount > 0;
+  const isFirstSolve = statusResult.modifiedCount > 0;
 
-  if (isFirstSolve) {
-    await UserQuestionProgress.updateOne(
-      { userId, questionId, 'attempts.firstAttemptAt': { $exists: false } },
-      { $set: { 'attempts.firstAttemptAt': solvedAt } }
-    );
-  }
-
+  // Fetch the updated progress document to return.
   const progress = await UserQuestionProgress.findOne({ userId, questionId }).lean();
+
   return { progress, isFirstSolve };
 }
 

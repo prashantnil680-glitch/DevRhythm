@@ -23,7 +23,7 @@ async function acquireLock(jobId, ttlSeconds) {
   if (!redisClient) return false;
   const lockKey = `lock:code-execution:${jobId}`;
   try {
-    const result = await redisClient.set(lockKey, '1', { NX: true, EX: ttlSeconds });
+    const result = await redisClient.set(lockKey, '1', 'NX', 'EX', ttlSeconds);
     return result === 'OK';
   } catch (err) {
     console.error(`[CodeExecutionWorker] Failed to acquire lock for job ${jobId}:`, err.message);

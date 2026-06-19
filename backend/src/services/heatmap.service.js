@@ -340,7 +340,7 @@ const generateHeatmapData = async (userId, year, timeZone = 'UTC') => {
     };
     const heatmap = await HeatmapData.findOneAndUpdate({ userId, year }, heatmapData, { upsert: true, new: true });
     const cacheKey = `heatmap:${userId}:${year}:true`;
-    await redisClient.setEx(cacheKey, 15 * 60, JSON.stringify(heatmap.toObject()));
+    await redisClient.setex(cacheKey, 15 * 60, JSON.stringify(heatmap.toObject()));
     return heatmap.toObject();
   } catch (error) {
     console.error('Error generating heatmap data:', error);
@@ -444,7 +444,7 @@ const warmHeatmapCache = async (userId, timeZone = 'UTC') => {
     const cached = await redisClient.get(cacheKey);
     if (!cached) {
       const heatmap = await HeatmapData.findOne({ userId, year }).lean();
-      if (heatmap) await redisClient.setEx(cacheKey, 24 * 60 * 60, JSON.stringify(heatmap));
+      if (heatmap) await redisClient.setex(cacheKey, 24 * 60 * 60, JSON.stringify(heatmap));
     }
     const filterTypes = ['all', 'new_problems', 'revisions'];
     for (const filterType of filterTypes) {
@@ -452,7 +452,7 @@ const warmHeatmapCache = async (userId, timeZone = 'UTC') => {
       const filterCached = await redisClient.get(filterKey);
       if (!filterCached && heatmap) {
         const filteredData = await calculateFilteredData(userId, year, filterType, timeZone);
-        await redisClient.setEx(filterKey, 30 * 60, JSON.stringify(filteredData));
+        await redisClient.setex(filterKey, 30 * 60, JSON.stringify(filteredData));
       }
     }
   } catch (error) {

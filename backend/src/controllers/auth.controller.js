@@ -30,7 +30,7 @@ const initiateOAuth = (provider) => (req, res, next) => {
   const redirectUri = req.query.redirect_uri || config.frontendUrl;
   
   // Store the frontend redirect URI with state
-  redisClient.setEx(`devrhythm:auth:${provider}:state:${state}`, 300, redirectUri);
+  redisClient.setex(`devrhythm:auth:${provider}:state:${state}`, 300, redirectUri);
   
   const authParams = {
     state,
@@ -69,7 +69,7 @@ const handleOAuthCallback = (provider) => (req, res, next) => {
 
       const code = crypto.randomBytes(32).toString('hex');
       const codeKey = `devrhythm:auth:code:${code}`;
-      await redisClient.setEx(codeKey, 300, JSON.stringify({
+      await redisClient.setex(codeKey, 300, JSON.stringify({
         userId: user._id.toString(),
         token,
         refreshToken
@@ -145,7 +145,7 @@ const refreshToken = async (req, res, next) => {
 
     // (Optional) Blacklist the old refresh token – prevents reuse if stolen
     // Set expiry equal to the token's remaining lifetime (or simply 30 days)
-    await redisClient.setEx(`blacklist:refresh:${refreshToken}`, 30 * 24 * 60 * 60, '1');
+    await redisClient.setex(`blacklist:refresh:${refreshToken}`, 30 * 24 * 60 * 60, '1');
 
     // Send the new pair
     res.json(formatResponse('Session refreshed successfully', {

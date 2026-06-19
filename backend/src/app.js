@@ -46,21 +46,24 @@ app.use(passport.session());
 // Attach user timezone to every request (UTC if not logged in)
 app.use(attachUserTimeZone);
 
-const limiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.maxRequests,
-  message: {
+// ===== Rate Limit Handler (consistent with rateLimiter.js) =====
+const rateLimitHandler = (req, res, next, options) => {
+  const retryAfterSeconds = Math.ceil(options.windowMs / 1000);
+  res.setHeader('Retry-After', String(retryAfterSeconds));
+  res.status(429).json({
     success: false,
     statusCode: 429,
     message: 'Too many requests, please try again later.',
     data: null,
     meta: {},
     error: { code: 'RATE_LIMIT_EXCEEDED' }
-  },
-  onLimitReached: (req, res, options) => {
-    const retryAfterSeconds = Math.ceil(options.windowMs / 1000);
-    res.setHeader('Retry-After', String(retryAfterSeconds));
-  }
+  });
+};
+
+const limiter = rateLimit({
+  windowMs: config.rateLimit.windowMs,
+  max: config.rateLimit.maxRequests,
+  handler: rateLimitHandler
 });
 app.use(limiter);
 

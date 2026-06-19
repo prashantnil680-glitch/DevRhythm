@@ -2,34 +2,40 @@
  * src/middleware/rateLimiter.js
  *
  * Rate limiters for various endpoints.
- * Added limiters for async code execution and result polling.
+ * Uses Redis store when available, falls back to memory store.
+ * Deprecated onLimitReached replaced with handler.
  */
 
 const rateLimit = require('express-rate-limit');
 const { client: redisClient } = require('../config/redis');
 const config = require('../config');
 
-const getRetryAfterSeconds = (windowMs) => Math.ceil(windowMs / 1000);
+/**
+ * Builds the standard error response for rate‑limit exceeded.
+ * @param {number} retryAfterSeconds - Seconds to wait before retrying.
+ * @returns {Object} Standard error response object.
+ */
+const buildRateLimitErrorResponse = (retryAfterSeconds) => ({
+  success: false,
+  statusCode: 429,
+  message: 'Too many requests, please try again later.',
+  data: null,
+  meta: {},
+  error: { code: 'RATE_LIMIT_EXCEEDED' },
+});
 
-const onLimitReached = (req, res, options) => {
-  const retryAfterSeconds = getRetryAfterSeconds(options.windowMs);
+/**
+ * Handler for rate‑limit exceeded events.
+ * Sets Retry-After header and sends JSON error response.
+ * @param {Request} req - Express request.
+ * @param {Response} res - Express response.
+ * @param {Function} next - Next middleware.
+ * @param {Object} options - Rate‑limit options (contains windowMs).
+ */
+const rateLimitHandler = (req, res, next, options) => {
+  const retryAfterSeconds = Math.ceil(options.windowMs / 1000);
   res.setHeader('Retry-After', String(retryAfterSeconds));
-};
-
-const createMemoryLimiter = (windowMs, max) => {
-  return rateLimit({
-    windowMs,
-    max,
-    message: {
-      success: false,
-      statusCode: 429,
-      message: 'Too many requests, please try again later.',
-      data: null,
-      meta: {},
-      error: { code: 'RATE_LIMIT_EXCEEDED' }
-    },
-    onLimitReached
-  });
+  res.status(429).json(buildRateLimitErrorResponse(retryAfterSeconds));
 };
 
 // Try to load Redis store
@@ -42,27 +48,39 @@ try {
   console.warn('rate-limit-redis not installed, using memory store');
 }
 
-// Create a Redis limiter if possible, otherwise fallback to memory
+/**
+ * Creates a memory‑based rate limiter (fallback).
+ * @param {number} windowMs - Time window in milliseconds.
+ * @param {number} max - Maximum number of requests per window.
+ * @returns {Function} Express middleware.
+ */
+const createMemoryLimiter = (windowMs, max) => {
+  return rateLimit({
+    windowMs,
+    max,
+    handler: rateLimitHandler,
+  });
+};
+
+/**
+ * Creates a Redis‑backed rate limiter if Redis is available, else falls back to memory.
+ * @param {number} windowMs - Time window in milliseconds.
+ * @param {number} max - Maximum number of requests per window.
+ * @param {string} keyPrefix - Prefix for Redis keys (e.g., 'oauth').
+ * @returns {Function} Express middleware.
+ */
 const createRedisLimiter = (windowMs, max, keyPrefix) => {
   if (redisStoreAvailable && redisClient && redisClient.isReady) {
     try {
       return rateLimit({
         store: new RedisStore({
           sendCommand: (...args) => redisClient.sendCommand(args),
-          prefix: `devrhythm:ratelimit:${keyPrefix}`
+          prefix: `devrhythm:ratelimit:${keyPrefix}`,
         }),
         windowMs,
         max,
         skipHeaders: false,
-        message: {
-          success: false,
-          statusCode: 429,
-          message: 'Too many requests, please try again later.',
-          data: null,
-          meta: {},
-          error: { code: 'RATE_LIMIT_EXCEEDED' }
-        },
-        onLimitReached
+        handler: rateLimitHandler,
       });
     } catch (error) {
       console.warn(`Redis limiter failed for ${keyPrefix}, using memory:`, error.message);
@@ -71,15 +89,15 @@ const createRedisLimiter = (windowMs, max, keyPrefix) => {
   return createMemoryLimiter(windowMs, max);
 };
 
-// ===== Predefined limiters (Redis-backed if possible) =====
+// ===== Predefined limiters (Redis‑backed if possible) =====
 const oauthLimiter = createRedisLimiter(15 * 60 * 1000, 200, 'oauth');
 const tokenLimiter = createRedisLimiter(15 * 60 * 1000, 300, 'token');
 const logoutLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'logout');
-const userLimiter = createRedisLimiter(20 * 60 * 1000, 250, 'user');
+const userLimiter = createRedisLimiter(20 * 60 * 1000, 350, 'user');
 const progressSnapshotLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'snapshot');
 const notificationReadLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'notification');
 const leaderboardLimiter = createRedisLimiter(15 * 60 * 1000, 300, 'leaderboard');
-const publicLimiter = createRedisLimiter(15 * 60 * 1000, 300, 'public');
+const publicLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'public');
 
 // Question endpoints
 const questionCreateLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'question:create');
@@ -89,7 +107,7 @@ const leetcodeSearchLimiter = createRedisLimiter(60 * 1000, 100, 'leetcode:searc
 const leetcodeFetchLimiter = createRedisLimiter(60 * 1000, 100, 'leetcode:fetch');
 
 // Progress endpoints
-const progressUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 200, 'progress:update');
+const progressUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'progress:update');
 
 // Revision endpoints
 const revisionCompleteLimiter = createRedisLimiter(15 * 60 * 1000, 200, 'revision:complete');
@@ -119,7 +137,7 @@ const groupChallengeLimiter = createRedisLimiter(15 * 60 * 1000, 60, 'group:chal
 
 // Heatmap endpoints
 const heatmapGetLimiter = createRedisLimiter(60 * 60 * 1000, 500, 'heatmap:get');
-const heatmapRefreshLimiter = createRedisLimiter(60 * 60 * 1000, 30, 'heatmap:refresh');
+const heatmapRefreshLimiter = createRedisLimiter(60 * 60 * 1000, 100, 'heatmap:refresh');  // ↑ 30 → 100
 const heatmapExportLimiter = createRedisLimiter(60 * 60 * 1000, 20, 'heatmap:export');
 const heatmapStatsLimiter = createRedisLimiter(60 * 60 * 1000, 1000, 'heatmap:stats');
 const heatmapFilterLimiter = createRedisLimiter(60 * 60 * 1000, 500, 'heatmap:filter');
@@ -128,11 +146,11 @@ const heatmapFilterLimiter = createRedisLimiter(60 * 60 * 1000, 500, 'heatmap:fi
 const progressLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'progress');
 const rankParticipantsLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'rank-participants');
 
-// ===== NEW: Code execution async limiters =====
+// Code execution async limiters
 const codeExecuteAsyncLimiter = createRedisLimiter(60 * 1000, 10, 'code:execute-async');
 const codeResultPollLimiter = createRedisLimiter(60 * 1000, 30, 'code:result-poll');
 
-// ===== NEW: Pattern Mastery limiter (higher limit) =====
+// Pattern Mastery limiter
 const patternMasteryLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'pattern-mastery');
 
 module.exports = {
@@ -187,10 +205,9 @@ module.exports = {
   codeExecuteAsyncLimiter,
   codeResultPollLimiter,
 
-  // NEW export
   patternMasteryLimiter,
 
-  // Keep helpers for any custom use
+  // Keep helpers for any custom use (if needed)
   createMemoryLimiter,
   createRedisLimiter,
 };

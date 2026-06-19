@@ -61,7 +61,8 @@ const handleQuestionSolved = async (job) => {
       }
     }
 
-    const isFirstSolve = !progress || progress.status !== "Solved";
+    // Determine if this is the first solve (status was not already Solved or Mastered)
+    const isFirstSolve = !progress || (progress.status !== 'Solved' && progress.status !== 'Mastered');
 
     user.stats.totalTimeSpent += timeSpent;
 
@@ -95,7 +96,7 @@ const handleQuestionSolved = async (job) => {
       { upsert: true, new: true }
     );
 
-    // ========== PATTERN MASTERY UPDATE WITH VERSION ERROR RETRY ==========
+    // ========== PATTERN MASTERY UPDATE ==========
     if (question.pattern && Array.isArray(question.pattern) && question.pattern.length > 0) {
       for (const patternName of question.pattern) {
         let retries = 3;
@@ -135,7 +136,6 @@ const handleQuestionSolved = async (job) => {
             pattern.lastPracticed = solvedDate;
             pattern.lastUpdated = new Date();
 
-            // Add recent question (avoid duplicates)
             const existingIdx = pattern.recentQuestions.findIndex(rq => rq.questionId?.toString() === questionId);
             if (existingIdx !== -1) pattern.recentQuestions.splice(existingIdx, 1);
             pattern.recentQuestions.unshift({
@@ -166,7 +166,6 @@ const handleQuestionSolved = async (job) => {
       }
       await invalidateCache(`pattern-mastery:*:user:${userId}:*`);
     }
-    // ========== END PATTERN MASTERY UPDATE ==========
 
     const solvedLocal = DateTime.fromJSDate(solvedDate, { zone: userTimeZone });
     const solvedLocalMidnight = solvedLocal.startOf('day');
@@ -174,6 +173,7 @@ const handleQuestionSolved = async (job) => {
     const startUTC = solvedLocalMidnight.toUTC().toJSDate();
     const endUTC = solvedLocalEnd.toUTC().toJSDate();
 
+    // Update planned goals
     const activePlannedGoals = await Goal.find({
       userId,
       goalType: "planned",
@@ -215,6 +215,7 @@ const handleQuestionSolved = async (job) => {
       }
     }
 
+    // Revision schedule creation/update (unchanged)
     const existingRevision = await RevisionSchedule.findOne({ userId, questionId });
 
     if (!existingRevision) {
@@ -242,7 +243,9 @@ const handleQuestionSolved = async (job) => {
     }
     await invalidateCache(`revisions:*:user:${userId}:*`);
     await invalidateCache(`question-details:*:${questionId}:*`);
+    await invalidateCache(`question-details:user:${userId}:*`);
 
+    // ========== POD NOTIFICATION ==========
     if (isPod) {
       const oneDayAgo = new Date();
       oneDayAgo.setDate(oneDayAgo.getDate() - 1);
@@ -280,7 +283,7 @@ const handleQuestionSolved = async (job) => {
       }
     }
 
-    // Daily/weekly goals update
+    // Daily/weekly goals update (unchanged)
     if (!wasSolvedToday) {
       let isGoalRelated = false;
 
@@ -343,6 +346,7 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`goals:*:user:${userId}:*`);
     }
 
+    // ========== ActivityLog – ALWAYS create for every solve ==========
     await ActivityLog.create({
       userId,
       action: "question_solved",
@@ -355,11 +359,12 @@ const handleQuestionSolved = async (job) => {
         platform: question.platform,
         pattern: question.pattern,
         timeSpent,
-        isFirstSolve,
+        isFirstSolve: isFirstSolve,
       },
       timestamp: solvedDate,
     });
 
+    // ========== Notifications and Milestones – ONLY on first solve ==========
     if (isFirstSolve) {
       await Notification.create({
         userId,

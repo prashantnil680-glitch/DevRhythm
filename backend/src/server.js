@@ -7,8 +7,6 @@ const mongoose = require('./config/database');
 const { client: redis, waitForRedis } = require('./config/redis');
 const { startAllJobs } = require('./jobs');
 const { startQueueWorkers } = require('./services/queue.service');
-const { startFastCodeExecutionWorkers } = require('./services/fastCodeExecutionQueue.service');
-const { startSlowCodeExecutionWorkers } = require('./services/slowCodeExecutionQueue.service');
 const { startInitialLeetcodeSync } = require('./services/leetcodeSync.service');
 
 const startServer = async () => {
@@ -19,12 +17,6 @@ const startServer = async () => {
 
     // Start main queue workers (all non‑code‑execution jobs)
     await startQueueWorkers();
-
-    // Start dedicated fast code execution queue workers (Python, JavaScript)
-    await startFastCodeExecutionWorkers();
-
-    // Start dedicated slow code execution queue workers (C++, Java)
-    await startSlowCodeExecutionWorkers();
 
     // Start cron jobs
     startAllJobs();

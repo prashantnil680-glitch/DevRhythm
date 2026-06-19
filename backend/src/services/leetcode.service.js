@@ -47,7 +47,7 @@ const checkVipBlacklist = async (slug) => {
 const addToVipBlacklist = async (slug) => {
   if (!redisClient) return;
   const key = `vip:slug:${slug}`;
-  await redisClient.setEx(key, VIP_BLACKLIST_TTL, '1');
+  await redisClient.setex(key, VIP_BLACKLIST_TTL, '1');
 };
 
 /**
@@ -203,7 +203,7 @@ const searchProblems = async (query, filterType = 'name') => {
     }));
 
     if (redisClient && results.length > 0) {
-      await redisClient.setEx(cacheKey, CACHE_TTL, JSON.stringify(results));
+      await redisClient.setex(cacheKey, CACHE_TTL, JSON.stringify(results));
     }
 
     return results;
@@ -280,7 +280,7 @@ const getDailyProblem = async (forceRefresh = false) => {
 
   if (redisClient) {
     try {
-      await redisClient.setEx(cacheKey, 86400, JSON.stringify(result));
+      await redisClient.setex(cacheKey, 86400, JSON.stringify(result));
     } catch (err) {
       console.warn('Redis cache write error for daily problem:', err.message);
     }

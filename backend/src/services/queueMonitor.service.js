@@ -1,12 +1,11 @@
 /**
  * src/services/queueMonitor.service.js
  *
- * Bull queue monitoring service for both main and dedicated code execution queues.
+ * Bull queue monitoring service for the main queue.
  * Provides real-time metrics for queue depth, worker utilization, and job counts.
  */
 
 const { jobQueue } = require('./queue.service');
-const { codeExecutionQueue } = require('./codeExecutionQueue.service');
 
 /**
  * Helper: Get metrics for a given queue.
@@ -73,22 +72,6 @@ async function getMainQueueMetrics() {
 }
 
 /**
- * Get metrics for the dedicated code execution queue.
- * @returns {Promise<Object>}
- */
-async function getCodeExecutionQueueMetrics() {
-  return getQueueMetricsForQueue(codeExecutionQueue, 'code execution queue');
-}
-
-/**
- * Backward compatibility: get metrics for the main queue.
- * @deprecated Use getMainQueueMetrics() instead.
- */
-async function getQueueMetrics() {
-  return getMainQueueMetrics();
-}
-
-/**
  * Get detailed information about stalled jobs in a queue.
  * @param {Bull} queue - Bull queue instance
  * @param {string} queueName - Name for logging
@@ -121,13 +104,6 @@ async function getStalledJobsForQueue(queue, queueName) {
  */
 async function getMainQueueStalledJobs() {
   return getStalledJobsForQueue(jobQueue, 'main queue');
-}
-
-/**
- * Get stalled jobs for code execution queue.
- */
-async function getCodeExecutionQueueStalledJobs() {
-  return getStalledJobsForQueue(codeExecutionQueue, 'code execution queue');
 }
 
 /**
@@ -186,32 +162,8 @@ async function getMainQueueHealth() {
   return getQueueHealthForQueue(jobQueue, 'main queue');
 }
 
-/**
- * Get health for code execution queue.
- */
-async function getCodeExecutionQueueHealth() {
-  return getQueueHealthForQueue(codeExecutionQueue, 'code execution queue');
-}
-
-/**
- * Backward compatibility: get health for main queue.
- * @deprecated Use getMainQueueHealth() instead.
- */
-async function getQueueHealth() {
-  return getMainQueueHealth();
-}
-
 module.exports = {
-  // Main queue (backward compatibility)
-  getQueueMetrics,
-  getQueueHealth,
-  getStalledJobs: getMainQueueStalledJobs,
-  // Main queue (explicit)
   getMainQueueMetrics,
   getMainQueueHealth,
   getMainQueueStalledJobs,
-  // Dedicated code execution queue
-  getCodeExecutionQueueMetrics,
-  getCodeExecutionQueueHealth,
-  getCodeExecutionQueueStalledJobs,
 };

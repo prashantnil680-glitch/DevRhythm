@@ -1,18 +1,16 @@
 /**
  * src/services/queue.service.js
  *
- * Bull queue setup and processor registration for all job types except code.execution.
- * Code execution jobs are handled by a dedicated queue (codeExecutionQueue.service.js).
+ * Bull queue setup and processor registration.
+ * Uses standard Redis connection (Bull creates its own client, subscriber, bclient).
+ * Only one queue remains, so total Redis connections ~4 (well within free tier).
  */
 
 const Bull = require('bull');
-const crypto = require('crypto');
 const { URL } = require('url');
 const config = require('../config');
-const CodeExecutionJob = require('../models/CodeExecutionJob');
-const { client: redisClient } = require('../config/redis');
 
-// Parse REDIS_URL manually to ensure TLS works correctly with Upstash
+// Parse REDIS_URL for Bull
 const redisUrl = config.redis.url;
 if (!redisUrl) {
   console.error('REDIS_URL not defined, queues will not work');
@@ -22,13 +20,14 @@ if (!redisUrl) {
 const parsedUrl = new URL(redisUrl);
 const isTLS = parsedUrl.protocol === 'rediss:';
 
-// Bull-compatible Redis options
 const redisOptions = {
   host: parsedUrl.hostname,
   port: Number(parsedUrl.port) || 6379,
   password: parsedUrl.password ? decodeURIComponent(parsedUrl.password) : undefined,
   db: config.redis.db || 0,
   connectTimeout: 10000,
+  maxRetriesPerRequest: null,   // Required by Bull
+  enableReadyCheck: false,      // Required by Bull
 };
 
 if (isTLS) {
@@ -51,21 +50,8 @@ const jobQueue = new Bull('devrhythm-jobs', {
   },
 });
 
-// Increase max listeners to avoid MaxListenersExceededWarning
+// Increase max listeners to avoid warnings
 jobQueue.setMaxListeners(50);
-
-// Increase max listeners on the underlying Redis clients
-Promise.all([jobQueue.client, jobQueue.subscriber, jobQueue.bclient])
-  .then(([client, subscriber, bclient]) => {
-    [client, subscriber, bclient].forEach((clientInstance) => {
-      if (clientInstance && typeof clientInstance.setMaxListeners === 'function') {
-        clientInstance.setMaxListeners(50);
-      }
-    });
-  })
-  .catch((err) => {
-    console.warn('[Queue] Failed to increase max listeners on Redis clients:', err.message);
-  });
 
 // ========== HEARTBEAT: keep Redis connection alive ==========
 let heartbeatInterval = null;
@@ -141,7 +127,7 @@ const { handleFetchLeetcodeDetails } = require('./queueHandlers/fetchLeetcodeDet
 const { handleSheetImport } = require('./queueHandlers/sheetImport.handler');
 const { handleSheetCreate } = require('./queueHandlers/sheetCreate.handler');
 
-// ========== REGISTER PROCESSORS (all except code.execution) ==========
+// ========== REGISTER PROCESSORS ==========
 jobQueue.process('question.solved', handleQuestionSolved);
 jobQueue.process('question.mastered', handleQuestionMastered);
 jobQueue.process('question.attempted', handleQuestionAttempted);
@@ -164,47 +150,6 @@ jobQueue.process('leetcode.fetch_details', handleFetchLeetcodeDetails);
 jobQueue.process('sheet.import', handleSheetImport);
 jobQueue.process('sheet.create', handleSheetCreate);
 
-// ========== QUEUE HELPERS FOR CODE EXECUTION ==========
-// Note: enqueueExecution still exists but will be modified in File 5 to use the dedicated queue.
-// For now, keep the function as is but it will be replaced later.
-// This function is called by the controller; it currently adds to the main queue.
-// We will update the controller later to use the dedicated queue.
-
-async function enqueueExecution({ userId, language, code, questionId, testCases, timezone = 'UTC' }) {
-  if (!jobQueue) throw new Error('Job queue not available');
-
-  const jobId = crypto.randomUUID();
-
-  await CodeExecutionJob.create({
-    jobId,
-    userId,
-    questionId,
-    language,
-    code,
-    testCases: testCases || [],
-    status: 'pending',
-    timezone,
-  });
-
-  await jobQueue.add(
-    'code.execution',
-    { jobId },
-    {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-      timeout: config.codeExecution?.interactiveTimeout || 30000,
-      removeOnComplete: true,
-      removeOnFail: true,
-    }
-  );
-
-  return jobId;
-}
-
-async function getExecutionStatus(jobId) {
-  return CodeExecutionJob.findOne({ jobId });
-}
-
 const startQueueWorkers = async () => {
   if (!jobQueue) {
     console.error('Queue not available, workers not started');
@@ -223,6 +168,4 @@ module.exports = {
   jobQueue,
   startQueueWorkers,
   stopQueueWorkers,
-  enqueueExecution,
-  getExecutionStatus,
 };

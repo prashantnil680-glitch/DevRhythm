@@ -16,9 +16,9 @@ const userHasActiveSession = async (userId) => {
   let cursor = 0;
   let keys = [];
   do {
-    const reply = await redisClient.scan(cursor, { MATCH: pattern, COUNT: 100 });
-    cursor = reply.cursor;
-    keys.push(...reply.keys);
+    const reply = await redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+    cursor = parseInt(reply[0]);
+    keys.push(...reply[1]);
   } while (cursor !== 0);
   return keys.length > 0;
 };
@@ -32,21 +32,21 @@ const getRevisionActivityKey = (userId, questionId, date) => {
 // ========== Record time spent for a day (frontend heartbeat) ==========
 const recordTimeSpent = async (userId, questionId, date, minutes) => {
   const key = getRevisionActivityKey(userId, questionId, date);
-  await redisClient.hIncrBy(key, 'timeSpent', minutes);
+  await redisClient.hincrby(key, 'timeSpent', minutes);
   await redisClient.expire(key, 86400);
 };
 
 // ========== Record code submission for a day ==========
 const recordCodeSubmission = async (userId, questionId, date) => {
   const key = getRevisionActivityKey(userId, questionId, date);
-  await redisClient.hSet(key, 'codeSubmitted', 'true');
+  await redisClient.hset(key, 'codeSubmitted', 'true');
   await redisClient.expire(key, 86400);
 };
 
 // ========== Get daily activity ==========
 const getRevisionActivity = async (userId, questionId, date) => {
   const key = getRevisionActivityKey(userId, questionId, date);
-  const data = await redisClient.hGetAll(key);
+  const data = await redisClient.hgetall(key);
   return {
     timeSpent: parseInt(data.timeSpent) || 0,
     codeSubmitted: data.codeSubmitted === 'true',
@@ -249,7 +249,7 @@ const startRevisionSession = async (userId, questionId, targetDate) => {
 
   const key = getRevisionSessionKey(userId, questionId, targetDate);
   const session = { activeSeconds: 0, testPassed: false };
-  await redisClient.setEx(key, 1200, JSON.stringify(session));
+  await redisClient.setex(key, 1200, JSON.stringify(session));
   console.log(`[revision.session] Session created for user ${userId}, question ${questionId}, date ${targetDate}`);
   return session;
 };
@@ -271,7 +271,7 @@ const addActiveSecondsToSession = async (userId, questionId, targetDate, seconds
   if (!session) return false;
 
   session.activeSeconds += seconds;
-  await redisClient.setEx(key, 1200, JSON.stringify(session));
+  await redisClient.setex(key, 1200, JSON.stringify(session));
 
   if (session.activeSeconds >= 1200 || session.testPassed === true) {
     const result = await completePastRevision(userId, questionId, targetDate);
@@ -285,9 +285,9 @@ const markTestPassedForQuestion = async (userId, questionId) => {
   let cursor = 0;
   let keys = [];
   do {
-    const reply = await redisClient.scan(cursor, { MATCH: pattern, COUNT: 100 });
-    cursor = reply.cursor;
-    keys.push(...reply.keys);
+    const reply = await redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+    cursor = parseInt(reply[0]);
+    keys.push(...reply[1]);
   } while (cursor !== 0);
 
   for (const key of keys) {
@@ -296,7 +296,7 @@ const markTestPassedForQuestion = async (userId, questionId) => {
       const session = JSON.parse(data);
       if (!session.testPassed) {
         session.testPassed = true;
-        await redisClient.setEx(key, 1200, JSON.stringify(session));
+        await redisClient.setex(key, 1200, JSON.stringify(session));
       }
       if (session.activeSeconds >= 1200 || session.testPassed) {
         const parts = key.split(':');
@@ -542,9 +542,9 @@ async function completeAllPastSessionsForQuestion(userId, questionId) {
   let cursor = 0;
   let keys = [];
   do {
-    const reply = await redisClient.scan(cursor, { MATCH: pattern, COUNT: 100 });
-    cursor = reply.cursor;
-    keys.push(...reply.keys);
+    const reply = await redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+    cursor = parseInt(reply[0]);
+    keys.push(...reply[1]);
   } while (cursor !== 0);
 
   let completedCount = 0;
@@ -558,14 +558,12 @@ async function completeAllPastSessionsForQuestion(userId, questionId) {
     const targetDate = new Date(targetDateStr);
     if (isNaN(targetDate.getTime())) continue;
 
-    // Ensure the session has testPassed = true
     let session = await getRevisionSession(userId, questionId, targetDate);
     if (session && !session.testPassed) {
       session.testPassed = true;
-      await redisClient.setEx(key, 1200, JSON.stringify(session));
+      await redisClient.setex(key, 1200, JSON.stringify(session));
     }
 
-    // Attempt to complete the revision for this date
     try {
       const result = await completePastRevision(userId, questionId, targetDate, null, true);
       if (result.completed) {
@@ -598,9 +596,9 @@ async function addActiveSecondsToAllSessions(userId, questionId, seconds) {
   let cursor = 0;
   let keys = [];
   do {
-    const reply = await redisClient.scan(cursor, { MATCH: pattern, COUNT: 100 });
-    cursor = reply.cursor;
-    keys.push(...reply.keys);
+    const reply = await redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+    cursor = parseInt(reply[0]);
+    keys.push(...reply[1]);
   } while (cursor !== 0);
 
   let updatedCount = 0;
@@ -614,11 +612,8 @@ async function addActiveSecondsToAllSessions(userId, questionId, seconds) {
     const targetDate = new Date(targetDateStr);
     if (isNaN(targetDate.getTime())) continue;
 
-    // Add seconds to this session
     const completed = await addActiveSecondsToSession(userId, questionId, targetDate, seconds);
     updatedCount++;
-
-    // If addActiveSecondsToSession returned true, it means the revision was completed
     if (completed) {
       completedCount++;
     }

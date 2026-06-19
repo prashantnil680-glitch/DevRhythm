@@ -7,7 +7,8 @@ const DEFAULT_TTL = Math.max(5, parseInt(process.env.CACHE_TTL_DEFAULT) || 30);
 const getKeys = async (pattern) => {
   if (!redisClient) return [];
   try {
-    const result = await redisClient.sendCommand(['KEYS', pattern]);
+    // ioredis provides keys(pattern) directly
+    const result = await redisClient.keys(pattern);
     return result;
   } catch (err) {
     console.warn('Error getting keys:', err);
@@ -38,7 +39,8 @@ const cache = (duration = DEFAULT_TTL, keyPrefix = '') => {
 
       const originalJson = res.json;
       res.json = function(data) {
-        redisClient.setEx(cacheKey, duration, JSON.stringify(data));
+        // ioredis: use setex (lowercase) or set with EX option
+        redisClient.setex(cacheKey, duration, JSON.stringify(data));
         originalJson.call(this, data);
       };
       next();

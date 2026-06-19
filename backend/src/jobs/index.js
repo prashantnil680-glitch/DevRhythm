@@ -15,8 +15,6 @@ const goalSnapshotJob = require('./goalSnapshot.job');
 const dailyQuestionJob = require('./dailyQuestion.job');
 const overdueRevisionsJob = require('./updateOverdueRevisions.job');
 const tempFileCleanupJob = require('./tempFileCleanup.job');
-// const codeExecutionCleanupJob = require('./codeExecutionQueueCleanup.job'); // OLD – replaced
-const dualQueueCleanupJob = require('./dualQueueCleanup.job'); // NEW
 
 const startAllJobs = () => {
   if (process.env.NODE_ENV === 'production') {
@@ -31,8 +29,6 @@ const startAllJobs = () => {
     dailyQuestionJob.startDailyQuestionJob();
     overdueRevisionsJob.startOverdueRevisionsJob();
     tempFileCleanupJob.startTempCleanupJob();
-    // codeExecutionCleanupJob.startCodeExecutionCleanupJob(); // DISABLED – replaced by dual queue cleanup
-    dualQueueCleanupJob.startDualQueueCleanupJob(); // NEW
   }
 };
 
@@ -48,8 +44,6 @@ const stopAllJobs = () => {
   dailyQuestionJob.stopDailyQuestionJob();
   overdueRevisionsJob.stopOverdueRevisionsJob();
   tempFileCleanupJob.stopTempCleanupJob();
-  // codeExecutionCleanupJob.stopCodeExecutionCleanupJob(); // DISABLED
-  dualQueueCleanupJob.stopDualQueueCleanupJob(); // NEW
 };
 
 module.exports = {
@@ -66,6 +60,4 @@ module.exports = {
   dailyQuestionJob,
   overdueRevisionsJob,
   tempFileCleanupJob,
-  // codeExecutionCleanupJob, // OLD – removed
-  dualQueueCleanupJob, // NEW
 };

@@ -495,7 +495,7 @@ const importSheetAsync = async (req, res, next) => {
       currentQuestion: null,
       startedAt: new Date().toISOString(),
     };
-    await redisClient.setEx(progressKey, 3600, JSON.stringify(initialProgress)); // 1 hour TTL
+    await redisClient.setex(progressKey, 3600, JSON.stringify(initialProgress)); // 1 hour TTL
 
     // Add job to Bull queue
     await jobQueue.add('sheet.import', {
@@ -634,7 +634,7 @@ const createSheetAsync = async (req, res, next) => {
       currentQuestion: null,
       startedAt: new Date().toISOString(),
     };
-    await redisClient.setEx(progressKey, 3600, JSON.stringify(initialProgress));
+    await redisClient.setex(progressKey, 3600, JSON.stringify(initialProgress));
 
     await jobQueue.add('sheet.create', {
       jobId,

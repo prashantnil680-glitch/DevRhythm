@@ -15,8 +15,12 @@
  * @param {Object} progress - Mongoose document of UserQuestionProgress
  * @returns {boolean} - Whether any change was made to the document
  */
-const updateProgressStatus = (progress) => {
-  const { status, attempts, revisionCount, totalTimeSpent } = progress;
+
+const ActivityLog = require('../models/ActivityLog');
+const Question = require('../models/Question');
+
+const updateProgressStatus = async (progress) => {
+  const { status, attempts, revisionCount, totalTimeSpent, userId, questionId } = progress;
   let changed = false;
 
   // ----- Helper: compute raw confidence score for mastery detection only -----
@@ -47,6 +51,31 @@ const updateProgressStatus = (progress) => {
     progress.status = 'Mastered';
     progress.attempts.masteredAt = new Date();
     changed = true;
+
+    // ========== Create ActivityLog for mastering ==========
+    try {
+      const question = await Question.findById(questionId).select('title platform platformQuestionId difficulty pattern').lean();
+      if (question) {
+        await ActivityLog.create({
+          userId,
+          action: 'question_mastered',
+          targetId: questionId,
+          targetModel: 'Question',
+          metadata: {
+            title: question.title,
+            platformQuestionId: question.platformQuestionId,
+            difficulty: question.difficulty,
+            platform: question.platform,
+            pattern: question.pattern,
+          },
+          timestamp: new Date(),
+        });
+        console.log(`[Mastered] ActivityLog created for user ${userId}, question ${questionId}`);
+      }
+    } catch (err) {
+      // Log error but do not prevent status update
+      console.error('[Mastered] Failed to create ActivityLog:', err.message);
+    }
   }
 
   // ----- Other status progressions (only if not Mastered) -----

@@ -11,7 +11,7 @@ const get = async (key) => {
 };
 
 const set = async (key, value, ttl = TTL_ONE_MINUTE) => {
-  await redisClient.setEx(`${CACHE_PREFIX}:${key}`, ttl, JSON.stringify(value));
+  await redisClient.setex(`${CACHE_PREFIX}:${key}`, ttl, JSON.stringify(value));
 };
 
 const del = async (key) => {

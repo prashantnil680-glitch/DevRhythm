@@ -17,7 +17,7 @@ import { undo, redo } from '@codemirror/commands';
 import {
   FiChevronDown, FiChevronUp, FiPlus, FiTrash2, FiPlay, FiCheckCircle,
   FiXCircle, FiClock, FiUpload, FiRotateCcw, FiCopy, FiX, FiChevronLeft,
-  FiChevronRight, FiRotateCw,
+  FiChevronRight, FiRotateCw, FiInfo,
 } from 'react-icons/fi';
 import { toast } from '@/shared/components/Toast';
 import styles from './CodeExecutionArea.module.css';
@@ -28,6 +28,7 @@ import { parseErrorLineNumber, getErrorType } from './errorParser';
 import { ExecutionStatusIndicator, ExecutionStatus } from '@/features/codeExecution/components/ExecutionStatusIndicator';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import Tooltip from '@/shared/components/Tooltip';
 
 interface TestCase {
   stdin: string;
@@ -59,14 +60,18 @@ interface CodeExecutionAreaProps {
   executionStatus?: ExecutionStatus;
 }
 
+// Language options with version information embedded in labels
 const languageOptions = [
-  { value: 'python', label: 'Python' },
-  { value: 'cpp', label: 'C++' },
+  { value: 'python', label: 'Python 3.14' },
+  { value: 'cpp', label: 'C++14 (g++-15)' },
 ];
 
 // Storage keys
 const getStorageKey = (questionId: string, language: string) => `code_${questionId}_${language}`;
 const getLanguageStorageKey = (questionId: string) => `code_language_${questionId}`;
+
+// Tooltip message for C++ (user‑friendly)
+const CPP_TOOLTIP = 'This environment uses C++14. C++17 features like structured bindings and if constexpr are not supported. If your code uses C++17, please rewrite it using C++14-compatible syntax.';
 
 // ========== Custom Find/Replace State ==========
 class SearchMatchValue extends RangeValue {
@@ -435,20 +440,16 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
   useEffect(() => {
     if (executionError) {
       const line = parseErrorLineNumber(executionError, language);
-      if (line !== null) {
-        setErrorLine(line);
-        if (editorViewRef.current) {
-          setTimeout(() => {
-            const view = editorViewRef.current;
-            if (view) {
-              try { const lineInfo = view.state.doc.lineAt(line); view.dispatch({ effects: EditorView.scrollIntoView(lineInfo.from, { y: 'center' }) }); } catch (e) {}
-            }
-          }, 200);
-        }
-      } else { setErrorLine(null); }
-    } else {
-      if (!results || results.length === 0) setErrorLine(null);
-    }
+      setErrorLine(line);
+      if (editorViewRef.current) {
+        setTimeout(() => {
+          const view = editorViewRef.current;
+          if (view) {
+            try { const lineInfo = view.state.doc.lineAt(line); view.dispatch({ effects: EditorView.scrollIntoView(lineInfo.from, { y: 'center' }) }); } catch (e) {}
+          }
+        }, 200);
+      }
+    } else { setErrorLine(null); }
   }, [executionError, language, results]);
 
   useEffect(() => {

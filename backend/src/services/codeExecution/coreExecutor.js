@@ -32,6 +32,7 @@ const { validatePythonSyntax } = require('../../utils/pythonSyntaxValidator');
 const { validateCppSyntax } = require('../../utils/cppSyntaxValidator');
 const { getPythonImports, getCppIncludes, prependCppAutoIncludes } = require('../../utils/autoImports');
 const { client: redisClient } = require('../../config/redis');
+const { analyzeCppError } = require('../../utils/cppErrorAnalyzer'); // NEW
 
 // Lazy load jobQueue to avoid circular dependency
 let cachedJobQueue = null;
@@ -218,6 +219,21 @@ function mergeMetadata(starter, user) {
 }
 
 /**
+ * Helper function to enrich C++ error messages with a user‑friendly hint.
+ * @param {string} errorMsg - The original error message.
+ * @param {string} language - The programming language ('cpp', 'python', etc.).
+ * @returns {string} The enriched error message.
+ */
+function enrichCppError(errorMsg, language) {
+  if (language !== 'cpp' || !errorMsg) return errorMsg;
+  const analysis = analyzeCppError(errorMsg);
+  if (analysis.hint) {
+    return `${errorMsg}\n\nHint: ${analysis.hint}`;
+  }
+  return errorMsg;
+}
+
+/**
  * Core execution logic – atomic and race‑free.
  * @returns {Promise<object>} Result object.
  */
@@ -301,7 +317,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
         input: tc.stdin,
         output: '',
         expected: tc.expected,
-        error: syntaxError,
+        error: enrichCppError(syntaxError, language), // Will be no‑op for python
         exitCode: 1,
         passed: false,
       }));
@@ -333,7 +349,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
         input: tc.stdin,
         output: '',
         expected: tc.expected,
-        error: syntaxError,
+        error: enrichCppError(syntaxError, language),
         exitCode: 1,
         passed: false,
       }));
@@ -383,11 +399,12 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
   } catch (execError) {
     timing.end('compiler.provider_request');
     console.error('Execution provider error:', execError);
+    const errorMsg = enrichCppError(`Code execution service error: ${execError.message}`, language);
     const failedResults = finalTestCases.map(tc => ({
       input: tc.stdin,
       output: '',
       expected: tc.expected,
-      error: `Code execution service error: ${execError.message}`,
+      error: errorMsg,
       exitCode: -1,
       passed: false,
     }));
@@ -409,7 +426,12 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
     const testCase = finalTestCases[idx];
     const actualOutput = res.stdout || '';
     const expectedOutput = testCase.expected || '';
-    const errorMessage = res.stderr || '';
+    let errorMessage = res.stderr || '';
+
+    // Enrich C++ errors with hints if present
+    if (language === 'cpp' && errorMessage) {
+      errorMessage = enrichCppError(errorMessage, language);
+    }
 
     let actualParsed = null;
     let expectedParsed = null;
@@ -437,12 +459,16 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
       passed = normalizedActual === normalizedExpected;
     }
 
+    // If there is an error (stderr) and the test didn't pass, we already have the enriched error.
+    // If there is no error but exit code is non‑zero, we add a generic message.
+    const finalError = errorMessage || (res.exitCode !== 0 ? `Execution failed with exit code ${res.exitCode}` : '');
+
     return {
       input: testCase.stdin,
       output: actualOutput,
       expected: expectedOutput,
-      error: errorMessage || (res.exitCode !== 0 ? `Execution failed with exit code ${res.exitCode}` : ''),
-      exitCode: res.exitCode ?? (errorMessage ? 1 : 0),
+      error: finalError,
+      exitCode: res.exitCode ?? (finalError ? 1 : 0),
       passed,
     };
   });

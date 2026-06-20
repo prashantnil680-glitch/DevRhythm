@@ -175,7 +175,7 @@
 
 /* ===== Page Layout ===== */
 .page {
-  padding: 2rem 0;
+  padding: 0rem 0;
 }
 
 /* ===== Header – redesigned ===== */
@@ -557,4 +557,117 @@
 }
 @media (max-width: 480px) {
   .title { font-size: 1.3rem; }
+}
+/* ===== Revision Badge Row – below title ===== */
+.revisionBadgeRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+  flex-wrap: wrap;
+}
+
+/* ===== Revision Status Badge – Redesigned ===== */
+.revisionBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.75rem 0.25rem 0.65rem;
+  border-radius: 100px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  border: 1px solid var(--border);
+  background-color: var(--bg-elevated);
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.revisionBadge .badgeIcon {
+  font-size: 0.7rem;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.revisionBadge .badgeSeparator {
+  opacity: 0.4;
+  margin: 0 0.1rem;
+}
+
+/* Pending Today – warm amber tint */
+.revisionBadge.pendingToday {
+  background-color: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.25);
+  color: var(--text-primary);
+}
+.revisionBadge.pendingToday .badgeIcon {
+  color: #f59e0b;
+}
+
+/* All Completed – green tint */
+.revisionBadge.allCompleted {
+  background-color: rgba(46, 125, 50, 0.10);
+  border-color: rgba(46, 125, 50, 0.25);
+  color: var(--text-primary);
+}
+.revisionBadge.allCompleted .badgeIcon {
+  color: #2e7d32;
+}
+
+/* Next Revision – muted teal/blue tint */
+.revisionBadge.nextRevision {
+  background-color: rgba(99, 102, 241, 0.10);
+  border-color: rgba(99, 102, 241, 0.20);
+  color: var(--text-primary);
+}
+.revisionBadge.nextRevision .badgeIcon {
+  color: #6366f1;
+}
+
+/* Pending Count – muted red/orange tint */
+.revisionBadge.pendingCount {
+  background-color: rgba(239, 68, 68, 0.10);
+  border-color: rgba(239, 68, 68, 0.20);
+  color: var(--text-primary);
+}
+.revisionBadge.pendingCount .badgeIcon {
+  color: #ef4444;
+}
+
+/* Hover effect */
+.revisionBadge:hover {
+  transform: scale(1.02);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* Dark mode overrides – using existing variables, but ensure enough contrast */
+:global(.dark) .revisionBadge.pendingToday {
+  background-color: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.30);
+}
+:global(.dark) .revisionBadge.allCompleted {
+  background-color: rgba(46, 125, 50, 0.18);
+  border-color: rgba(46, 125, 50, 0.30);
+}
+:global(.dark) .revisionBadge.nextRevision {
+  background-color: rgba(99, 102, 241, 0.18);
+  border-color: rgba(99, 102, 241, 0.30);
+}
+:global(.dark) .revisionBadge.pendingCount {
+  background-color: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.30);
+}
+
+/* Extra small screens – keep compact */
+@media (max-width: 480px) {
+  .revisionBadge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.6rem 0.15rem 0.5rem;
+  }
+  .revisionBadge .badgeIcon {
+    font-size: 0.6rem;
+  }
 }

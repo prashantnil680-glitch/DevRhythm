@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import Link from 'next/link';
-import { FiCheck, FiAlertCircle } from 'react-icons/fi';
-import { differenceInDays } from 'date-fns';
+import { FiCheck, FiAlertCircle, FiExternalLink, FiClock } from 'react-icons/fi';
+import { differenceInDays, format } from 'date-fns';
 import { useMarkRevision } from '@/features/revision/hooks/useMarkRevision';
 import Button from '@/shared/components/Button';
 import Tooltip from '@/shared/components/Tooltip';
@@ -58,6 +58,21 @@ export const RevisionTimelinePanel: React.FC<RevisionTimelinePanelProps> = ({
     setOptimisticIndex(null);
   }, [revision]);
 
+  // Build a lookup map: scheduled date (YYYY-MM-DD) -> completion details
+  const completionLookup = React.useMemo(() => {
+    const map = new Map<string, { completedAt: string; overdueCompleted: boolean; timeSpent: number }>();
+    if (!optimisticRevision?.completedRevisions) return map;
+    for (const comp of optimisticRevision.completedRevisions) {
+      const scheduledDateStr = format(new Date(comp.date), 'yyyy-MM-dd');
+      map.set(scheduledDateStr, {
+        completedAt: comp.completedAt,
+        overdueCompleted: comp.overdueCompleted || false,
+        timeSpent: comp.timeSpent || 0,
+      });
+    }
+    return map;
+  }, [optimisticRevision]);
+
   const scheduleStatuses = optimisticRevision?.scheduleStatuses || [];
   const schedule = optimisticRevision?.schedule || [];
   const currentIndex = optimisticRevision?.currentRevisionIndex ?? 0;
@@ -105,12 +120,22 @@ export const RevisionTimelinePanel: React.FC<RevisionTimelinePanelProps> = ({
       const targetIndex = schedule.findIndex((d) => d === targetDate);
       if (targetIndex === -1) return;
 
+      // Determine if this revision is overdue (scheduled date < today)
+      const today = new Date();
+      const scheduledDate = new Date(targetDate);
+      const isOverdue = scheduledDate < today;
+
       const newCompleted = [
         ...(optimisticRevision?.completedRevisions || []),
         {
           date: targetDate,
           completedAt: new Date().toISOString(),
           status: 'completed' as const,
+          timeSpent: 0,
+          confidenceAfter: null,
+          overdueCompleted: isOverdue,
+          skipped: false,
+          outOfOrder: false,
         },
       ];
       const newCurrentIndex = targetIndex === currentIndex ? currentIndex + 1 : currentIndex;
@@ -169,13 +194,33 @@ export const RevisionTimelinePanel: React.FC<RevisionTimelinePanelProps> = ({
           const isUpcoming = status === 'Upcoming';
           const showButton = status === 'Pending';
 
+          // Check if this completion was overdue (only if completed)
+          const completionInfo = isCompleted ? completionLookup.get(format(new Date(date), 'yyyy-MM-dd')) : null;
+          const isOverdueCompletion = completionInfo?.overdueCompleted || false;
+          const completedAt = completionInfo?.completedAt;
+
           let statusLabel = status;
           if (isPending) statusLabel = 'Pending Today';
           else if (isUpcoming) {
             const daysRemaining = getDaysRemainingLocal(date);
             statusLabel = getUpcomingLabel(daysRemaining);
           } else if (isOverdue) statusLabel = 'Overdue';
-          else if (isCompleted) statusLabel = 'Completed';
+          else if (isCompleted) {
+            if (isOverdueCompletion) {
+              // Calculate days late
+              const scheduled = new Date(date);
+              const completed = new Date(completedAt!);
+              const daysLate = differenceInDays(completed, scheduled);
+              statusLabel = `Completed (${daysLate} day${daysLate !== 1 ? 's' : ''} late)`;
+            } else {
+              statusLabel = 'Completed';
+            }
+          }
+
+          // Tooltip content for overdue completion
+          const overdueTooltip = isOverdueCompletion && completedAt
+            ? `Completed on ${formatLocalDate(completedAt)} (${differenceInDays(new Date(completedAt), new Date(date))} day${differenceInDays(new Date(completedAt), new Date(date)) !== 1 ? 's' : ''} late)`
+            : '';
 
           return (
             <div
@@ -188,7 +233,13 @@ export const RevisionTimelinePanel: React.FC<RevisionTimelinePanelProps> = ({
             >
               <div
                 className={`${styles.marker} ${
-                  isCompleted ? styles.completed : isPending ? styles.pending : styles.upcoming
+                  isCompleted
+                    ? isOverdueCompletion
+                      ? styles.completedOverdue
+                      : styles.completed
+                    : isPending
+                    ? styles.pending
+                    : styles.upcoming
                 } ${optimisticIndex === idx ? styles.pulse : ''}`}
               >
                 {isCompleted && <FiCheck className={styles.checkIcon} />}
@@ -196,14 +247,36 @@ export const RevisionTimelinePanel: React.FC<RevisionTimelinePanelProps> = ({
                 {!isCompleted && !isOverdue && <div className={styles.innerDot} />}
               </div>
               <div className={styles.content}>
-                <Link href={datePath} className={styles.dateLink}>
-                  {formattedDate}
-                </Link>
+                <div className={styles.leftGroup}>
+                  <Link href={datePath} className={styles.dateLink}>
+                    {formattedDate}
+                  </Link>
+                  {isCompleted && isOverdueCompletion && (
+                    <Tooltip content={overdueTooltip} placement="top">
+                      <span className={styles.overdueWarningIcon}>
+                        <FiClock size={14} />
+                      </span>
+                    </Tooltip>
+                  )}
+                  {isCompleted && isOverdueCompletion && completedAt && (
+                    <Link
+                      href={getDatePath(completedAt)}
+                      className={styles.activityLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="View activity for completion date"
+                    >
+                      <FiExternalLink size={12} />
+                    </Link>
+                  )}
+                </div>
                 <div className={styles.statusRow}>
                   <span
                     className={`${styles.status} ${
                       isCompleted
-                        ? styles.statusCompleted
+                        ? isOverdueCompletion
+                          ? styles.statusCompletedOverdue
+                          : styles.statusCompleted
                         : isPending
                         ? styles.statusPending
                         : isOverdue

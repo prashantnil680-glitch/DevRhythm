@@ -327,10 +327,11 @@ export interface Question extends Timestamp {
   testCases?: Array<{
     stdin: string;
     expected: string;
-    isDefault?: boolean; // optional, backend may set it
+    isDefault?: boolean;
+    _id?: ID;
   }>;
-  createdBy?: ID;          // user ID who created the question (only for manual)
-  source?: 'manual' | 'leetcode'; // where the question came from
+  createdBy?: ID;
+  source?: 'manual' | 'leetcode';
   starterCode?: Record<string, string>;
   fullRunnerCode?: Record<string, string>;
   isSolved?: boolean;
@@ -367,6 +368,7 @@ export interface UserQuestionProgress extends Timestamp {
     expected: string;
     createdAt?: ISODateString;
     updatedAt?: ISODateString;
+    _id?: ID;
   }>;
 }
 
@@ -405,7 +407,6 @@ export interface Goal extends Timestamp {
   status: GoalStatus;
   completionPercentage: number; // 0-100
   achievedAt?: ISODateString;
-  // Planned goal specific fields
   targetQuestions?: Array<ID | Question>;
   completedQuestions?: Array<{
     questionId: ID | Question;
@@ -422,11 +423,18 @@ export interface RevisionSchedule extends Timestamp {
   completedRevisions: Array<{
     date: ISODateString;
     completedAt: ISODateString;
-    status: 'completed' | 'skipped';
+    status: 'completed' | 'skipped' | 'auto_skipped';
+    timeSpent: number;
+    confidenceAfter: number | null;
+    overdueCompleted: boolean;
+    skipped: boolean;
+    outOfOrder: boolean;
+    _id?: ID;
   }>;
   currentRevisionIndex: number;
   status: RevisionStatus;
   overdueCount: number;
+  overdueActive?: boolean;
   baseDate: ISODateString;
   currentStatus?: string;
   scheduleStatuses?: Array<{
@@ -483,9 +491,9 @@ export interface Share extends Timestamp {
   _id: ID;
   userId: ID;
   shareType: ShareType;
-  periodType?: PeriodType; // required if shareType === 'period'
-  startDate?: ISODateString; // required if shareType === 'period'
-  endDate?: ISODateString; // required if shareType === 'period'
+  periodType?: PeriodType;
+  startDate?: ISODateString;
+  endDate?: ISODateString;
   customPeriodName?: string;
   sharedData: SharedData;
   privacy: Privacy;
@@ -752,10 +760,9 @@ export interface RevisionDashboardStats {
     totalActiveSchedules: number;
     totalRevisionsCompleted: number;
     totalRevisionsScheduled: number;
-    upcomingSchedulesCount: number;       // schedules with upcoming revisions
-    totalPendingRevisionEntries: number;  // total incomplete revision slots
-    completionRate: number;               // percentage
-    // Optional fields (may not always be present)
+    upcomingSchedulesCount: number;
+    totalPendingRevisionEntries: number;
+    completionRate: number;
     totalCompletedSchedules?: number;
     totalOverdueSchedules?: number;
     averageOverdueDays?: number;
@@ -774,7 +781,7 @@ export interface RevisionDashboardStats {
   }>;
   trends: {
     daily: Array<{
-      date: string; // YYYY-MM-DD
+      date: string;
       completed: number;
       timeSpent: number;
       avgConfidence: number | null;

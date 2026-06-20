@@ -17,7 +17,17 @@ import Button from '@/shared/components/Button';
 import Tabs from '@/shared/components/Tabs';
 import Modal from '@/shared/components/Modal';
 import { toast } from '@/shared/components/Toast';
-import { FiExternalLink, FiMaximize2, FiMinimize2, FiX } from 'react-icons/fi';
+import Tooltip from '@/shared/components/Tooltip';
+import {
+  FiExternalLink,
+  FiMaximize2,
+  FiMinimize2,
+  FiX,
+  FiClock,
+  FiCheckCircle,
+  FiAlertCircle,
+} from 'react-icons/fi';
+import { startOfDay, format } from 'date-fns';
 import type { Question } from '@/shared/types';
 import { ProgressCard } from './ProgressCard';
 import { SimilarQuestionsGrid } from './SimilarQuestionsGrid';
@@ -335,6 +345,78 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
     return `/questions?page=1&${tagsParams}`;
   }, [initialQuestion.tags]);
 
+  // ===== Compute revision status badge =====
+  const revisionBadge = useMemo(() => {
+    if (!revision || !revision.scheduleStatuses || revision.scheduleStatuses.length === 0) {
+      return null;
+    }
+
+    const today = startOfDay(new Date());
+    const statuses = revision.scheduleStatuses;
+
+    const allCompleted = statuses.every(s => s.status === 'Completed');
+    const todayPending = statuses.some(
+      s => s.status === 'Pending' && startOfDay(new Date(s.date)).getTime() === today.getTime()
+    );
+    const pendingCount = statuses.filter(s => s.status === 'Pending' || s.status === 'Overdue').length;
+    const upcomingEntries = statuses
+      .filter(s => s.status === 'Upcoming')
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const nextUpcoming = upcomingEntries.length > 0 ? upcomingEntries[0] : null;
+
+    // Case 1: Today's revision is pending
+    if (todayPending) {
+      return {
+        label: 'Pending Today Revision',
+        variant: 'pendingToday',
+        icon: <FiClock className={styles.badgeIcon} />,
+        tooltip: 'You have a revision scheduled for today. Complete it to stay on track.',
+        tooltipPlacement: 'bottom' as const,
+      };
+    }
+
+    // Case 3: All revisions completed
+    if (allCompleted && statuses.length > 0) {
+      return {
+        label: 'All Revisions Completed',
+        variant: 'allCompleted',
+        icon: <FiCheckCircle className={styles.badgeIcon} />,
+        tooltip: 'All scheduled revisions for this question are completed. Great job!',
+        tooltipPlacement: 'top' as const,
+      };
+    }
+
+    // Case 4: Past revisions pending/overdue
+    if (pendingCount > 0) {
+      const pendingDates = statuses
+        .filter(s => s.status === 'Pending' || s.status === 'Overdue')
+        .map(s => format(new Date(s.date), 'MMM d, yyyy'))
+        .join(', ');
+      return {
+        label: `${pendingCount} Revision${pendingCount > 1 ? 's' : ''} Pending`,
+        variant: 'pendingCount',
+        icon: <FiAlertCircle className={styles.badgeIcon} />,
+        tooltip: `Pending on: ${pendingDates}. Check the Revision section for details.`,
+        tooltipPlacement: 'bottom' as const,
+      };
+    }
+
+    // Case 2: Next revision is in the future
+    if (nextUpcoming) {
+      const nextDate = format(new Date(nextUpcoming.date), 'MMM d');
+      return {
+        label: `Next Revision: ${nextDate}`,
+        variant: 'nextRevision',
+        icon: <FiClock className={styles.badgeIcon} />,
+        tooltip: `Your next revision is scheduled for ${format(new Date(nextUpcoming.date), 'MMMM d, yyyy')}.`,
+        tooltipPlacement: 'bottom' as const,
+      };
+    }
+
+    // Fallback (should not happen)
+    return null;
+  }, [revision]);
+
   const isLoading = detailsLoading && !details;
 
   if (isLoading) return <QuestionDetailSkeleton />;
@@ -398,6 +480,18 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
         <a href={initialQuestion.problemLink} target="_blank" rel="noopener noreferrer" className={styles.metadataChip}>
           Solve on {initialQuestion.platform} <FiExternalLink size={10} />
         </a>
+
+              {/* Revision Badge Row – below title */}
+      {revisionBadge && (
+        <div className={styles.revisionBadgeRow}>
+          <Tooltip content={revisionBadge.tooltip || ''} placement={revisionBadge.tooltipPlacement || 'top'}>
+            <span className={`${styles.revisionBadge} ${styles[revisionBadge.variant]}`}>
+              {revisionBadge.icon}
+              {revisionBadge.label}
+            </span>
+          </Tooltip>
+        </div>
+      )}
       </div>
 
       {/* Warning Banner */}

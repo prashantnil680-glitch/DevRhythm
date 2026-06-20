@@ -222,31 +222,72 @@ const updateOverdueRevisions = async (timeZone = 'UTC') => {
   return result.modifiedCount;
 };
 
-const getRevisionStatusLabel = (revision, index = null, mode = 'actionable', timeZone = 'UTC') => {
-  const idx = index !== null ? index : revision.currentRevisionIndex;
-  if (revision.status === 'completed') return 'Completed';
-
-  const isCompleted = revision.completedRevisions.some(cr => {
-    const crDate = new Date(cr.date);
-    const schDate = revision.schedule[idx];
-    return crDate.getTime() === schDate.getTime();
+/**
+ * Helper: Check if a specific scheduled date has been completed.
+ * Compares dates by ISO string (YYYY-MM-DD) in the given timezone.
+ * @param {Object} revision - The revision schedule document.
+ * @param {Date} date - The scheduled date to check.
+ * @param {string} timeZone - The user's timezone.
+ * @returns {boolean} True if the date is in completedRevisions.
+ */
+function _isDateCompleted(revision, date, timeZone) {
+  if (!revision || !revision.completedRevisions || revision.completedRevisions.length === 0) {
+    return false;
+  }
+  const targetDateStr = DateTime.fromJSDate(date, { zone: 'UTC' })
+    .setZone(timeZone)
+    .toFormat('yyyy-MM-dd');
+  return revision.completedRevisions.some(completed => {
+    const completedDateStr = DateTime.fromJSDate(completed.date, { zone: 'UTC' })
+      .setZone(timeZone)
+      .toFormat('yyyy-MM-dd');
+    return completedDateStr === targetDateStr;
   });
-  if (isCompleted) return 'Completed';
+}
 
-  const dueDate = revision.schedule[idx];
+/**
+ * Get the status label for a revision schedule entry.
+ * @param {Object} revision - The revision schedule document.
+ * @param {number|null} index - The index of the scheduled date to check. If null, uses currentRevisionIndex.
+ * @param {string} mode - 'actionable' (returns status for the current pending revision) or 'display' (returns status for the given index).
+ * @param {string} timeZone - The user's timezone (e.g., 'Asia/Kolkata', 'UTC').
+ * @returns {string} One of: 'Completed', 'Overdue', 'Pending', 'Upcoming'.
+ */
+const getRevisionStatusLabel = (revision, index = null, mode = 'actionable', timeZone = 'UTC') => {
+  // Early exit: if the entire schedule is completed, all entries are Completed.
+  if (revision.status === 'completed') {
+    return 'Completed';
+  }
+
+  // Determine which index to evaluate.
+  const idx = (index !== null) ? index : revision.currentRevisionIndex;
+
+  // If the schedule is active but the index is beyond the schedule length,
+  // treat it as completed (should not happen in normal flow).
+  if (idx >= revision.schedule.length) {
+    return 'Completed';
+  }
+
+  const date = revision.schedule[idx];
   const todayStart = getStartOfDay(new Date(), timeZone);
-  if (mode === 'display') {
-    if (dueDate < todayStart) return 'Overdue';
-    if (isToday(dueDate, timeZone)) return 'Pending';
-    return 'Upcoming';
+
+  // 1. Check if this specific date is already completed.
+  if (_isDateCompleted(revision, date, timeZone)) {
+    return 'Completed';
   }
 
-  if (idx < revision.currentRevisionIndex) return 'Completed';
-  if (idx === revision.currentRevisionIndex) {
-    if (dueDate < todayStart) return 'Overdue';
-    if (isToday(dueDate, timeZone)) return 'Pending';
-    return 'Upcoming';
+  // 2. If the date is before today, it is overdue.
+  if (date < todayStart) {
+    return 'Overdue';
   }
+
+  // 3. If the date is today, it is pending.
+  const isToday = date >= todayStart && date < getEndOfDay(new Date(), timeZone);
+  if (isToday) {
+    return 'Pending';
+  }
+
+  // 4. Otherwise, it is upcoming.
   return 'Upcoming';
 };
 

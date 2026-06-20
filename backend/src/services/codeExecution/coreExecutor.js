@@ -32,7 +32,7 @@ const { validatePythonSyntax } = require('../../utils/pythonSyntaxValidator');
 const { validateCppSyntax } = require('../../utils/cppSyntaxValidator');
 const { getPythonImports, getCppIncludes, prependCppAutoIncludes } = require('../../utils/autoImports');
 const { client: redisClient } = require('../../config/redis');
-const { analyzeCppError } = require('../../utils/cppErrorAnalyzer'); // NEW
+const { analyzeCppError } = require('../../utils/cppErrorAnalyzer');
 
 // Lazy load jobQueue to avoid circular dependency
 let cachedJobQueue = null;
@@ -547,8 +547,9 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
       completedRevisions: [],
     });
     await invalidateCache(`revisions:*:user:${userId}:*`);
-    await invalidateCache(`question-details:*:${questionId}:*`);
+    // Also invalidate question details cache for the new revision
     await invalidateCache(`question-details:user:${userId}:*`);
+    await invalidateCache(`question-details:user:${userId}:*/questions/${questionId}/details*`);
   }
   timing.end('processing.revision_update');
 
@@ -623,6 +624,16 @@ async function executeCodeCore(userId, body, timeZone = 'UTC', timing = null) {
 
     timing.end('processing.confidence_update');
   }
+
+  // ------------------------------------------------------------------
+  // INVALIDATE QUESTION DETAILS CACHE (always after successful execution)
+  // This ensures that the latest execution history, progress, and revision
+  // status are reflected in the question details endpoint.
+  // ------------------------------------------------------------------
+  // We invalidate even if some tests failed, because the execution history
+  // and attempts were still updated.
+  await invalidateCache(`question-details:user:${userId}:*`);
+  await invalidateCache(`question-details:user:${userId}:*/questions/${questionId}/details*`);
 
   return responseData;
 }

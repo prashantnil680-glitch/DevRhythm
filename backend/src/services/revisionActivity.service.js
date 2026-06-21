@@ -1,3 +1,5 @@
+// backend/src/services/revisionActivity.service.js
+
 const { client: redisClient } = require('../config/redis');
 const RevisionSchedule = require('../models/RevisionSchedule');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
@@ -9,19 +11,7 @@ const { slugify } = require('../utils/helpers/string');
 const { invalidateCache } = require('../middleware/cache');
 const heatmapService = require('./heatmap.service');
 const { updateUserActivity } = require('./user.service');
-
-// ========== Helper: Check if user already has any active past‑revision session ==========
-const userHasActiveSession = async (userId) => {
-  const pattern = `revision:session:${userId}:*:*`;
-  let cursor = 0;
-  let keys = [];
-  do {
-    const reply = await redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
-    cursor = parseInt(reply[0]);
-    keys.push(...reply[1]);
-  } while (cursor !== 0);
-  return keys.length > 0;
-};
+const AppError = require('../utils/errors/AppError');
 
 // ========== Helper: Redis key for daily activity ==========
 const getRevisionActivityKey = (userId, questionId, date) => {
@@ -241,14 +231,82 @@ const getRevisionSessionKey = (userId, questionId, targetDate) => {
   return `revision:session:${userId}:${questionId}:${dateStr}`;
 };
 
+/**
+ * Get info of the active revision session for a user, if any.
+ * @param {string} userId - User ObjectId
+ * @returns {Promise<{ questionId: string, date: string } | null>}
+ */
+async function getActiveSessionInfo(userId) {
+  const pattern = `revision:session:${userId}:*:*`;
+  let cursor = 0;
+  let keys = [];
+  do {
+    const reply = await redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+    cursor = parseInt(reply[0]);
+    keys.push(...reply[1]);
+  } while (cursor !== 0);
+  if (keys.length === 0) return null;
+  const key = keys[0];
+  const parts = key.split(':');
+  if (parts.length >= 5) {
+    const questionId = parts[3];
+    const date = parts[4];
+    // Fetch session data to get startedAt
+    const sessionData = await redisClient.get(key);
+    let startedAt = null;
+    if (sessionData) {
+      try {
+        const parsed = JSON.parse(sessionData);
+        startedAt = parsed.startedAt || null;
+      } catch (e) {
+        console.warn('Failed to parse session data:', e);
+      }
+    }
+    return { questionId, date, startedAt };
+  }
+  return null;
+}
+
+/**
+ * Start a revision session for a specific past date.
+ * @param {string} userId - User ObjectId
+ * @param {string} questionId - Question ObjectId
+ * @param {Date} targetDate - The revision date
+ * @throws {AppError} if another active session exists
+ */
+// Inside startRevisionSession
 const startRevisionSession = async (userId, questionId, targetDate) => {
-  const hasActive = await userHasActiveSession(userId);
-  if (hasActive) {
-    throw new Error('You already have an active revision session for another question. Please complete or cancel it first.');
+  const active = await getActiveSessionInfo(userId);
+  if (active) {
+    const question = await Question.findById(active.questionId)
+      .select('title platformQuestionId')
+      .lean();
+    const title = question?.title || 'another question';
+    const platformQuestionId = question?.platformQuestionId || null;
+    throw new AppError(
+      `You already have an active revision session for "${title}" (started on ${active.date}). Please complete or cancel it first.`,
+      409,
+      {
+        activeSession: {
+          questionId: active.questionId,
+          title,
+          platformQuestionId,
+          date: active.date,
+          sessionStartedAt: active.startedAt,
+          path: platformQuestionId
+            ? `/questions/${platformQuestionId}`
+            : `/questions/${active.questionId}`,
+        }
+      }
+    );
   }
 
   const key = getRevisionSessionKey(userId, questionId, targetDate);
-  const session = { activeSeconds: 0, testPassed: false };
+  const session = {
+    activeSeconds: 0,
+    testPassed: false,
+    startedAt: Date.now()
+  };
   await redisClient.setex(key, 1200, JSON.stringify(session));
   console.log(`[revision.session] Session created for user ${userId}, question ${questionId}, date ${targetDate}`);
   return session;

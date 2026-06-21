@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -23,6 +23,7 @@ import Pagination from '@/shared/components/Pagination';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import NoRecordFound from '@/shared/components/NoRecordFound';
 import Tooltip from '@/shared/components/Tooltip';
+import Modal from '@/shared/components/Modal';
 import PlatformIcon from '@/shared/components/PlatformIcon';
 import { formatDateForDisplay } from '@/shared/lib/dateUtils';
 import { toast } from '@/shared/components/Toast';
@@ -99,6 +100,18 @@ export default function ActionStream() {
   const [overdueDatesMap, setOverdueDatesMap] = useState<Record<string, string[]>>({});
   const [fetchingDatesForId, setFetchingDatesForId] = useState<string | null>(null);
   const [pendingDateForItem, setPendingDateForItem] = useState<{ itemId: string; date: string } | null>(null);
+
+  const [activeSessionConflict, setActiveSessionConflict] = useState<{
+    questionId: string;
+    title: string;
+    platformQuestionId: string;
+    date: string;
+    sessionStartedAt?: number;
+    path: string;
+  } | null>(null);
+
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const completePastRevisionMutation = useCompletePastRevision();
 
@@ -209,9 +222,7 @@ export default function ActionStream() {
         const diffOrder = { Easy: 1, Medium: 2, Hard: 3 };
         items.sort((a, b) => diffOrder[a.difficulty] - diffOrder[b.difficulty]);
         break;
-      // case 'title':
-      //   items.sort((a, b) => a.title.localeCompare(b.title));
-      //   break;
+      // case 'title': // kept commented as per original
     }
     return items;
   }, [allUpcomingItems, upcomingSearch, upcomingDifficulty, upcomingSort]);
@@ -232,28 +243,19 @@ export default function ActionStream() {
   );
 
   const allOverdueItems = useMemo(() => {
-    return overdueItems.map((item) => {
-      const lastCompleted = item.completedRevisions?.slice(-1)[0];
-      const confidenceLevel = item.confidenceAfter ?? 0;
-      const totalTimeSpent = item.totalTimeSpent ?? 0;
-      const attemptsCount = item.attempts ?? 0;
-      const revisionCount = item.currentRevisionIndex || 0;
-      const scheduledDateRaw = item.scheduledDate;
-      const scheduledDate = safeParseDate(scheduledDateRaw) ? scheduledDateRaw : null;
-      return {
-        _id: item._id,
-        questionId: item.questionId,
-        platformQuestionId: item.platformQuestionId,
-        title: item.title ?? 'Unknown',
-        difficulty: (item.difficulty as 'Easy' | 'Medium' | 'Hard') ?? 'Medium',
-        platform: item.platform ?? 'Unknown',
-        scheduledDate,
-        totalTimeSpent,
-        attemptsCount,
-        revisionCount,
-        confidenceLevel,
-      };
-    });
+    return overdueItems.map((item) => ({
+      _id: item._id,
+      questionId: item.questionId,
+      platformQuestionId: item.platformQuestionId,
+      title: item.title ?? 'Unknown',
+      difficulty: (item.difficulty as 'Easy' | 'Medium' | 'Hard') ?? 'Medium',
+      platform: item.platform ?? 'Unknown',
+      scheduledDate: item.scheduledDate,
+      totalTimeSpent: item.totalTimeSpent ?? 0,
+      attemptsCount: item.attempts ?? 0,
+      revisionCount: item.currentRevisionIndex || 0,
+      confidenceLevel: item.confidenceAfter ?? 0,
+    }));
   }, [overdueItems]);
 
   const filteredOverdue = useMemo(() => {
@@ -290,9 +292,6 @@ export default function ActionStream() {
         const diffOrder = { Easy: 1, Medium: 2, Hard: 3 };
         items.sort((a, b) => diffOrder[a.difficulty] - diffOrder[b.difficulty]);
         break;
-      // case 'title':
-      //   items.sort((a, b) => a.title.localeCompare(b.title));
-      //   break;
     }
     return items;
   }, [allOverdueItems, overdueSearch, overdueDifficulty, overdueSort]);
@@ -325,8 +324,11 @@ export default function ActionStream() {
     setPendingDateForItem({ itemId: item._id, date });
     try {
       await startSessionAndRedirect(item.questionId, date, item.platformQuestionId);
-    } catch (err) {
-      // error already toasted by mutation, just re-enable buttons
+    } catch (err: any) {
+      const errorData = err?.response?.data;
+      if (errorData?.statusCode === 409 && errorData?.error?.activeSession) {
+        setActiveSessionConflict(errorData.error.activeSession);
+      }
     } finally {
       setPendingDateForItem(null);
     }
@@ -362,43 +364,59 @@ export default function ActionStream() {
     });
   };
 
-  const isLoading = upcomingLoading || overdueLoading;
-  const hasError = upcomingError || overdueError;
+  const closeConflictModal = useCallback(() => {
+    setActiveSessionConflict(null);
+    setRemainingSeconds(null);
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+  }, []);
 
-  if (isLoading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.twoColumns}>
-          <div className={styles.strongestCard}>
-            <SkeletonLoader variant="custom" className={styles.cardSkeleton} />
-          </div>
-          <div className={styles.weakestCard}>
-            <SkeletonLoader variant="custom" className={styles.cardSkeleton} />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const goToActiveQuestion = useCallback(() => {
+    if (activeSessionConflict?.path) {
+      router.push(activeSessionConflict.path);
+      closeConflictModal();
+    }
+  }, [activeSessionConflict, router, closeConflictModal]);
 
-  if (hasError) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.errorContainer}>
-          <FiAlertCircle size={32} />
-          <p>Unable to load revision schedule. Please try again later.</p>
-          <Button
-            variant="primary"
-            onClick={() => {
-              refetchUpcoming();
-              fetchAllOverdue();
-            }}
-          >
-            Retry
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  // Timer effect for conflict modal
+  useEffect(() => {
+    if (activeSessionConflict?.sessionStartedAt) {
+      const startedAt = new Date(activeSessionConflict.sessionStartedAt).getTime();
+      const expiryTime = startedAt + 20 * 60 * 1000; // 20 minutes
+      const updateTimer = () => {
+        const now = Date.now();
+        const remaining = Math.max(0, Math.floor((expiryTime - now) / 1000));
+        setRemainingSeconds(remaining);
+        if (remaining === 0) {
+          if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+          }
+          closeConflictModal();
+          refetchOverdue();
+          toast.info('The active revision session has expired. You can try again now.');
+        }
+      };
+      updateTimer();
+      timerIntervalRef.current = setInterval(updateTimer, 1000);
+      return () => {
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+          timerIntervalRef.current = null;
+        }
+      };
+    } else {
+      setRemainingSeconds(null);
+    }
+  }, [activeSessionConflict, closeConflictModal, refetchOverdue]);
+
+  const formatTimer = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const renderTimelineItem = (item: any, type: 'upcoming' | 'overdue') => {
     const scheduledDate = safeParseDate(item.scheduledDate);
@@ -507,12 +525,7 @@ export default function ActionStream() {
                 onClick={() => handleRescue(item)}
                 disabled={isFetchingDates}
               >
-                {isFetchingDates ? (
-                  <span className={styles.spinnerSmall} />
-                ) : (
-                  <FiCheck />
-                )}{' '}
-                Review Now
+                {isFetchingDates ? <span className={styles.spinnerSmall} /> : <FiCheck />} Review Now
               </button>
             </div>
           </>
@@ -533,6 +546,44 @@ export default function ActionStream() {
       </div>
     );
   };
+
+  const isLoading = upcomingLoading || overdueLoading;
+  const hasError = upcomingError || overdueError;
+
+  if (isLoading) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.twoColumns}>
+          <div className={styles.strongestCard}>
+            <SkeletonLoader variant="custom" className={styles.cardSkeleton} />
+          </div>
+          <div className={styles.weakestCard}>
+            <SkeletonLoader variant="custom" className={styles.cardSkeleton} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.errorContainer}>
+          <FiAlertCircle size={32} />
+          <p>Unable to load revision schedule. Please try again later.</p>
+          <Button
+            variant="primary"
+            onClick={() => {
+              refetchUpcoming();
+              fetchAllOverdue();
+            }}
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.container}>
@@ -577,7 +628,6 @@ export default function ActionStream() {
                 <option value="date-asc">Due (earliest first)</option>
                 <option value="date-desc">Due (latest first)</option>
                 <option value="difficulty">Difficulty</option>
-                {/* <option value="title">Title</option> */}
               </select>
               <button
                 onClick={() => {
@@ -674,7 +724,6 @@ export default function ActionStream() {
                 <option value="date-asc">Due (earliest first)</option>
                 <option value="date-desc">Due (latest first)</option>
                 <option value="difficulty">Difficulty</option>
-                {/* <option value="title">Title</option> */}
               </select>
               <button
                 onClick={() => {
@@ -731,6 +780,63 @@ export default function ActionStream() {
           </div>
         </div>
       </div>
+
+      {/* Conflict Modal */}
+      {activeSessionConflict && (
+        <Modal
+          isOpen={!!activeSessionConflict}
+          onClose={closeConflictModal}
+          title="Hold On – Another Revision is in Progress"
+          size="md"
+          closeOnBackdropClick
+          closeOnEsc
+          showCloseButton
+          footer={
+            <div className={styles.modalFooter}>
+              <Button variant="ghost" onClick={closeConflictModal}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={goToActiveQuestion}>
+                Go to Question
+              </Button>
+            </div>
+          }
+        >
+          <div className={styles.conflictModalContent}>
+            <p className={styles.conflictMessage}>
+              You already have an active revision session for another question.
+            </p>
+
+            <div className={styles.conflictDetailsCard}>
+              <div className={styles.conflictDetailRow}>
+                <span className={styles.conflictDetailLabel}>Question</span>
+                <span className={styles.conflictDetailValue}>{activeSessionConflict.title}</span>
+              </div>
+              <div className={styles.conflictDetailRow}>
+                <span className={styles.conflictDetailLabel}>Started on</span>
+                <span className={styles.conflictDetailValue}>
+                  {formatDateForDisplay(new Date(activeSessionConflict.date))}
+                </span>
+              </div>
+            </div>
+
+            <div className={styles.conflictTimerRow}>
+              <span className={styles.conflictTimerLabel}>⏳ Session expires in</span>
+              <span className={styles.conflictTimerValue}>
+                {remainingSeconds !== null ? formatTimer(remainingSeconds) : '—'}
+              </span>
+            </div>
+
+            <p className={styles.conflictActionMessage}>
+              Please complete this revision before starting a new one.
+              <br />
+              <span className={styles.conflictHint}>
+                You can jump straight to that question to finish your revision.
+              </span>
+            </p>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

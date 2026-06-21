@@ -216,7 +216,6 @@
 
 .viewAll:hover {
   color: var(--accent-moss);
-  /* text-decoration: underline; */
 }
 
 /* Timeline layout */
@@ -287,7 +286,6 @@
 }
 
 .titleLink:hover {
-  /* text-decoration: underline; */
   color: var(--accent-moss);
 }
 
@@ -340,7 +338,8 @@
   gap: 4px;
 }
 
-.dueDate, .overdueDate {
+.dueDate,
+.overdueDate {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -373,7 +372,7 @@
   font-size: 0.8rem;
 }
 
-/* Practice button (Upcoming) – uses accent-moss */
+/* Practice button */
 .practiceButton {
   background: var(--accent-moss);
   border: none;
@@ -394,9 +393,6 @@
 .practiceButton:active {
   transform: scale(0.98);
 }
-
-
-/* Add these styles to the end of ActionStream.module.css */
 
 /* Date Selection Panel */
 .dateSelectionPanel {
@@ -474,7 +470,6 @@
   cursor: not-allowed;
 }
 
-/* Spinner for date button */
 .spinner {
   display: inline-block;
   width: 12px;
@@ -486,7 +481,6 @@
   margin-left: 4px;
 }
 
-/* Small spinner for the "Review Now" button while fetching dates */
 .spinnerSmall {
   display: inline-block;
   width: 12px;
@@ -523,7 +517,7 @@
   }
 }
 
-/* Rescue button (Overdue) – uses error color */
+/* Rescue button */
 .actionButton {
   background: none;
   border: 1px solid var(--border);
@@ -539,7 +533,7 @@
 }
 
 .rescueButton {
-  background: rgba(214, 139, 92, 0.1); /* warm amber background */
+  background: rgba(214, 139, 92, 0.1);
   border-color: #d68b5c;
   color: #d68b5c;
 }
@@ -581,8 +575,13 @@
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* Responsive */
@@ -590,7 +589,8 @@
   .twoColumns {
     flex-direction: column;
   }
-  .strongestCard, .weakestCard {
+  .strongestCard,
+  .weakestCard {
     width: 100%;
   }
 }
@@ -627,17 +627,113 @@
   .titleLink {
     font-size: 0.9rem;
   }
-  .meta, .metricsRow {
+  .meta,
+  .metricsRow {
     font-size: 0.7rem;
   }
-  .actionButton, .practiceButton {
+  .actionButton,
+  .practiceButton {
     padding: 4px 12px;
     font-size: 0.7rem;
   }
   .filterGroup {
     flex-direction: column;
   }
-  .filterSelect, .clearFilters {
+  .filterSelect,
+  .clearFilters {
     width: 100%;
   }
+}
+
+/* ===== Conflict Modal Styles ===== */
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+.conflictModalContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.conflictMessage {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.conflictDetailsCard {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.conflictDetailRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.conflictDetailLabel {
+  font-weight: 500;
+  color: var(--text-secondary);
+  min-width: 90px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.conflictDetailValue {
+  color: var(--text-primary);
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.conflictTimerRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  font-size: 0.95rem;
+  margin: 0.25rem 0;
+}
+
+.conflictTimerLabel {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.conflictTimerValue {
+  font-weight: 700;
+  color: var(--accent-moss);
+  font-family: var(--font-code);
+  font-size: 1.1rem;
+}
+
+.conflictActionMessage {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin: 0.25rem 0 0 0;
+  line-height: 1.5;
+}
+
+.conflictHint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+  display: inline-block;
+  margin-top: 0.2rem;
 }

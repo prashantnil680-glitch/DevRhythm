@@ -19,12 +19,19 @@ export function useCompletePastRevision() {
       queryClient.invalidateQueries({ queryKey: ['revisions', 'stats'] });
     },
     onError: (error: any) => {
+      // Check if this is a 409 conflict with active session details
+      const status = error.response?.status;
+      const activeSession = error.response?.data?.error?.activeSession;
+      if (status === 409 && activeSession) {
+        // Do NOT show toast – the component will handle this via modal
+        return;
+      }
+
       const message =
         error.response?.data?.message ||
         error.message ||
         'Failed to complete revision. Please ensure you have spent sufficient active time on the question.';
       toast.error(message);
-      // No re‑throw – component will handle re‑enabling
     },
   });
 }

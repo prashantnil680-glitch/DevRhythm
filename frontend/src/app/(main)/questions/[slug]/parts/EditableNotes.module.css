@@ -1,93 +1,110 @@
+/* ===== Container – soft card with subtle shadow ===== */
 .container {
   background-color: var(--bg-surface);
   border-radius: var(--radius);
-  padding: 1.25rem;
-  border: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: var(--transition);
+  border: 1px solid var(--border-light);
 }
 
+.container:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* ===== Header ===== */
 .header {
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px dashed var(--border);
-}
-
-.header h3 {
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 0;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .headerIcon {
   color: var(--accent-moss);
-  font-size: 1.2rem;
-}
-
-.errorMessage {
-  background-color: rgba(var(--error-rgb), 0.1);
-  border-left: 3px solid var(--error);
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 1rem;
-  font-size: 0.85rem;
-  color: var(--error);
-  border-radius: var(--radius);
-}
-
-.content {
-  display: flex;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-}
-
-.column {
-  flex: 1;
-  min-width: 200px;
-}
-
-.label {
-  font-family: var(--font-body);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-muted);
-  margin-bottom: 0.5rem;
+  font-size: 1rem;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
 }
 
-.labelIcon {
-  font-size: 0.9rem;
+.headerTitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.fieldContainer {
+/* ===== Error ===== */
+.errorMessage {
+  background-color: rgba(var(--error-rgb), 0.06);
+  border-left: 2px solid var(--error);
+  padding: 0.3rem 0.6rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--error);
+  border-radius: var(--radius-sm);
+}
+
+/* ===== Content ===== */
+.content {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
+.row {
+  display: flex;
+  flex-direction: column;
+}
+
+.fieldLabel {
+  font-size: 0.65rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 0.15rem;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.labelIcon {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.fieldContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+/* ===== Read‑only content – larger, more inviting ===== */
 .readOnlyContent {
   background-color: var(--bg-elevated);
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  padding: 0.75rem;
-  min-height: 80px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  min-height: 4rem;
   cursor: pointer;
   transition: var(--transition);
+  display: flex;
+  align-items: center;
 }
 
 .readOnlyContent:hover {
   background-color: var(--hover-surface);
-  border-color: var(--border);
+  border-color: var(--accent-moss);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
 }
 
 .contentText {
-  font-family: var(--font-notes);
-  font-size: 1rem;
+  font-size: 0.9rem;
   line-height: 1.5;
   color: var(--text-primary);
   margin: 0;
@@ -96,63 +113,81 @@
 }
 
 .placeholder {
-  font-family: var(--font-notes);
-  font-size: 1rem;
-  font-style: italic;
+  font-size: 0.9rem;
   color: var(--text-muted);
+  opacity: 0.7;
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
+  font-style: normal;
 }
 
+/* ===== Edit button ===== */
 .editButton {
   background: none;
   border: none;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
+  color: var(--text-muted);
   cursor: pointer;
-  padding: 0.25rem 0;
+  padding: 0.1rem 0.2rem;
   width: fit-content;
   transition: var(--transition);
+  display: flex;
+  align-items: center;
+  opacity: 0.5;
+  margin-top: 0.1rem;
 }
 
 .editButton:hover {
+  opacity: 1;
   color: var(--accent-moss);
-   /* text-decoration: underline; */
 }
 
+.editIcon {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+/* ===== Separator between rows – FIXED ===== */
+.separator {
+  border: none;
+  border-top: 2px dashed var(--border);
+  margin: 0.4rem 0 0.5rem 0;
+  opacity: 0.8;
+  width: 100%;
+}
+
+/* ===== Edit mode ===== */
 .editMode {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.3rem;
 }
 
 .textarea {
   width: 100%;
-  font-family: var(--font-notes);
-  font-size: 1rem;
+  font-size: 0.9rem;
   line-height: 1.5;
-  padding: 0.75rem;
+  padding: 0.5rem 0.75rem;
   border: 1px solid var(--border-input);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   background-color: var(--bg-elevated);
   color: var(--text-primary);
   resize: vertical;
   transition: var(--transition);
+  font-family: var(--font-body);
+  min-height: 4.5rem;
 }
 
 .textarea:focus {
   outline: none;
   border-color: var(--accent-moss);
-  box-shadow: var(--focus-ring);
+  box-shadow: 0 0 0 3px rgba(var(--accent-moss-rgb), 0.15);
 }
 
+/* ===== Buttons ===== */
 .buttonGroup {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.3rem;
   justify-content: flex-end;
 }
 
@@ -160,13 +195,14 @@
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.4rem 0.75rem;
-  font-size: 0.85rem;
-  border-radius: var(--radius);
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: var(--transition);
   border: 1px solid transparent;
   background: none;
+  font-weight: 500;
 }
 
 .saveButton {
@@ -174,10 +210,10 @@
   color: var(--primary-text-on-action);
   border-color: var(--primary-action);
 }
-
 .saveButton:hover:not(:disabled) {
   background-color: var(--primary-action-hover);
   transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .cancelButton {
@@ -185,20 +221,19 @@
   color: var(--text-secondary);
   border-color: var(--border);
 }
-
 .cancelButton:hover:not(:disabled) {
   background-color: var(--hover-surface);
 }
 
 .actionButton:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .spinner {
   display: inline-block;
-  width: 1rem;
-  height: 1rem;
+  width: 0.8rem;
+  height: 0.8rem;
   border: 2px solid currentColor;
   border-right-color: transparent;
   border-radius: 50%;
@@ -206,115 +241,138 @@
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .content {
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .column {
-    width: 100%;
-  }
-
-  .label {
-    font-size: 0.7rem;
-  }
-
-  .contentText,
-  .placeholder {
-    font-size: 0.95rem;
-  }
-
-  .editButton,
-  .actionButton {
-    font-size: 0.8rem;
-    padding: 0.35rem 0.6rem;
-  }
-
-  .textarea {
-    font-size: 0.95rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .container {
-    padding: 1rem;
-  }
-
-  .contentText,
-  .placeholder {
-    font-size: 0.9rem;
-  }
-
-  .textarea {
-    font-size: 0.9rem;
-  }
-
-  .buttonGroup {
-    justify-content: stretch;
-  }
-
-  .actionButton {
-    flex: 1;
-    justify-content: center;
-  }
-}
-
-
-/* Existing styles remain unchanged – add these new classes at the end */
-
-/* ===== Login Placeholder (when user is not authenticated) ===== */
+/* ===== Login placeholder ===== */
 .loginPlaceholder {
   background-color: var(--bg-elevated);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius);
-  padding: 2rem;
-  text-align: center;
-  margin-bottom: 1rem;
-}
-
-.loginPlaceholderContent {
-  max-width: 400px;
-  margin: 0 auto;
-}
-
-.loginPlaceholderTitle {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
+  padding: 1rem;
   margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.lockIcon {
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.loginContent {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .loginPlaceholderText {
   font-size: 0.85rem;
   color: var(--text-secondary);
-  margin-bottom: 1rem;
+  margin: 0;
 }
 
 .loginButton {
-  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  padding: 0.2rem 1rem;
 }
 
+/* ===== Read‑only section for unauthenticated ===== */
 .readOnlySection {
   display: flex;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-  margin-top: 0.5rem;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-/* Responsive adjustment */
+.readOnlyItem {
+  display: flex;
+  flex-direction: column;
+}
+
+.readOnlyLabel {
+  font-size: 0.65rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-bottom: 0.1rem;
+}
+
+.readOnlyLabel .labelIcon {
+  font-size: 0.7rem;
+}
+
+/* ===== Responsive ===== */
 @media (max-width: 768px) {
-  .readOnlySection {
+  .container {
+    padding: 0.5rem 0.75rem;
+  }
+  .content {
+    gap: 0.4rem;
+  }
+  .readOnlyContent {
+    min-height: 3.5rem;
+    padding: 0.4rem 0.6rem;
+  }
+  .contentText,
+  .placeholder {
+    font-size: 0.85rem;
+  }
+  .textarea {
+    font-size: 0.85rem;
+    min-height: 4rem;
+  }
+  .actionButton {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+  }
+  .loginPlaceholder {
     flex-direction: column;
-    gap: 1rem;
+    text-align: center;
+  }
+  .loginContent {
+    justify-content: center;
+  }
+  .loginPlaceholderText {
+    font-size: 0.8rem;
+  }
+  .separator {
+    margin: 0.3rem 0 0.4rem 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 0.4rem 0.5rem;
+  }
+  .readOnlyContent {
+    min-height: 3rem;
+  }
+  .contentText,
+  .placeholder {
+    font-size: 0.8rem;
+  }
+  .textarea {
+    font-size: 0.8rem;
+  }
+  .buttonGroup {
+    justify-content: stretch;
+  }
+  .actionButton {
+    flex: 1;
+    justify-content: center;
+  }
+  .separator {
+    margin: 0.25rem 0 0.35rem 0;
   }
 }

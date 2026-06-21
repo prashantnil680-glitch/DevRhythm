@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { FiEdit2, FiSave, FiX, FiFileText, FiZap } from 'react-icons/fi';
+import { FiEdit2, FiSave, FiX, FiFileText, FiZap, FiLock } from 'react-icons/fi';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import Button from '@/shared/components/Button';
@@ -37,7 +37,6 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
-  // Start editing notes
   const handleEditNotes = () => {
     if (!isLoggedIn) return;
     setTempNotes(notes);
@@ -45,14 +44,12 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
     setError(null);
   };
 
-  // Cancel editing notes
   const handleCancelNotes = () => {
     setIsEditingNotes(false);
     setTempNotes(notes);
     setError(null);
   };
 
-  // Save notes
   const handleSaveNotes = async () => {
     if (!isLoggedIn) return;
     if (tempNotes === notes) {
@@ -73,7 +70,6 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
     }
   };
 
-  // Start editing key insights
   const handleEditKeyInsights = () => {
     if (!isLoggedIn) return;
     setTempKeyInsights(keyInsights);
@@ -81,14 +77,12 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
     setError(null);
   };
 
-  // Cancel editing key insights
   const handleCancelKeyInsights = () => {
     setIsEditingKeyInsights(false);
     setTempKeyInsights(keyInsights);
     setError(null);
   };
 
-  // Save key insights
   const handleSaveKeyInsights = async () => {
     if (!isLoggedIn) return;
     if (tempKeyInsights === keyInsights) {
@@ -109,35 +103,26 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
     }
   };
 
-  // If not logged in, show a read‑only view with a login button
+  // If not logged in, show a friendly locked state
   if (!isLoggedIn) {
     return (
       <div className={styles.container}>
         <div className={styles.header}>
-          <h3>
-            <FiFileText className={styles.headerIcon} />
-            Notes & Key Insights
-          </h3>
+          <FiFileText className={styles.headerIcon} />
+          <span className={styles.headerTitle}>Notes & Key Insights</span>
         </div>
         <div className={styles.loginPlaceholder}>
-          <div className={styles.loginPlaceholderContent}>
-            <p className={styles.loginPlaceholderTitle}>🔒 Login to add notes</p>
-            <p className={styles.loginPlaceholderText}>
-              Save your personal notes and key insights for this question.
-            </p>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => router.push('/login')}
-              className={styles.loginButton}
-            >
+          <FiLock className={styles.lockIcon} />
+          <div className={styles.loginContent}>
+            <p className={styles.loginPlaceholderText}>Sign in to add personal notes and key insights</p>
+            <Button variant="primary" size="sm" onClick={() => router.push('/login')} className={styles.loginButton}>
               Login to Save
             </Button>
           </div>
         </div>
         <div className={styles.readOnlySection}>
-          <div className={styles.column}>
-            <div className={styles.label}>Notes</div>
+          <div className={styles.readOnlyItem}>
+            <div className={styles.readOnlyLabel}>Notes</div>
             <div className={styles.readOnlyContent}>
               {initialNotes.trim() ? (
                 <p className={styles.contentText}>{initialNotes}</p>
@@ -146,8 +131,8 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
               )}
             </div>
           </div>
-          <div className={styles.column}>
-            <div className={styles.label}>
+          <div className={styles.readOnlyItem}>
+            <div className={styles.readOnlyLabel}>
               <FiZap className={styles.labelIcon} /> Key Insights
             </div>
             <div className={styles.readOnlyContent}>
@@ -163,22 +148,19 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
     );
   }
 
-  // Logged‑in view (original component)
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h3>
-          <FiFileText className={styles.headerIcon} />
-          Notes & Key Insights
-        </h3>
+        <FiFileText className={styles.headerIcon} />
+        <span className={styles.headerTitle}>Notes & Key Insights</span>
       </div>
 
       {error && <div className={styles.errorMessage}>{error}</div>}
 
       <div className={styles.content}>
-        {/* Notes column */}
-        <div className={styles.column}>
-          <div className={styles.label}>Notes</div>
+        {/* Notes Row */}
+        <div className={styles.row}>
+          <div className={styles.fieldLabel}>Notes</div>
           <div className={styles.fieldContainer}>
             {!isEditingNotes ? (
               <>
@@ -194,7 +176,7 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
                   {notes.trim() ? (
                     <p className={styles.contentText}>{notes}</p>
                   ) : (
-                    <p className={styles.placeholder}>— no notes yet —</p>
+                    <p className={styles.placeholder}>✏️ Click to add your notes for this question</p>
                   )}
                 </div>
                 <button
@@ -202,7 +184,7 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
                   onClick={handleEditNotes}
                   aria-label="Edit notes"
                 >
-                  <FiEdit2 /> Edit
+                  <FiEdit2 className={styles.editIcon} />
                 </button>
               </>
             ) : (
@@ -213,28 +195,20 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
                   onChange={(e) => setTempNotes(e.target.value)}
                   rows={4}
                   autoFocus
-                  aria-label="Edit notes"
                 />
                 <div className={styles.buttonGroup}>
                   <button
                     className={`${styles.actionButton} ${styles.saveButton}`}
                     onClick={handleSaveNotes}
                     disabled={isSavingNotes}
-                    aria-label="Save notes"
                   >
-                    {isSavingNotes ? (
-                      <span className={styles.spinner} />
-                    ) : (
-                      <>
-                        <FiSave /> Save
-                      </>
-                    )}
+                    {isSavingNotes ? <span className={styles.spinner} /> : <FiSave />}
+                    Save
                   </button>
                   <button
                     className={`${styles.actionButton} ${styles.cancelButton}`}
                     onClick={handleCancelNotes}
                     disabled={isSavingNotes}
-                    aria-label="Cancel editing"
                   >
                     <FiX /> Cancel
                   </button>
@@ -244,9 +218,12 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
           </div>
         </div>
 
-        {/* Key Insights column */}
-        <div className={styles.column}>
-          <div className={styles.label}>
+        {/* Separator */}
+        <div className={styles.separator} />
+
+        {/* Key Insights Row */}
+        <div className={styles.row}>
+          <div className={styles.fieldLabel}>
             <FiZap className={styles.labelIcon} /> Key Insights
           </div>
           <div className={styles.fieldContainer}>
@@ -264,7 +241,7 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
                   {keyInsights.trim() ? (
                     <p className={styles.contentText}>{keyInsights}</p>
                   ) : (
-                    <p className={styles.placeholder}>— add key insights —</p>
+                    <p className={styles.placeholder}>⚡ Click to add key insights</p>
                   )}
                 </div>
                 <button
@@ -272,7 +249,7 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
                   onClick={handleEditKeyInsights}
                   aria-label="Edit key insights"
                 >
-                  <FiEdit2 /> Edit
+                  <FiEdit2 className={styles.editIcon} />
                 </button>
               </>
             ) : (
@@ -283,28 +260,20 @@ export const EditableNotes: React.FC<EditableNotesProps> = ({
                   onChange={(e) => setTempKeyInsights(e.target.value)}
                   rows={4}
                   autoFocus
-                  aria-label="Edit key insights"
                 />
                 <div className={styles.buttonGroup}>
                   <button
                     className={`${styles.actionButton} ${styles.saveButton}`}
                     onClick={handleSaveKeyInsights}
                     disabled={isSavingKeyInsights}
-                    aria-label="Save key insights"
                   >
-                    {isSavingKeyInsights ? (
-                      <span className={styles.spinner} />
-                    ) : (
-                      <>
-                        <FiSave /> Save
-                      </>
-                    )}
+                    {isSavingKeyInsights ? <span className={styles.spinner} /> : <FiSave />}
+                    Save
                   </button>
                   <button
                     className={`${styles.actionButton} ${styles.cancelButton}`}
                     onClick={handleCancelKeyInsights}
                     disabled={isSavingKeyInsights}
-                    aria-label="Cancel editing"
                   >
                     <FiX /> Cancel
                   </button>

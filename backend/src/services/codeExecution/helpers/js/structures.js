@@ -24,10 +24,71 @@ function deserializeLinkedList(arr) {
     return head;
 }
 
+/**
+ * Build a linked list from data that may include a cycle.
+ * The data can be:
+ *   - A plain array (fallback to deserializeLinkedList)
+ *   - An object with "list" (array) and "pos" (integer) keys
+ * If pos == -1, returns a linear list (no cycle).
+ * If pos is a valid index, creates a cycle from the tail to the node at pos.
+ */
+function deserializeCyclicLinkedList(data) {
+    if (!data) return null;
+    
+    // If it's a plain array, use the standard deserializer
+    if (Array.isArray(data)) {
+        return deserializeLinkedList(data);
+    }
+    
+    // If it's an object with "list" and "pos"
+    if (typeof data === 'object' && data !== null) {
+        const list = data.list;
+        const pos = data.pos;
+        
+        if (!Array.isArray(list) || pos === undefined) return null;
+        if (list.length === 0) return null;
+        
+        // Build linear list
+        const head = deserializeLinkedList(list);
+        if (!head) return null;
+        
+        // If pos == -1, return linear list (no cycle)
+        if (pos === -1) return head;
+        
+        // If pos out of bounds, return linear list
+        if (pos < 0 || pos >= list.length) return head;
+        
+        // Find tail
+        let tail = head;
+        while (tail.next) {
+            tail = tail.next;
+        }
+        
+        // Find node at position pos
+        let posNode = head;
+        for (let i = 0; i < pos; i++) {
+            if (posNode.next) {
+                posNode = posNode.next;
+            } else {
+                return head; // safety fallback
+            }
+        }
+        
+        // Create cycle
+        tail.next = posNode;
+        return head;
+    }
+    
+    return null;
+}
+
 function serializeLinkedList(head) {
     const res = [];
+    // To avoid infinite loops on cyclic lists, track visited nodes
+    const visited = new Set();
     let cur = head;
-    while (cur) {
+    while (cur && !visited.has(cur)) {
+        visited.add(cur);
         res.push(cur.val);
         cur = cur.next;
     }
@@ -282,6 +343,7 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         ListNode,
         deserializeLinkedList,
+        deserializeCyclicLinkedList,
         serializeLinkedList,
         TreeNode,
         deserializeTree,

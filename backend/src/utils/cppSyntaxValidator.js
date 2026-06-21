@@ -5,6 +5,10 @@
  * We explicitly use -std=c++14 to match the default standard used by
  * the OnlineCompiler.io provider (g++-15 default is pre-C++17).
  * This ensures that local validation catches C++17 features early.
+ *
+ * To avoid "undeclared identifier" errors for data structures like ListNode,
+ * we prepend the contents of structures.h (which defines all required types)
+ * before running the syntax check.
  */
 
 const { execSync } = require('child_process');
@@ -12,6 +16,26 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { prependCppAutoIncludes } = require('./autoImports');
+
+// Read and cache the structures header (defines ListNode, TreeNode, Node, etc.)
+const STRUCTURES_HEADER_PATH = path.join(
+  __dirname,
+  '../services/codeExecution/helpers/cpp/structures.h'
+);
+let structuresHeader = null;
+
+try {
+  structuresHeader = fs.readFileSync(STRUCTURES_HEADER_PATH, 'utf8');
+} catch (err) {
+  console.warn('[cppSyntaxValidator] Could not read structures.h:', err.message);
+  // Fallback to a minimal definition if the file is missing (should not happen in production)
+  structuresHeader = `
+    struct ListNode { int val; ListNode *next; ListNode() : val(0), next(nullptr) {} ListNode(int x) : val(x), next(nullptr) {} ListNode(int x, ListNode *next) : val(x), next(next) {} };
+    struct TreeNode { int val; TreeNode *left; TreeNode *right; TreeNode() : val(0), left(nullptr), right(nullptr) {} TreeNode(int x) : val(x), left(nullptr), right(nullptr) {} TreeNode(int x, TreeNode *left, TreeNode *right) : val(x), left(left), right(right) {} };
+    struct Node { int val; std::vector<Node*> neighbors; Node* next; Node* random; Node() : val(0), next(nullptr), random(nullptr) {} Node(int _val) : val(_val), next(nullptr), random(nullptr) {} Node(int _val, std::vector<Node*> _neighbors) : val(_val), neighbors(_neighbors), next(nullptr), random(nullptr) {} Node(int _val, Node* _next, Node* _random) : val(_val), next(_next), random(_random) {} };
+    class NestedInteger { private: int value; std::vector<NestedInteger> list; bool isInt; public: NestedInteger() : isInt(false) {} NestedInteger(int val) : value(val), isInt(true) {} bool isInteger() const { return isInt; } int getInteger() const { return value; } void setInteger(int val) { value = val; isInt = true; list.clear(); } void add(const NestedInteger& ni) { list.push_back(ni); } const std::vector<NestedInteger>& getList() const { return list; } };
+  `;
+}
 
 /**
  * Detect available C++ compiler.
@@ -32,7 +56,8 @@ function getCppCompiler() {
 
 /**
  * Validates C++ code syntax using the compiler's -fsyntax-only flag.
- * Auto-includes standard headers and using namespace std; if missing.
+ * Prepends the data structure definitions (structures.h) to the user's code,
+ * and also ensures standard includes and using namespace std; are present.
  * Forces -std=c++14 to align with the execution provider's default.
  *
  * @param {string} code - C++ source code
@@ -44,8 +69,11 @@ function validateCppSyntax(code) {
     return 'C++ compiler not found. Please install g++ or clang++ and ensure it is in PATH.';
   }
 
-  // Prepend auto-includes to ensure standard library types are recognized
-  const fullCode = prependCppAutoIncludes(code);
+  // 1. Add auto-includes (standard headers and using namespace std)
+  let fullCode = prependCppAutoIncludes(code);
+
+  // 2. Prepend the structures header to define ListNode, TreeNode, etc.
+  fullCode = structuresHeader + '\n\n' + fullCode;
 
   const tempFile = path.join(os.tmpdir(), `_syntax_check_${Date.now()}.cpp`);
   try {

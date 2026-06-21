@@ -246,6 +246,63 @@ static JsonValue serializeStringVector(const std::vector<std::string>& vec) {
     return JsonValue(res);
 }
 
+static std::vector<std::vector<std::string>> deserializeStringVectorVector(const JsonValue& val) {
+    std::vector<std::vector<std::string>> res;
+    if (!val.isArray()) return res;
+    for (const auto& elem : val.asArray()) {
+        res.push_back(deserializeStringVector(elem));
+    }
+    return res;
+}
+
+static JsonValue serializeStringVectorVector(const std::vector<std::vector<std::string>>& vec) {
+    std::vector<JsonValue> res;
+    for (const auto& inner : vec) {
+        res.push_back(serializeStringVector(inner));
+    }
+    return JsonValue(res);
+}
+
+static std::vector<char> deserializeCharVector(const JsonValue& val) {
+    std::vector<char> res;
+    if (!val.isArray()) return res;
+    for (const auto& elem : val.asArray()) {
+        if (elem.isString()) {
+            std::string s = elem.asString();
+            if (!s.empty()) res.push_back(s[0]);
+        } else if (elem.isNumber()) {
+            res.push_back((char)elem.asNumber());
+        }
+    }
+    return res;
+}
+
+static JsonValue serializeCharVector(const std::vector<char>& vec) {
+    std::vector<JsonValue> res;
+    for (char c : vec) {
+        std::string s(1, c);
+        res.push_back(JsonValue(s));
+    }
+    return JsonValue(res);
+}
+
+static std::vector<std::vector<char>> deserializeCharVectorVector(const JsonValue& val) {
+    std::vector<std::vector<char>> res;
+    if (!val.isArray()) return res;
+    for (const auto& row : val.asArray()) {
+        res.push_back(deserializeCharVector(row));
+    }
+    return res;
+}
+
+static JsonValue serializeCharVectorVector(const std::vector<std::vector<char>>& vec) {
+    std::vector<JsonValue> res;
+    for (const auto& row : vec) {
+        res.push_back(serializeCharVector(row));
+    }
+    return JsonValue(res);
+}
+
 static ListNode* deserializeListNode(const JsonValue& val) {
     if (!val.isArray()) return nullptr;
     auto arr = val.asArray();
@@ -259,9 +316,57 @@ static ListNode* deserializeListNode(const JsonValue& val) {
     return head;
 }
 
+/**
+ * Deserialize a linked list that may have a cycle.
+ * Expects the JsonValue to be an object with "list" and "pos" keys.
+ * If the JsonValue is a plain array, falls back to deserializeListNode.
+ */
+static ListNode* deserializeCyclicListNode(const JsonValue& val, int pos) {
+    // If it's a plain array, use the standard deserializer
+    if (val.isArray()) {
+        return deserializeListNode(val);
+    }
+    // If it's an object with "list" and "pos", handle it
+    if (!val.isObject()) return nullptr;
+    auto obj = val.asObject();
+    auto listIt = obj.find("list");
+    auto posIt = obj.find("pos");
+    if (listIt == obj.end() || posIt == obj.end()) return nullptr;
+    if (!listIt->second.isArray()) return nullptr;
+    if (!posIt->second.isNumber()) return nullptr;
+    int posVal = (int)posIt->second.asNumber();
+    
+    // Build linear list from the "list" array
+    auto arr = listIt->second.asArray();
+    if (arr.empty()) return nullptr;
+    ListNode* head = new ListNode((int)arr[0].asNumber());
+    ListNode* cur = head;
+    for (size_t i = 1; i < arr.size(); ++i) {
+        cur->next = new ListNode((int)arr[i].asNumber());
+        cur = cur->next;
+    }
+    // If pos == -1, return linear list
+    if (posVal == -1) return head;
+    // If pos out of bounds, return linear list
+    if (posVal < 0 || posVal >= (int)arr.size()) return head;
+    // Find tail and node at pos
+    ListNode* tail = head;
+    while (tail->next) tail = tail->next;
+    ListNode* posNode = head;
+    for (int i = 0; i < posVal; ++i) {
+        if (posNode->next) posNode = posNode->next;
+        else return head; // safety
+    }
+    tail->next = posNode;
+    return head;
+}
+
 static JsonValue serializeListNode(ListNode* head) {
     std::vector<JsonValue> res;
-    while (head) {
+    // To avoid infinite loops on cyclic lists, limit traversal to 1000 nodes or detect visited.
+    std::unordered_set<ListNode*> visited;
+    while (head && visited.find(head) == visited.end()) {
+        visited.insert(head);
         res.push_back(JsonValue((double)head->val));
         head = head->next;
     }

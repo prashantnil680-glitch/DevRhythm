@@ -409,9 +409,45 @@ static ListNode* deserializeListNode(const JsonValue& val) {
     return head;
 }
 
+static ListNode* deserializeCyclicListNode(const JsonValue& val, int pos) {
+    if (val.isArray()) {
+        return deserializeListNode(val);
+    }
+    if (!val.isObject()) return nullptr;
+    auto obj = val.asObject();
+    auto listIt = obj.find("list");
+    auto posIt = obj.find("pos");
+    if (listIt == obj.end() || posIt == obj.end()) return nullptr;
+    if (!listIt->second.isArray()) return nullptr;
+    if (!posIt->second.isNumber()) return nullptr;
+    int posVal = (int)posIt->second.asNumber();
+    
+    auto arr = listIt->second.asArray();
+    if (arr.empty()) return nullptr;
+    ListNode* head = new ListNode((int)arr[0].asNumber());
+    ListNode* cur = head;
+    for (size_t i = 1; i < arr.size(); ++i) {
+        cur->next = new ListNode((int)arr[i].asNumber());
+        cur = cur->next;
+    }
+    if (posVal == -1) return head;
+    if (posVal < 0 || posVal >= (int)arr.size()) return head;
+    ListNode* tail = head;
+    while (tail->next) tail = tail->next;
+    ListNode* posNode = head;
+    for (int i = 0; i < posVal; ++i) {
+        if (posNode->next) posNode = posNode->next;
+        else return head;
+    }
+    tail->next = posNode;
+    return head;
+}
+
 static JsonValue serializeListNode(ListNode* head) {
     std::vector<JsonValue> res;
-    while (head) {
+    std::unordered_set<ListNode*> visited;
+    while (head && visited.find(head) == visited.end()) {
+        visited.insert(head);
         res.push_back(JsonValue((double)head->val));
         head = head->next;
     }
@@ -598,12 +634,12 @@ static JsonValue serializeNestedInteger(const NestedInteger& ni) {
   }
 
   _generateExecutionCode(metadata) {
-    const { interactive, className, methodName, parameters, returnType, constructorParams, methods } = metadata;
+    const { interactive, className, constructorParams, methods } = metadata;
     if (interactive) {
       return this._generateInteractive(className, constructorParams, methods);
     } else {
-      const deserCode = this._generateDeserialization(parameters);
-      const callCode = this._generateStandardCall(className, methodName, parameters, returnType);
+      const deserCode = this._generateDeserialization(metadata.parameters);
+      const callCode = this._generateStandardCall(className, metadata.methodName, metadata.parameters, metadata.returnType);
       return { deserCode, callCode, interactiveMain: null };
     }
   }
@@ -615,10 +651,15 @@ static JsonValue serializeNestedInteger(const NestedInteger& ni) {
       let type = param.type;
       let normalized = type.replace(/[&*]/g, '').replace(/const/g, '').trim();
       normalized = normalized.replace(/\s+/g, ' ');
+      
+      // Check if this is a ListNode parameter
+      const isListNode = normalized.includes("ListNode");
       let expr = `argsArray[${i}]`;
 
-      // Order of checks: most specific first
-      if (normalized.includes("vector<vector<string>>")) {
+      if (isListNode) {
+        // For ListNode, check if it's an object with "list" and "pos"
+        expr = `deserializeCyclicListNode(argsArray[${i}], argsArray[${i}].isObject() ? (int)argsArray[${i}].asObject()["pos"].asNumber() : -1)`;
+      } else if (normalized.includes("vector<vector<string>>")) {
         expr = `deserializeStringVectorVector(argsArray[${i}])`;
       } else if (normalized.includes("vector<vector<char>>")) {
         expr = `deserializeCharVectorVector(argsArray[${i}])`;
@@ -630,8 +671,6 @@ static JsonValue serializeNestedInteger(const NestedInteger& ni) {
         expr = `deserializeStringVector(argsArray[${i}])`;
       } else if (normalized.includes("vector<int>")) {
         expr = `deserializeIntVector(argsArray[${i}])`;
-      } else if (normalized.includes("ListNode")) {
-        expr = `deserializeListNode(argsArray[${i}])`;
       } else if (normalized.includes("TreeNode")) {
         expr = `deserializeTreeNode(argsArray[${i}])`;
       } else if (normalized.includes("Node")) {
@@ -658,12 +697,9 @@ static JsonValue serializeNestedInteger(const NestedInteger& ni) {
     const argNames = parameters.map((_, i) => `arg${i}`).join(', ');
     const isVoid = returnType === "void";
 
-    // For void methods that modify the first parameter (TreeNode*, ListNode*, Node*)
-    // we need to serialise that parameter after the call.
     let voidSerialization = '';
     if (isVoid && parameters.length > 0) {
       const firstParamType = parameters[0].type;
-      // Normalize the type to detect custom structures
       let normalized = firstParamType.replace(/[&*]/g, '').replace(/const/g, '').trim();
       normalized = normalized.replace(/\s+/g, ' ');
       if (normalized.includes("TreeNode")) {
@@ -755,7 +791,7 @@ static JsonValue serializeNestedInteger(const NestedInteger& ni) {
         else if constexpr (std::is_same_v<T, bool>) return val.asBool();
         else if constexpr (std::is_same_v<T, std::string>) return val.asString();
         else if constexpr (std::is_same_v<T, char>) return (val.asString().empty() ? '\\0' : val.asString()[0]);
-        else if constexpr (std::is_same_v<T, ListNode*>) return deserializeListNode(val);
+        else if constexpr (std::is_same_v<T, ListNode*>) return deserializeCyclicListNode(val, val.isObject() ? (int)val.asObject()["pos"].asNumber() : -1);
         else if constexpr (std::is_same_v<T, TreeNode*>) return deserializeTreeNode(val);
         else if constexpr (std::is_same_v<T, Node*>) return deserializeNode(val);
         else if constexpr (std::is_same_v<T, NestedInteger>) return deserializeNestedInteger(val);

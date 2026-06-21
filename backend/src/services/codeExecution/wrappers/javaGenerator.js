@@ -70,6 +70,11 @@ class NestedInteger {
     }
   }
 
+  /**
+   * Generate Java deserialisation code for the given parameters.
+   * For ListNode parameters, we generate code that calls deserializeCyclicListNode,
+   * which handles both plain Lists and Maps with "list"/"pos".
+   */
   _generateDeserialization(parameters) {
     const lines = [];
     lines.push(`        if (argsArray.size() < ${parameters.length}) {`);
@@ -79,7 +84,18 @@ class NestedInteger {
       const param = parameters[i];
       const type = param.type;
       const typeStr = (typeof type === 'string') ? type : String(type);
-      const expr = this._deserializeExpression(typeStr, i);
+      
+      // Check if this is a ListNode parameter
+      const isListNode = typeStr.includes("ListNode");
+      let expr;
+      
+      if (isListNode) {
+        // For ListNode, use deserializeCyclicListNode which handles both List and Map
+        expr = `deserializeCyclicListNode(argsArray.get(${i}))`;
+      } else {
+        expr = this._deserializeExpression(typeStr, i);
+      }
+      
       lines.push(`        ${this._javaTypeCast(typeStr)} arg${i} = ${expr};`);
     }
     return lines.join('\n');
@@ -87,13 +103,10 @@ class NestedInteger {
 
   /**
    * Generate the correct Java expression to convert an Object from argsArray
-   * into the desired parameter type.
+   * into the desired parameter type (for non-ListNode types).
    */
   _deserializeExpression(typeStr, index) {
     // Custom data structures
-    if (typeStr.includes("ListNode")) {
-      return `deserializeListNode(argsArray.get(${index}))`;
-    }
     if (typeStr.includes("TreeNode")) {
       return `deserializeTreeNode(argsArray.get(${index}))`;
     }

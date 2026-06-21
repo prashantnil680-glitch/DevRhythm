@@ -70,10 +70,34 @@ def deserialize_linked_list(arr):
     for v in arr[1:]: cur.next = ListNode(v); cur = cur.next
     return head
 
+def deserialize_cyclic_linked_list(data, pos):
+    """Fallback implementation for cyclic linked list."""
+    if not data: return None
+    head = deserialize_linked_list(data)
+    if pos == -1:
+        return head
+    if pos < 0 or pos >= len(data):
+        return head
+    tail = head
+    while tail.next:
+        tail = tail.next
+    pos_node = head
+    for _ in range(pos):
+        if pos_node.next:
+            pos_node = pos_node.next
+        else:
+            return head
+    tail.next = pos_node
+    return head
+
 def serialize_linked_list(head):
     res = []
+    visited = set()
     cur = head
-    while cur: res.append(cur.val); cur = cur.next
+    while cur and id(cur) not in visited:
+        visited.add(id(cur))
+        res.append(cur.val)
+        cur = cur.next
     return res
 
 def deserialize_tree(arr):
@@ -258,6 +282,13 @@ class SortedSet:
     }
   }
 
+  /**
+   * Generate Python deserialisation code for the given parameters.
+   * For ListNode parameters, it generates code that handles both:
+   *   - A plain array (legacy) → deserialize_linked_list
+   *   - A dict with "list" and "pos" keys → deserialize_cyclic_linked_list
+   * For all other types, it uses the existing heuristics.
+   */
   _generateDeserialization(parameters) {
     if (!parameters.length) return '';
     const lines = [];
@@ -267,37 +298,34 @@ class SortedSet:
       const param = parameters[i];
       const paramName = param.name;
       const lowerName = (paramName || '').toLowerCase();
+      const baseType = this._getBaseType(param.type);
+
       let expr = `args[${i}]`;
 
-      if (lowerName === 'head' || lowerName === 'list') {
-        expr = `deserialize_linked_list(args[${i}]) if isinstance(args[${i}], list) else args[${i}]`;
-      } else if (lowerName === 'root' || lowerName === 'tree') {
+      // For ListNode parameters, use the conditional cyclic/linear logic
+      if (baseType === 'ListNode') {
+        expr = `deserialize_cyclic_linked_list(args[${i}].get("list"), args[${i}].get("pos")) if isinstance(args[${i}], dict) and "list" in args[${i}] and "pos" in args[${i}] else (deserialize_linked_list(args[${i}]) if isinstance(args[${i}], list) else args[${i}])`;
+      } else if (baseType === 'TreeNode') {
         expr = `deserialize_tree(args[${i}]) if isinstance(args[${i}], list) else args[${i}]`;
-      } else if (lowerName.includes('graph') || lowerName.includes('adj')) {
-        expr = `deserialize_graph(args[${i}]) if isinstance(args[${i}], list) else args[${i}]`;
-      } else if (lowerName === 'node' || lowerName === 'random') {
+      } else if (baseType === 'Node') {
         expr = `deserialize_node(args[${i}]) if isinstance(args[${i}], list) else args[${i}]`;
-      } else if (lowerName.includes('nested')) {
+      } else if (baseType === 'NestedInteger') {
         expr = `deserialize_nested_integer(args[${i}])`;
       } else {
-        const baseType = this._getBaseType(param.type);
-        switch (baseType) {
-          case 'ListNode':
-            expr = `deserialize_linked_list(args[${i}])`;
-            break;
-          case 'TreeNode':
-            expr = `deserialize_tree(args[${i}])`;
-            break;
-          case 'Node':
-            expr = `deserialize_node(args[${i}])`;
-            break;
-          case 'NestedInteger':
-            expr = `deserialize_nested_integer(args[${i}])`;
-            break;
-          default:
-            break;
+        // Fallback: use existing heuristics based on parameter name
+        if (lowerName === 'head' || lowerName === 'list') {
+          expr = `deserialize_linked_list(args[${i}]) if isinstance(args[${i}], list) else args[${i}]`;
+        } else if (lowerName === 'root' || lowerName === 'tree') {
+          expr = `deserialize_tree(args[${i}]) if isinstance(args[${i}], list) else args[${i}]`;
+        } else if (lowerName.includes('graph') || lowerName.includes('adj')) {
+          expr = `deserialize_graph(args[${i}]) if isinstance(args[${i}], list) else args[${i}]`;
+        } else if (lowerName === 'node' || lowerName === 'random') {
+          expr = `deserialize_node(args[${i}]) if isinstance(args[${i}], list) else args[${i}]`;
+        } else if (lowerName.includes('nested')) {
+          expr = `deserialize_nested_integer(args[${i}])`;
         }
       }
+
       lines.push(`        arg_${i} = ${expr}`);
     }
     return lines.join('\n');

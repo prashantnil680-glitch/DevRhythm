@@ -110,6 +110,7 @@ public class Structures {
     public static ListNode deserializeListNode(Object obj) {
         if (obj == null) return null;
         List<?> list = (List<?>) obj;
+        if (list.isEmpty()) return null;
         ListNode dummy = new ListNode(0);
         ListNode cur = dummy;
         for (Object val : list) {
@@ -119,11 +120,85 @@ public class Structures {
         return dummy.next;
     }
 
+    /**
+     * Deserialize a linked list that may have a cycle.
+     * Expects the input to be either:
+     *   - A plain List (fallback to deserializeListNode)
+     *   - A Map with "list" (List) and "pos" (Integer) keys
+     * If pos == -1, returns a linear list (no cycle).
+     * If pos is a valid index, creates a cycle from the tail to the node at pos.
+     */
+    public static ListNode deserializeCyclicListNode(Object obj) {
+        if (obj == null) return null;
+        
+        // If it's a plain List, fall back to linear deserialization
+        if (obj instanceof List) {
+            return deserializeListNode(obj);
+        }
+        
+        // If it's a Map with "list" and "pos"
+        if (obj instanceof Map) {
+            Map<?, ?> map = (Map<?, ?>) obj;
+            Object listObj = map.get("list");
+            Object posObj = map.get("pos");
+            
+            if (listObj == null || posObj == null) return null;
+            if (!(listObj instanceof List)) return null;
+            if (!(posObj instanceof Number)) return null;
+            
+            List<?> list = (List<?>) listObj;
+            int pos = ((Number) posObj).intValue();
+            
+            if (list.isEmpty()) return null;
+            
+            // Build linear list
+            ListNode dummy = new ListNode(0);
+            ListNode cur = dummy;
+            for (Object val : list) {
+                cur.next = new ListNode(((Number) val).intValue());
+                cur = cur.next;
+            }
+            ListNode head = dummy.next;
+            
+            // If pos == -1, return linear list (no cycle)
+            if (pos == -1) return head;
+            
+            // If pos out of bounds, return linear list
+            if (pos < 0 || pos >= list.size()) return head;
+            
+            // Find tail
+            ListNode tail = head;
+            while (tail.next != null) {
+                tail = tail.next;
+            }
+            
+            // Find node at position pos
+            ListNode posNode = head;
+            for (int i = 0; i < pos; i++) {
+                if (posNode.next != null) {
+                    posNode = posNode.next;
+                } else {
+                    return head; // safety fallback
+                }
+            }
+            
+            // Create cycle
+            tail.next = posNode;
+            return head;
+        }
+        
+        return null;
+    }
+
     public static Object serializeListNode(ListNode head) {
         List<Integer> list = new ArrayList<>();
-        while (head != null) {
-            list.add(head.val);
-            head = head.next;
+        // To avoid infinite loops on cyclic lists, track visited nodes by identity
+        Set<ListNode> visited = new HashSet<>();
+        ListNode cur = head;
+        while (cur != null && !visited.contains(cur)) {
+            visited.add(cur);
+            list.add(cur.val);
+            cur = cur.next;
         }
         return list;
     }

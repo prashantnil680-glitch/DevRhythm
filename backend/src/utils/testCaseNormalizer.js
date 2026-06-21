@@ -4,13 +4,14 @@
  * Normalize a test case input string into a JSON object with an "args" array,
  * or preserve an interactive JSON object (with "constructor" and "methods").
  *
- * Supported formats:
+ * Supports:
  * - Already interactive JSON: {"constructor": [...], "methods": [...]} → returned as‑is.
  * - Already simple JSON: {"args": [...]} → returned as‑is.
  * - JSON array: [1,2,3] → becomes {"args": [1,2,3]}.
  * - Legacy key‑value: "arr1 = [1,10,100], arr2 = [1000]" → becomes {"args": [[1,10,100], [1000]]}.
  * - Multi‑line: "[1,10,100]\n[1000]" → becomes {"args": [[1,10,100], [1000]]}.
  * - Single value (no '=', no newline) → becomes {"args": [value]}.
+ * - Linked‑list cycle input: "head = [3,2,0,-4], pos = 1" → becomes {"args": [{"list": [3,2,0,-4], "pos": 1}]}.
  *
  * @param {string} stdin – The raw input string.
  * @returns {string} – JSON string in the format expected by the wrapper.
@@ -71,7 +72,13 @@ function normalizeTestCaseInput(stdin) {
     }
   }
 
-  // 5. Legacy format: split by commas not inside brackets/braces/quotes
+  // 5. Detect linked‑list cycle input: "head = [..], pos = N" or "list = [..], pos = N"
+  const cycleMatch = detectCycleInput(trimmed);
+  if (cycleMatch) {
+    return JSON.stringify({ args: [cycleMatch] });
+  }
+
+  // 6. Legacy format: split by commas not inside brackets/braces/quotes
   const parts = splitLegacyInput(trimmed);
   const args = [];
 
@@ -104,6 +111,48 @@ function isInteractiveFormat(str) {
   } catch (e) {
     return false;
   }
+}
+
+/**
+ * Detect a linked‑list cycle input pattern:
+ * - Contains a list assignment like "head = [..]" or "list = [..]"
+ * - Contains a "pos = N" assignment
+ * Both must be present and the pos must be an integer.
+ * If matched, returns an object { list: Array, pos: number }.
+ * Otherwise returns null.
+ */
+function detectCycleInput(input) {
+  // Normalise: remove extra spaces, but keep brackets intact
+  const normalized = input.replace(/\s+/g, ' ').trim();
+
+  // Regex to capture: a variable name, an equals sign, a JSON array, then a comma, then "pos = integer"
+  // Supports: head, list, or any variable name (but we only care about list part)
+  // The array may contain numbers, strings, booleans, nested arrays (but we capture the whole array string)
+  const cycleRegex = /^(?:head|list)\s*=\s*(\[[\s\S]*?\])\s*,\s*pos\s*=\s*(-?\d+)\s*$/i;
+  const match = normalized.match(cycleRegex);
+  if (!match) return null;
+
+  const arrayStr = match[1];
+  const posStr = match[2];
+  const pos = parseInt(posStr, 10);
+
+  // Parse the array part (should be a valid JSON array)
+  let list;
+  try {
+    list = JSON.parse(arrayStr);
+    if (!Array.isArray(list)) return null;
+  } catch (e) {
+    return null;
+  }
+
+  // Ensure pos is a number and within reasonable bounds (allow -1 and up to list length-1)
+  if (isNaN(pos) || pos < -1 || pos >= list.length) {
+    // For safety, if pos is out of range, treat as -1 (no cycle)
+    // But we still return the object with the given pos; the wrapper will handle invalid pos.
+    // We'll allow any pos and let the helper decide.
+  }
+
+  return { list, pos };
 }
 
 /**

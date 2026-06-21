@@ -20,10 +20,59 @@ def deserialize_linked_list(arr: List[int]) -> Optional[ListNode]:
         curr = curr.next
     return head
 
+def deserialize_cyclic_linked_list(data, pos: int) -> Optional[ListNode]:
+    """
+    Build a linked list from a list and optionally create a cycle at the given position.
+    
+    Args:
+        data: List of integers representing node values.
+        pos: Index where the tail's next should point to create a cycle.
+             -1 means no cycle (linear list).
+             Any other valid index (0 <= pos < len(data)) creates a cycle.
+    
+    Returns:
+        The head of the linked list (possibly cyclic).
+    """
+    if not data:
+        return None
+
+    # Build the linear list
+    head = deserialize_linked_list(data)
+
+    # If pos == -1, return the linear list (no cycle)
+    if pos == -1:
+        return head
+
+    # If pos is out of bounds, return the linear list as a safety fallback
+    if pos < 0 or pos >= len(data):
+        return head
+
+    # Find the tail (last node)
+    tail = head
+    while tail.next:
+        tail = tail.next
+
+    # Find the node at the given position
+    pos_node = head
+    for _ in range(pos):
+        if pos_node.next:
+            pos_node = pos_node.next
+        else:
+            # Should not happen if pos is in bounds, but fallback to linear list
+            return head
+
+    # Create the cycle by pointing the tail's next to the node at pos
+    tail.next = pos_node
+
+    return head
+
 def serialize_linked_list(head: Optional[ListNode]) -> List[int]:
     res = []
     curr = head
-    while curr:
+    # To avoid infinite loops in cyclic lists, we track visited nodes (by id)
+    visited = set()
+    while curr and id(curr) not in visited:
+        visited.add(id(curr))
         res.append(curr.val)
         curr = curr.next
     return res

@@ -113,10 +113,8 @@ const handleSheetImport = async (job) => {
       scheduledAt: new Date(),
     });
 
-    // Invalidate caches
-    const { invalidateCache } = require('../../middleware/cache');
-    await invalidateCache('sheets:list:*');
-    await invalidateCache(`user:${userId}:sheets:*`);
+    // Invalidate caches using centralized method
+    await SheetService._invalidateSheetCaches(sheet._id, sheet.slug, userId);
 
     console.log(`[SheetImport] Successfully created sheet ${sheet.slug} for user ${userId} (matched: ${matched}, skipped: ${skipped})`);
   } catch (error) {

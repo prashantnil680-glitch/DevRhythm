@@ -1575,20 +1575,41 @@ class SheetService {
   }
 
   /**
-   * Invalidate all caches related to a sheet, including exact URL patterns.
+   * Invalidate all caches related to a sheet.
    * @param {ObjectId} sheetId
    * @param {string} slug
    * @param {string|null} userId - optional, for user-specific caches
    * @returns {Promise<void>}
    */
   static async _invalidateSheetCaches(sheetId, slug, userId = null) {
+    // Always invalidate public caches (non-user-specific)
     await invalidateCache(`sheet:${slug}:*`);
     await invalidateCache(`sheet:${sheetId}:*`);
     await invalidateCache('sheets:list:*');
     await invalidateCache(`sheet:/api/v1/sheets/${slug}*`);
+
+    // Invalidate public rank and participants caches
+    await invalidateCache(`sheet:rank:${slug}:*`);
+    await invalidateCache(`sheet:rank:${sheetId}:*`);
+    await invalidateCache(`sheet:participants:${slug}:*`);
+    await invalidateCache(`sheet:participants:${sheetId}:*`);
+
     if (userId) {
+      // Invalidate ALL user-specific sheet caches (broad but safe)
+      await invalidateCache(`sheet:user:${userId}:*`);
+
+      // Specific patterns for this sheet (slug and ID)
+      await invalidateCache(`sheet:user:${userId}:${slug}:*`);
+      await invalidateCache(`sheet:user:${userId}:${sheetId}:*`);
+
+      // URL-based pattern (already correct)
       await invalidateCache(`sheet:user:${userId}:/api/v1/sheets/${slug}*`);
+
+      // User's sheet list caches (both "mySheets" and general lists)
+      await invalidateCache(`sheets:list:user:${userId}:*`);
       await invalidateCache(`user:${userId}:sheets:*`);
+
+      // User's bookmarks list
       await invalidateCache(`sheets:bookmarks:user:${userId}:*`);
     }
   }

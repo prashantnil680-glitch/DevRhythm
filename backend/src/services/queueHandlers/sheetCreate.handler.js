@@ -57,9 +57,6 @@ const handleSheetCreate = async (job) => {
     });
 
     // Use partial resolution to get matched IDs and track progress
-    // resolveQuestionIdentifiersPartial returns { resolvedIds, unresolved }
-    // We will simulate progress by processing identifiers in batches? The existing method returns all at once.
-    // For progress, we can still set processed = total after resolution.
     const { resolvedIds, unresolved } = await SheetService.resolveQuestionIdentifiersPartial(questionIdentifiers);
     const matched = resolvedIds.length;
     const skipped = unresolved.length;
@@ -122,11 +119,8 @@ const handleSheetCreate = async (job) => {
       scheduledAt: new Date(),
     });
 
-    // Invalidate caches
-    const { invalidateCache } = require('../../middleware/cache');
-    await invalidateCache('sheets:list:*');
-    await invalidateCache(`user:${userId}:sheets:*`);
-    await invalidateCache(`sheet:${sheet.slug}:*`);
+    // Invalidate caches using centralized method
+    await SheetService._invalidateSheetCaches(sheet._id, sheet.slug, userId);
 
     console.log(`[SheetCreate] Successfully created sheet ${sheet.slug} for user ${userId} (matched: ${matched}, skipped: ${skipped})`);
   } catch (error) {
